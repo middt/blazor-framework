@@ -5,13 +5,13 @@ using Middt.Framework.Common.Email;
 using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.SignalR;
-using Middt.Template.Common.Service;
+using Middt.Sample.Common.Service;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mail;
 
-namespace Middt.Template.Api.Controllers
+namespace Middt.Sample.Api.Controllers
 {
     [ApiController]
     [Route("api/v{version:apiVersion}/[controller]")]

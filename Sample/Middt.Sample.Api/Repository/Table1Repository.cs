@@ -1,7 +1,7 @@
 ﻿using Middt.Framework.Common.Database;
-using Middt.Template.Api.Model.Database;
+using Middt.Sample.Api.Model.Database;
 
-namespace Middt.Template.Api.Repository
+namespace Middt.Sample.Api.Repository
 {
     public class Table1Repository : BaseCrudRepository<Table1, Frameworkv2Context>
     {

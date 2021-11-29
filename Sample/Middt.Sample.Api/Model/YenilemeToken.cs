@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Middt.Template.Api.Model
+namespace Middt.Sample.Api.Model
 {
     public partial class YenilemeToken
     {

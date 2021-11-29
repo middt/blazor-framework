@@ -2,7 +2,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace Middt.Template.Api.Model.Database
+namespace Middt.Sample.Api.Model.Database
 {
     [MetadataType(typeof(Table1SecureMetaData))]
     public partial class Table1Secure

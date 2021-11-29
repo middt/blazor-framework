@@ -1,6 +1,6 @@
 using System;
 
-namespace Middt.Template.Api;
+namespace Middt.Sample.Api;
 
 public class WeatherForecast
 {

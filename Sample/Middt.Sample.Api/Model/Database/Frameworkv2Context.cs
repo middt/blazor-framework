@@ -4,7 +4,7 @@ using Middt.UBKS.WebApi.config.Model;
 
 #nullable disable
 
-namespace Middt.Template.Api.Model.Database
+namespace Middt.Sample.Api.Model.Database
 {
     public partial class Frameworkv2Context : DbContext
     {

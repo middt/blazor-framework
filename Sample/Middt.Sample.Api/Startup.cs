@@ -10,7 +10,7 @@ using Middt.Framework.Model.Model.Authentication;
 using Middt.UBKS.WebApi.config.Helper;
 using Swashbuckle.AspNetCore.Filters;
 
-namespace Middt.Template.Api
+namespace Middt.Sample.Api
 {
 
     public class Startup : BaseApiStartup

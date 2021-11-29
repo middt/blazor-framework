@@ -1,7 +1,7 @@
 
 using Microsoft.AspNetCore.Builder;
 using Middt.Framework.Common.Licence;
-using Middt.Template.BlazorServer;
+using Middt.Sample.BlazorServer;
 using System;
 
 var builder = WebApplication.CreateBuilder(args);

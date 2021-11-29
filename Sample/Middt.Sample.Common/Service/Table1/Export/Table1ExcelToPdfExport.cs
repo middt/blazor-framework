@@ -1,6 +1,6 @@
 ﻿using Middt.Framework.Common.Export;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class Table1ExcelToPdfExport : BaseExcelToPdfExport
     {

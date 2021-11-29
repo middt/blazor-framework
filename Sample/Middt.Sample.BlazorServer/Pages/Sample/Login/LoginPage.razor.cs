@@ -5,7 +5,7 @@ using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Security.Refit;
 using Middt.Framework.Model.Authentication;
 
-namespace Middt.Template.BlazorServer.Pages.Sample.Login
+namespace Middt.Sample.BlazorServer.Pages.Sample.Login
 {
 
 

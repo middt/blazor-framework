@@ -2,12 +2,12 @@
 using Middt.Framework.Api;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
-using Middt.Template.Api.Model;
+using Middt.Sample.Api.Model;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 
-namespace Middt.Template.Api.Controllers
+namespace Middt.Sample.Api.Controllers
 {
     [ApiController]
     //[Route("api/[controller]")]

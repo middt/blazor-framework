@@ -1,4 +1,4 @@
-﻿namespace Middt.Template.Api.Helper
+﻿namespace Middt.Sample.Api.Helper
 {
     //public class DependencyHelper : BaseDependency
     //{

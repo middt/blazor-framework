@@ -1,4 +1,4 @@
-﻿namespace Middt.Template.BlazorServer.Model
+﻿namespace Middt.Sample.BlazorServer.Model
 {
     public class ThemeState
     {

@@ -3,15 +3,15 @@ using Microsoft.AspNetCore.Mvc;
 using Middt.Framework.Api;
 using Middt.Framework.Common.Export;
 using Middt.Framework.Common.Model.Data;
-using Middt.Template.Api.Model.Database;
-using Middt.Template.Api.Repository;
-using Middt.Template.Common.Service;
+using Middt.Sample.Api.Model.Database;
+using Middt.Sample.Api.Repository;
+using Middt.Sample.Common.Service;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
 
-namespace Middt.Template.Api.Controllers
+namespace Middt.Sample.Api.Controllers
 {
     [ApiController]
     //[Route("api/[controller]")]

@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Middt.Framework.Blazor.Web.Base;
 using Middt.Framework.Blazor.Web.Base.SignalR;
-using Middt.Template.BlazorServer.SignalR;
+using Middt.Sample.BlazorServer.SignalR;
 using System;
 
-namespace Middt.Template.BlazorServer.Pages.Sample.SignalR.Component
+namespace Middt.Sample.BlazorServer.Pages.Sample.SignalR.Component
 {
     public partial class TestSignalRComponent : BaseComponent
     {

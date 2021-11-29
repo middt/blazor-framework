@@ -1,12 +1,12 @@
 ﻿using RestEase;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
-using Middt.Template.Api.Model.Database;
+using Middt.Sample.Api.Model.Database;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Threading.Tasks;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public interface ITable1SecureService : IBaseCrudRefit<Table1Secure>
     {

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Middt.Template.BlazorServer.Model
+namespace Middt.Sample.BlazorServer.Model
 {
     public class MenuItem
     {

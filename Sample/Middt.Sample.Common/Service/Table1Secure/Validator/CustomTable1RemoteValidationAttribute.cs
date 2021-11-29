@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class CustomTable1RemoteValidationAttribute : ValidationAttribute
     {

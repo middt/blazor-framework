@@ -3,13 +3,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
 using Radzen.Blazor;
 using Middt.Framework.Common.Security;
-using Middt.Template.BlazorServer.Model;
-using Middt.Template.BlazorServer.Service;
+using Middt.Sample.BlazorServer.Model;
+using Middt.Sample.BlazorServer.Service;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Middt.Template.BlazorServer.Shared
+namespace Middt.Sample.BlazorServer.Shared
 {
     public partial class MainLayout : LayoutComponentBase
     {

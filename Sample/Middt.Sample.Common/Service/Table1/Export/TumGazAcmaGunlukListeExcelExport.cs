@@ -4,7 +4,7 @@ using Syncfusion.Drawing;
 using Syncfusion.XlsIO;
 using System.Data;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class TumGazAcmaGunlukListeExcelExport : BaseExcelExport
     {

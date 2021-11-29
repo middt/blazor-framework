@@ -3,7 +3,7 @@ using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Security.Refit;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class TokenService : BaseTokenService
     {

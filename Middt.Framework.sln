@@ -7,11 +7,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Model", "Fr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Common", "Framework\Common\Middt.Framework.Common\Middt.Framework.Common.csproj", "{E40F806C-425D-4800-87CF-7AE51D179739}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Template.Api", "Sample\Middt.Sample.Api\Middt.Template.Api.csproj", "{BB9D3172-FE34-4C85-82B2-F577DD4D28FE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Sample.Api", "Sample\Middt.Sample.Api\Middt.Sample.Api.csproj", "{BB9D3172-FE34-4C85-82B2-F577DD4D28FE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Template.BlazorServer", "Sample\Middt.Sample.BlazorServer\Middt.Template.BlazorServer.csproj", "{874252E7-8A58-42B3-B421-9D2776D7FE87}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Sample.BlazorServer", "Sample\Middt.Sample.BlazorServer\Middt.Sample.BlazorServer.csproj", "{874252E7-8A58-42B3-B421-9D2776D7FE87}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Template.Common", "Sample\Middt.Sample.Common\Middt.Template.Common.csproj", "{F7E48BFF-81ED-41A2-A96D-45B2005299BE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Sample.Common", "Sample\Middt.Sample.Common\Middt.Sample.Common.csproj", "{F7E48BFF-81ED-41A2-A96D-45B2005299BE}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Framework", "Framework", "{26622C5A-146B-4421-B44F-698B0476B826}"
 EndProject

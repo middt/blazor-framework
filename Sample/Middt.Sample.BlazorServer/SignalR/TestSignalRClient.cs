@@ -3,7 +3,7 @@ using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.SignalR;
 
-namespace Middt.Template.BlazorServer.SignalR
+namespace Middt.Sample.BlazorServer.SignalR
 {
     public class TestSignalRClient : BaseSignalRClient<string>
     {

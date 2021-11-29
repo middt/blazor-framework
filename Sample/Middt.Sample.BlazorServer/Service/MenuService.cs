@@ -1,9 +1,9 @@
-﻿using Middt.Template.BlazorServer.Model;
+﻿using Middt.Sample.BlazorServer.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Middt.Template.BlazorServer.Service
+namespace Middt.Sample.BlazorServer.Service
 {
     public class MenuService
     {

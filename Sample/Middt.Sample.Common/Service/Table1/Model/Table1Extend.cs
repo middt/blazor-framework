@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Middt.Template.Api.Model.Database
+namespace Middt.Sample.Api.Model.Database
 {
     [MetadataType(typeof(Table1MetaData))]
     public partial class Table1 : BaseRequestModel

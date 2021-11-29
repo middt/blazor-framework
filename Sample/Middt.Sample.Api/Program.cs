@@ -1,7 +1,7 @@
 
 using Microsoft.AspNetCore.Builder;
 using Middt.Framework.Common.Licence;
-using Middt.Template.Api;
+using Middt.Sample.Api;
 using System;
 
 var builder = WebApplication.CreateBuilder(args);

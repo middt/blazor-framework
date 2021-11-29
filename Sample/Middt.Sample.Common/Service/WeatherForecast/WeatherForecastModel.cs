@@ -1,7 +1,7 @@
 ﻿using Middt.Framework.Common.Model.Data;
 using System;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class WeatherForecastModel : BaseRequestModel
     {

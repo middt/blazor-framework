@@ -49,7 +49,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Framework\Web\Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj" />
-    <ProjectReference Include="..\Middt.Sample.Common\Middt.Template.Common.csproj" />
+    <ProjectReference Include="..\Middt.Sample.Common\Middt.Sample.Common.csproj" />
   </ItemGroup>
 
 </Project>

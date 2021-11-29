@@ -1,13 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Middt.Framework.Api;
 using Middt.Framework.Common.Model.Data;
-using Middt.Template.Api.Model.Database;
-using Middt.Template.Api.Repository;
+using Middt.Sample.Api.Model.Database;
+using Middt.Sample.Api.Repository;
 //using Syncfusion.DocIO;
 //using Syncfusion.DocIO.DLS;
 using System.Collections.Generic;
 
-namespace Middt.Template.Api.Controllers
+namespace Middt.Sample.Api.Controllers
 {
     [ApiController]
     //[Route("api/[controller]")]

@@ -1,4 +1,4 @@
-﻿namespace Middt.Template.Common
+﻿namespace Middt.Sample.Common
 {
     public interface ITest
     {

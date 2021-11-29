@@ -3,11 +3,11 @@ using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Service;
-using Middt.Template.Api.Model.Database;
+using Middt.Sample.Api.Model.Database;
 using System.Collections.Generic;
 using System.Dynamic;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class Table1SecureService : BaseCrudRefit<ITable1SecureService, Table1Secure>
     {

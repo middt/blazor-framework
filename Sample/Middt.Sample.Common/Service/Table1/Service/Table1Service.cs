@@ -2,9 +2,9 @@
 using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Service;
-using Middt.Template.Api.Model.Database;
+using Middt.Sample.Api.Model.Database;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public class Table1Service : BaseCrudRefit<ITable1Service, Table1>
     {

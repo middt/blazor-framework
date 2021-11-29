@@ -1,6 +1,6 @@
 ﻿using Middt.Framework.Common.Service;
 
-namespace Middt.Template.Common.Service
+namespace Middt.Sample.Common.Service
 {
     public interface IWeatherForecastService : IBaseCrudRefit<WeatherForecastModel>
     {

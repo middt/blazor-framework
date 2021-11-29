@@ -19,7 +19,7 @@
       "ancmHostingModel": "OutOfProcess",
       "nativeDebugging": false
     },
-    "Middt.Template.Api": {
+    "Middt.Sample.Api": {
       "commandName": "Project",
       "launchBrowser": true,
       "launchUrl": "weatherforecast",

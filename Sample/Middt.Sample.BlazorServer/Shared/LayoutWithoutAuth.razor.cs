@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Radzen.Blazor;
-using Middt.Template.BlazorServer.Model;
+using Middt.Sample.BlazorServer.Model;
 
-namespace Middt.Template.BlazorServer.Shared
+namespace Middt.Sample.BlazorServer.Shared
 {
     public partial class LayoutWithoutAuth : LayoutComponentBase
     {

@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Middt.Framework.Blazor.Web.Base.Page;
-using Middt.Template.Api.Model.Database;
-using Middt.Template.Common.Service;
+using Middt.Sample.Api.Model.Database;
+using Middt.Sample.Common.Service;
 using System;
 
-namespace Middt.Template.BlazorServer.Pages.Sample.CRUD
+namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
 {
     [Authorize]
     public partial class ListRadzenSamplePage : BaseListPageCode<Table1SecureService, ITable1SecureService, Table1Secure>

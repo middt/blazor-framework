@@ -3,7 +3,7 @@ using Middt.Framework.Common.Validation;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace Middt.Template.Api.Model.Database
+namespace Middt.Sample.Api.Model.Database
 {
     public class Table1SecureMetaData
     {

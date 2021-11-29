@@ -1,8 +1,8 @@
 ﻿using Middt.Framework.Blazor.Web.Base.Page;
-using Middt.Template.Api.Model.Database;
-using Middt.Template.Common.Service;
+using Middt.Sample.Api.Model.Database;
+using Middt.Sample.Common.Service;
 
-namespace Middt.Template.BlazorServer.Pages.Sample.CRUD
+namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
 {
     public partial class DetailSamplePage : BaseDetailPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
     {

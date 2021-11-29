@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Middt.Template.Api.Model.Database
+namespace Middt.Sample.Api.Model.Database
 {
 
     public partial class Table1Secure : BaseRequestModel

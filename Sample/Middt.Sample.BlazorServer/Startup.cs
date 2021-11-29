@@ -9,13 +9,13 @@ using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Notification;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Security.Refit;
-using Middt.Template.BlazorServer.config.Helper;
-using Middt.Template.BlazorServer.Model;
-using Middt.Template.BlazorServer.Service;
-using Middt.Template.BlazorServer.SignalR;
-using Middt.Template.Common.Service;
+using Middt.Sample.BlazorServer.config.Helper;
+using Middt.Sample.BlazorServer.Model;
+using Middt.Sample.BlazorServer.Service;
+using Middt.Sample.BlazorServer.SignalR;
+using Middt.Sample.Common.Service;
 using Syncfusion.Blazor;
-namespace Middt.Template.BlazorServer
+namespace Middt.Sample.BlazorServer
 {
     public class Startup : BaseBlazorStartup
     {

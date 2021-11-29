@@ -3,12 +3,12 @@ using Radzen.Blazor;
 using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Model;
-using Middt.Template.Api.Model.Database;
-using Middt.Template.Common.Service;
+using Middt.Sample.Api.Model.Database;
+using Middt.Sample.Common.Service;
 using System.Collections.Generic;
 using System.Dynamic;
 
-namespace Middt.Template.BlazorServer.Pages.Sample.CRUD
+namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
 {
     public class RadzenColumn
     {
