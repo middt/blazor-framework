@@ -1,3 +1,5 @@
+using System;
+
 namespace Suges.Template.Api;
 
 public class WeatherForecast
