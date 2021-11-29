@@ -1,0 +1,41 @@
+﻿
+@page "/DetailSamplePage"
+
+@inherits BaseDetailPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
+
+
+@using Suges.Framework.Blazor.Web.Base
+@using Suges.Framework.Blazor.Web.Base.Page;
+@using Suges.Template.Common.Service
+@using Suges.Template.Api.Model.Database;
+
+ 
+
+
+<BaseDetailPage
+TService="Table1SecureService"
+TInterface="ITable1SecureService"
+TModel="Table1Secure"
+QueryStringID="ID"
+GetMethod="GetFirmaByFirmaID"
+
+@ref="baseDetailPage">
+    <DetailContent>
+            <table class="table">
+        <thead>
+            <tr>
+                <th>Ad</th>
+                <th>BoolDeger</th>
+                <th>Tarih</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>@Model.Ad</td>
+                <td>@Model.BoolDeger</td>
+                <td>@Model.Tarih?.ToShortDateString()</td>
+            </tr>
+        </tbody>
+    </table>
+    </DetailContent>
+</BaseDetailPage>

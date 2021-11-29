@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Company>SuBilgi Teknolojileri</Company>
+		<Product>Suges Framework Common</Product>
+
+
+
+		<IsPackable>true</IsPackable>
+
+		
+		<VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
+		<AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
+		<AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>
+		<Version Condition=" '$(VersionSuffix)' == '' ">0.0.1.0</Version>
+		<Version Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</Version>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="EFCore.BulkExtensions" Version="6.0.4" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="6.0.0" />
+		<PackageReference Include="Polly" Version="7.2.2" />
+		<PackageReference Include="RestEase" Version="1.5.5" />
+		<PackageReference Include="Syncfusion.DocIO.Net.Core" Version="18.4.0.49" />
+		<PackageReference Include="Syncfusion.DocIORenderer.Net.Core" Version="18.4.0.49" />
+		<PackageReference Include="Syncfusion.Licensing" Version="18.4.0.49" />
+		<PackageReference Include="Syncfusion.XlsIO.Net.Core" Version="18.4.0.49" />
+		<PackageReference Include="Syncfusion.XlsIORenderer.Net.Core" Version="18.4.0.49" />
+		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.2.14" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Suges.NetCore.Model\Suges.Framework.Model.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+﻿@inherits Suges.Framework.Blazor.Web.Base.BaseAuthorizeComponent
+
+@Display
+
+@code {
+    [Parameter]
+    public RenderFragment Authorized { get; set; }
+    [Parameter]
+    public RenderFragment NotAuthorized { get; set; }
+
+    public RenderFragment Display { get; set; }
+
+    protected override void CustomOnAfterRenderAsync(bool firstRender)
+    {
+        base.CustomOnAfterRenderAsync(firstRender);
+
+        //if(firstRender)
+        //{
+        if (IsAuthenticated)
+            Display = Authorized;
+        else
+            Display = NotAuthorized;
+        //}
+    }
+}

@@ -1,0 +1,50 @@
+﻿
+@inherits Suges.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+@using Suges.Framework.Common.Model.Data
+
+<BaseModal Title="@Title" @ref="baseModal" IsFullScreen="@IsFullScreen" Width="@Width" Height="@Height" ModalName="Crud" ShowClose="@ShowClose">
+    <ChildContent>
+        @if (Model != null)
+        {
+        <EditForm Model="@Model" OnValidSubmit="@Save">
+            <DataAnnotationsValidator />
+            @ChildContent
+
+
+            <div class="row top-space">
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                    <button type="reset" class="btn btn-secondary" data-dismiss="modal" @onclick="() => Close()">İptal</button>
+                </div>
+            </div>
+        </EditForm>
+        }
+    </ChildContent>
+    <FooterContent>
+        @FooterContent
+    </FooterContent>
+</BaseModal>
+@code{
+        public BaseModal baseModal { get; set; }
+        [Parameter]
+        public Action OnSave { get; set; }
+        public void Save()
+        {
+            OnSave?.Invoke();
+        }
+
+        public BaseRequestModel Model { get; set; }
+
+        public void Open(BaseRequestModel model)
+        {
+            Model = model;
+
+            baseModal.Open();
+        }
+
+        public void Close()
+        {
+            baseModal.Close();
+            OnClose?.Invoke(string.Empty);
+        }
+}

@@ -1,0 +1,61 @@
+﻿@inherits BaseComponent
+
+@using Radzen.Blazor
+@using Suges.Framework.Blazor.Web.Base
+@using Radzen
+
+       @if (Count > 0)
+{
+    <div class="rz-paginator rz-unselectable-text rz-helper-clearfix rz-paginator-bottom">
+        @if (CurrentPage == 1)
+        {
+            <span class="rz-paginator-first rz-paginator-element rz-state-disabled">
+                <span class="rz-paginator-icon rzi rzi-step-backward"></span>
+            </span>
+            <span class="rz-paginator-prev rz-paginator-element rz-state-disabled">
+                <span class="rz-paginator-icon rzi rzi-caret-left"></span>
+            </span>
+        }
+        else
+        {
+            <span class="rz-paginator-first rz-paginator-element">
+                <span class="rz-paginator-icon rzi rzi-step-backward" @onclick="() => GotoPage(1)"></span>
+            </span>
+            <span class="rz-paginator-prev rz-paginator-element">
+                <span class="rz-paginator-icon rzi rzi-caret-left" @onclick="() => Previous()"></span>
+            </span>
+        }
+        Sayfa @CurrentPage / @TotalPage
+        <RadzenDropDown TValue="int"
+                    Style="width:75px"
+                    @bind-Value=@CurrentPage
+                    Data=@PageList
+                    Change=@(args => GotoPage(Convert.ToInt32(args))) />
+         Gösterilecek Kayıt Sayısı:
+        <RadzenDropDown TValue="int"
+                    Style="width:75px"
+                    @bind-Value=@PageSize
+                    Data=@PageSizeList
+                    Change=@(args => ChangeRecordSize()) />
+        @if (CurrentPage == TotalPage)
+        {
+            <span class="rz-paginator-next rz-paginator-element rz-state-disabled">
+                <span class="rz-paginator-icon rzi rzi-caret-right"></span>
+            </span>
+            <span class="rz-paginator-last rz-paginator-element rz-state-disabled">
+                <span class="rz-paginator-icon rzi rzi-step-forward">
+                </span>
+            </span>
+        }
+        else
+        {
+            <span class="rz-paginator-next rz-paginator-element">
+                <span class="rz-paginator-icon rzi rzi-caret-right" @onclick="() => Next()"></span>
+            </span>
+            <span class="rz-paginator-last rz-paginator-element">
+                <span class="rz-paginator-icon rzi rzi-step-forward" @onclick="() => GotoPage(TotalPage)">
+                </span>
+            </span>
+        }
+    </div>
+}

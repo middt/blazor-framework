@@ -1,0 +1,5 @@
+.\nuget.exe sources Add -Name "SugesFrameworkv2" -Source "https://kolingroup.pkgs.visualstudio.com/_packaging/SugesFrameworkv2/nuget/v3/index.json"
+
+
+dotnet pack -c release -o D:\Projects\Middt\Framework\NugetSuges\Package
+.\nuget.exe push D:\Projects\SugesFrameworkv2\NugetSuges\Package\*.nupkg -Source https://subilgi.pkgs.visualstudio.com/_packaging/NugetSuges/nuget/v3/index.json -ApiKey az

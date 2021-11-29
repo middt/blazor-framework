@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	  <TargetFramework>net6.0</TargetFramework>
+    <Version>1.0.23</Version>
+    <Company>SuBilgi Teknolojileri</Company>
+    <Product>Suges Framework</Product>
+    <AssemblyVersion>1.0.13.0</AssemblyVersion>
+    <FileVersion>1.0.13.0</FileVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Polly" Version="7.2.2" />
+    <PackageReference Include="RestEase" Version="1.5.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Suges.NetCore.Common\Suges.Framework.Common.csproj" />
+    <ProjectReference Include="..\Suges.NetCore.Model\Suges.Framework.Model.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Service\TableHistory\Service\" />
+  </ItemGroup>
+
+</Project>

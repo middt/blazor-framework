@@ -1,0 +1,54 @@
+﻿@inherits BaseListPageComponentClass<TService, TInterface, TModel>
+
+@using Suges.Framework.Blazor.Web.Base.Page;
+@using Suges.Framework.Blazor.Web.Base
+@using Suges.Framework.Common.Model.Data
+@using Suges.Framework.Common.Service
+@using Suges.Framework.Model.Model.Enumerations
+
+@using Suges.Framework.Blazor.Web.Base.Component.Modal;
+@using Radzen.Blazor;
+@using Suges.Framework.Blazor.Web.Base.Component.Pagination;
+
+@typeparam TService where TService : BaseListRefit<TInterface, TModel>
+@typeparam TInterface where TInterface : IBaseListRefit<TModel>
+@typeparam TModel where TModel : BaseRequestModel, new()
+
+@if (SearchContent != null && !HideSearch)
+{
+
+    <RadzenCard>
+        <EditForm Model="@SearchRequestModel">
+            <div class="row" style="margin-top:10px;">
+                @SearchContent
+            </div>
+            @if (!HideSearchButton)
+            {
+                <div class="row" style="margin-top:10px;">
+                    <div class="col-lg-5">
+                    <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
+                    <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+
+                </div>
+            </div>
+            }
+        </EditForm>
+    </RadzenCard>
+}
+<br />
+
+
+<RadzenGrid 
+AllowColumnResize="true" 
+@ref="radzenGrid"
+            TItem=TModel
+style="height: 500px">
+    <Columns>
+        @ListContent
+    </Columns>
+</RadzenGrid>
+<BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
+</BasePaginationComponent>
+
+<BaseLoadingModal @ref="LoadingModal">
+</BaseLoadingModal>
