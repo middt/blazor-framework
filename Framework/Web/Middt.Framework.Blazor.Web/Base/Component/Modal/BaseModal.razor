@@ -1,0 +1,67 @@
+﻿@inherits Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+
+@using Radzen;
+
+<style>
+    .modal {
+    text-align: center;
+    padding: 1%;
+     z-index: 3;
+    }
+    .modal-dialog {
+    text-align: left; /* you'll likely want this */
+    max-width: 100%;
+    width: auto !important;
+    display: inline-block;
+    }
+    .modal-backdrop {
+    z-index: 2;
+    }
+    .top-space { margin-top:20px; }
+</style>
+@code {
+    [Inject]
+    DialogService DialogService { get; set; }
+
+    protected override void OpenModal()
+    {
+        DialogOptions dialogOptions = new DialogOptions();
+        dialogOptions.ShowClose = ShowClose;
+        dialogOptions.ShowTitle = ShowTitle;
+
+
+        if (IsFullScreen)
+        {
+            dialogOptions.Width = "90%";
+            dialogOptions.Height = "90%";
+        }
+        else
+        {
+            if (!string.IsNullOrEmpty(Width))
+                dialogOptions.Width = Width;
+
+            if (!string.IsNullOrEmpty(Height))
+                dialogOptions.Width = Height;
+
+            if (!string.IsNullOrEmpty(Style))
+                dialogOptions.Style = Style;
+        }
+
+        DialogService.Open(Title, ds => ChildContent, dialogOptions);
+        //DialogService.OnClose += DialogService_OnClose;
+    }
+
+    //private void DialogService_OnClose(dynamic obj)
+    //{
+    //    OnClose?.Invoke(ModalName);
+    //    DialogService.OnClose -= DialogService_OnClose;
+
+    //}
+
+    protected override void CloseModal()
+    {
+        DialogService.Close();
+        OnClose?.Invoke(ModalName);
+
+    }
+}

@@ -1,0 +1,34 @@
+﻿@page "/"
+@*@layout LayoutWithoutAuth*@
+@inherits BasePageComponent
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Framework.Blazor.Web.Base.Component.Captcha
+@using Middt.Framework.Blazor.Web.Base.Component.Security
+
+<button style="color:deepskyblue" @onclick="(async()=> { WordTemplate(); })">Word Template</button>
+<button style="color:deepskyblue" @onclick="(async()=> { WordToPdfTemplate(); })">Word to PDF Template</button>
+
+<br/>
+<br/>
+<br/>
+<button style="color:deepskyblue" @onclick="(async()=> { ExcelTemplate(); })">Excel Template</button>
+<button style="color:deepskyblue" @onclick="(async()=> { ExcelToPdfTemplate(); })">Excel to PDF Template</button>
+<br/>
+<br/>
+<br/>
+
+<BaseAuthorizeView>
+    <Authorized>
+        ---- Authorize ---
+        <RadzenTextBox @oninput=@(args => CaptchaChange(args.Value.ToString())) Style="height:40px;width:180px;" />
+
+        <BaseCaptcha @ref="baseCaptcha" CharNumber="4" Height="40" Width="150" />
+        <span> - @isValid - </span>
+        @*<span> Expire In - @ExpireIn - </span>*@
+    </Authorized>
+    <NotAuthorized>
+        <ReditectToLogin></ReditectToLogin>
+    </NotAuthorized>
+</BaseAuthorizeView>
+

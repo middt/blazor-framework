@@ -1,0 +1,41 @@
+﻿@inherits BaseComponent
+@using Middt.Framework.Blazor.Web.Base
+@using  Middt.Framework.Common.SignalR
+
+@typeparam TSignalRClient  where TSignalRClient : BaseSignalRClient<TModel>
+@typeparam TModel
+
+@Content
+
+@code{
+
+        [Parameter]
+        public RenderFragment Content { get; set; }
+
+        [Inject]
+        public TSignalRClient SignalRClient { get; set; }
+
+        public Action<TModel> OnReceive { get; set; }
+
+        public TModel Model { get; set; }
+
+        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        {
+            base.CustomOnAfterRenderAsync(firstRender);
+
+
+            if (firstRender)
+            {
+                SignalRClient.OnReceive += (TModel model) =>
+                {
+                    DefaultValue(model);
+                    OnReceive?.Invoke(model);
+                };
+            }
+        }
+
+        public void DefaultValue(TModel model)
+        {
+            Model = model;
+        }
+}

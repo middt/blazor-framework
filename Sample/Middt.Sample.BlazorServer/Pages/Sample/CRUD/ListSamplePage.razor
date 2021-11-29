@@ -1,0 +1,70 @@
+﻿@page "/ListSamplePage"
+@inherits BaseListPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
+
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Template.Common.Service
+@using Middt.Template.Api.Model.Database;
+@using Framework.Model.Model.Enumerations;
+@using Middt.Framework.Blazor.Web.Base.Component.Security
+
+
+@*<BaseAuthorizeView Roles='new List<string>() {"2"}'>*@
+
+    <BaseAuthorizeView>
+        <Authorized>
+            @*@baseTokenHelper.Username*@
+            <BaseListPage TService="Table1SecureService"
+                          TInterface="ITable1SecureService"
+                          TModel="Table1Secure"
+                          SearchMethod="GetRandevuByFirmaID"
+                          @ref="baseListPage" PageSize=3>
+                <SearchContent>
+
+                    <RadzenButton Click="@(args => Search())" Style="float:left">Listele</RadzenButton>
+                    @if (@ExcelDisable == false)
+                    {
+                        <RadzenButton Click="@(args => Search())" Style="float:left">excel Fake</RadzenButton>
+                    }
+
+                </SearchContent>
+
+                <ListContent>
+                    @if (
+               SearchResultModel != null
+              && SearchResultModel.Result == ResultEnum.Success
+              && SearchResultModel.Data != null
+              && SearchResultModel.Data.Count > 0)
+                    {
+
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Ad</th>
+                                    <th>BoolDeger</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var table1 in SearchResultModel.Data)
+                                {
+                                    <tr>
+                                        <td>@table1.Ad</td>
+                                        <td>@table1.BoolDeger</td>
+                                        <td>@table1.Tarih?.ToShortDateString()</td>
+                                        <td><a href="/table1detail/@table1.Table1Id">Detay</a></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+
+                    }
+                </ListContent>
+            </BaseListPage>
+        </Authorized>
+        <NotAuthorized>
+            <ReditectToLogin></ReditectToLogin>
+        </NotAuthorized>
+    </BaseAuthorizeView>
+

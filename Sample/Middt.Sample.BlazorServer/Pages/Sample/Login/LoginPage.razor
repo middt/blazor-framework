@@ -1,0 +1,56 @@
+﻿@page "/login"
+@layout LayoutWithoutAuth
+@inherits BasePageComponent
+
+@using Middt.Framework.Blazor.Web.Base.Page
+@using Middt.Framework.Blazor.Web.Base.Component.Modal
+@using System.Security.Claims
+@using Middt.Framework.Blazor.Web.Base.Component.Captcha
+@using Middt.Framework.Blazor.Web.Base.Component.Security
+
+
+@*<AuthorizeView>
+    <NotAuthorized>*@
+        <EditForm Model="loginRequestModel" Context="formContext">
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                </div>
+                <div class="col-lg-4 mb-4">
+                    <RadzenCard style="height: 100%;margin-bottom:1rem">
+                        <h4>Login</h4>
+                        <p>
+                            <RadzenTextBox @bind-Value="loginRequestModel.username" Placeholder="Username" />
+                        </p>
+                        <p>
+                            <RadzenPassword @bind-Value="loginRequestModel.password" Placeholder="Password" />
+                        </p>
+                        <p>
+                               <RadzenTextBox @oninput=@(args => CaptchaChange(args.Value.ToString())) Style="height:40px;width:180px;" />
+
+        <BaseCaptcha @ref="baseCaptcha" CharNumber="4" Height="40" Width="150" />
+                        </p>
+                        <p>
+                            <RadzenButton Click="@(args => LoginSite())" Text="Button" Style="margin-bottom: 20px; width: 150px" />
+                        </p>
+                    </RadzenCard>
+                </div>
+                <div class="col-lg-4 mb-4">
+                </div>
+            </div>
+        </EditForm>
+    @*</NotAuthorized>
+</AuthorizeView>*@
+<BaseLoadingModal @ref="LoadingModal">
+</BaseLoadingModal>
+
+
+@*<AuthorizeView Roles="1">
+    <Authorized>
+        <RadzenButton Click="@GetData" Text="GetData"></RadzenButton>
+        <button @onclick="() => LogoutSite()">Logout</button>
+        <h1>Hello, @context.User.Identity.Name!</h1>
+        The user: @context.User.FindFirst(ClaimTypes.Name).Value is authorized
+        <br />
+        <button @onclick="() => GetData()">GetData</button>
+    </Authorized>
+</AuthorizeView>*@

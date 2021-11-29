@@ -1,0 +1,113 @@
+﻿@page "/ListCrudSamplePage"
+@inherits BaseListCrudPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Template.Common.Service
+@using Middt.Template.Api.Model.Database;
+
+@using Middt.Framework.Blazor.Web.Base.Component.FileUpload;
+@using Middt.Framework.Model.Model.Enumerations
+
+
+<BaseListCrudPage ModalTitle="Ekle/Güncelle"
+                  TService="Table1SecureService"
+                  TInterface="ITable1SecureService"
+                  TModel="Table1Secure"
+                  @ref="baseListCrudPage">
+    <SearchContent>
+        <div class="row top-space">
+            <InputText id="name" @bind-Value="SearchRequestModel.RequestModel.Ad" class="form-control" />
+        </div>
+    </SearchContent>
+    <ListContent>
+        @if (
+       SearchResultModel != null
+      && SearchResultModel.Result == ResultEnum.Success
+      && SearchResultModel.Data != null
+      && SearchResultModel.Data.Count > 0)
+        {
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Ad</th>
+                        <th>BoolDeger</th>
+                        <th>Tarih</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var table1 in SearchResultModel.Data)
+                    {
+                        <tr>
+                            <td>@table1.Ad</td>
+                            <td>@table1.BoolDeger</td>
+                            <td>@table1.Tarih?.ToShortDateString()</td>
+                            <td><a href="/table1detail/@table1.Table1Id">Detay</a></td>
+
+                            @*<td><RadzenButton Click="() => Edit(table1)" Icon="edit" /></td>*@
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+
+        }
+    </ListContent>
+    <EditContent>
+
+
+
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <RadzenDropDown AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                @bind-Value="MainListID"
+                                Data=@MainList
+                                Change=@(args => ProjeTipChange())
+                                TextProperty="Text"
+                                ValueProperty="Value" Style="width: 150px; margin-right: 20px; margin-left:83px;" />
+            </div>
+            @if (disableProjeAltTipi)
+            {
+                <div class="col-md-9">
+                    <RadzenDropDown AllowClear="true"
+                                    AllowFiltering="true"
+                                    @bind-Value="SubListID"
+                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                    Data=@SubList
+                                    TextProperty="Text"
+                                    ValueProperty="Value" Style="width: 150px; " />
+                </div>
+            }
+        </div>
+
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="name">Ad</label>
+            </div>
+            <div class="col-md-9">
+                <InputText id="name" @bind-Value="Model.Ad" class="form-control" />
+                <ValidationMessage For="() => Model.Ad"></ValidationMessage>
+            </div>
+        </div>
+
+
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="tarih">Tarih</label>
+            </div>
+            <div class="col-md-9">
+                <RadzenDatePicker id="tarih" @bind-Value="Model.Tarih" ShowTime="false" />
+                <ValidationMessage For="() => Model.Tarih"></ValidationMessage>
+            </div>
+        </div>
+
+        <div class="row top-space">
+            <div class="col-md-12">
+                <ValidationMessage For="() => Model.ListFileUploadModel"></ValidationMessage>
+                <BaseFileUploadComponent fileUploadModelList="Model.ListFileUploadModel"></BaseFileUploadComponent>
+            </div>
+        </div>
+    </EditContent>
+</BaseListCrudPage>

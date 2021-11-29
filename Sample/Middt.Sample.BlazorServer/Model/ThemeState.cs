@@ -1,0 +1,7 @@
+﻿namespace Middt.Template.BlazorServer.Model
+{
+    public class ThemeState
+    {
+        public string CurrentTheme { get; set; } = "default";
+    }
+}

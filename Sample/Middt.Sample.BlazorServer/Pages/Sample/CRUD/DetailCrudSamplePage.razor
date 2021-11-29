@@ -1,0 +1,21 @@
+﻿@page "/DetailCrudSamplePage"
+
+@inherits BaseDetailCrudPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
+
+@using Middt.Framework.Blazor.Web.Base.Page
+
+@using Middt.Template.Common.Service
+@using Middt.Template.Api.Model.Database;
+
+
+<BaseDetailCrudPage TService="Table1SecureService"
+TInterface="ITable1SecureService"
+TModel="Table1Secure"
+QueryStringID="ID"
+SaveAfterURL =""
+GetMethod="GetFirmaByFirmaID"
+@ref="baseDetailCrudPage">
+    <DetailContent>
+        <InputText id="name" @bind-Value="Model.Ad" /><ValidationMessage For="() => Model.Ad"></ValidationMessage>
+    </DetailContent>
+</BaseDetailCrudPage>
