@@ -37,7 +37,7 @@ namespace Middt.Framework.Api.Swagger
         {
             var info = new OpenApiInfo()
             {
-                Title = "SUGES API",
+                Title = "Web API",
                 Version = description.ApiVersion.ToString()
             };
 

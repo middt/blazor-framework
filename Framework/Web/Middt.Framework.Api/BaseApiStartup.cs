@@ -71,13 +71,6 @@ namespace Middt.Framework.Api
 
 
                 swagger.OperationFilter<AddResponseHeadersFilter>(); // [SwaggerResponseHeader]
-                //This is to generate the Default UI of Swagger Documentation    
-                //swagger.SwaggerDoc("v1", new OpenApiInfo
-                //{
-                //    Version = "v1",
-                //    Title = "SUGES Web API",
-                //    Description = "SUGES Web API with JWT and Swagger"
-                //});
 
                 // To Enable authorization using Swagger (JWT)    
                 swagger.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()

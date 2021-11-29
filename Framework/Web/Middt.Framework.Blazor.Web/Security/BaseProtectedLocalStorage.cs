@@ -13,7 +13,7 @@ namespace Middt.Framework.Blazor.Web.Security
 {
     public class BaseProtectedLocalStorage : IBaseSessionState
     {
-        string storageName = "suges";
+        string storageName = "middt";
         SaveTokenResponseModel saveTokenResponseModel;
         ProtectedLocalStorage protectedLocalStorage;
         IBaseConfiguration baseConfiguration;

@@ -1,21 +1,3 @@
 ﻿@using Middt.Framework.Common.Configuration
 @using Middt.Framework.Model.Model.Configuration
 <h3>Giriş sayfasına yönlendiriliyorsunuz, Lütfen bekleyin.</h3>
-
-@code {
-    [Inject]
-    public NavigationManager navigationManager { get; set; }
-
-    [Inject]
-    protected IBaseConfiguration baseConfiguration { get; set; }
-
-    protected override Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            SecuritySettings securitySettings = baseConfiguration.Get<SecuritySettings>();
-            navigationManager.NavigateTo(securitySettings.LoginPageURL + $"?returnUrl={Uri.EscapeDataString(navigationManager.ToBaseRelativePath(navigationManager.Uri))}");
-        }
-        return base.OnAfterRenderAsync(firstRender);
-    }
-}
