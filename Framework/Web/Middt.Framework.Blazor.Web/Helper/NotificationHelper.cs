@@ -1,4 +1,6 @@
-﻿namespace Middt.Framework.Blazor.Web.Helper
+﻿using System;
+
+namespace Middt.Framework.Blazor.Web.Helper
 {
     public sealed class NotificationHelper
     {

@@ -1,5 +1,6 @@
 ﻿using Microsoft.JSInterop;
-
+using System;
+using System.Threading.Tasks;
 
 public static class JSRuntimeExtension
 {

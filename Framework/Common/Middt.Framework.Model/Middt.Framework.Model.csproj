@@ -2,10 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
-		<Company>SuBilgi Teknolojileri</Company>
-		<Product>Suges Framework Model</Product>
-
-
+		<Product>Middt Framework Model</Product>
 		<IsPackable>true</IsPackable>
 
 

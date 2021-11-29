@@ -1,6 +1,7 @@
 ﻿using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
+using System;
 
 namespace Middt.Framework.Blazor.Web.Base.Page
 {

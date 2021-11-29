@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using System;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 {

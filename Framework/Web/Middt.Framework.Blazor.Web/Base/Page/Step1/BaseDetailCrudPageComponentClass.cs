@@ -2,6 +2,7 @@
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using Middt.Framework.Model.Model.Enumerations;
+using System.Linq;
 
 namespace Middt.Framework.Blazor.Web.Base
 {

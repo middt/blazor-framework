@@ -2,11 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
-		<Company>SuBilgi Teknolojileri</Company>
-		<Product>Suges Framework Common</Product>
-
-
-
+		<Product>Middt Framework Common</Product>
 		<IsPackable>true</IsPackable>
 
 		
@@ -18,7 +14,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="EFCore.BulkExtensions" Version="6.0.4" />
+		<PackageReference Include="EFCore.BulkExtensions" Version="6.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />

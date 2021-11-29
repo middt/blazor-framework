@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
+using System;
+using System.Collections.Generic;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
 {

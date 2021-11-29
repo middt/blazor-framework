@@ -2,6 +2,10 @@
 using Middt.Framework.Blazor.Web.Configuration;
 using Middt.Framework.Common.Dependency;
 using Middt.Framework.Model.Model.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
 
 namespace Middt.Framework.Blazor.Web
 {

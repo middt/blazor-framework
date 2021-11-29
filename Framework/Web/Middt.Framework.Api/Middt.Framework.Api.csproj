@@ -2,14 +2,9 @@
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
-		<Nullable>enable</Nullable>
-		<ImplicitUsings>enable</ImplicitUsings>
-		
-		<Company>SuBilgi Teknolojileri</Company>
-		<Product>Suges Framework Api</Product>
-
+		<Product>Middt Framework Api</Product>
 		<IsPackable>true</IsPackable>
-
+		<ImplicitUsings>enable</ImplicitUsings>
 		<VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
 		<AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
 		<AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>

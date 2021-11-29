@@ -6,7 +6,9 @@ using Middt.Framework.Common.Configuration;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
+using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.Filters;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -26,8 +28,8 @@ namespace Middt.Framework.Api
         }
 
         [HttpPost("[action]")]
-        [SwaggerTagAttribute(true)]
-        [Swashbuckle.AspNetCore.Annotations.SwaggerOperation(Summary = "Token Servisi")]
+        [Swagger.SwaggerTagAttribute(true)]
+        [SwaggerOperation(Summary = "Token Servisi")]
         [SwaggerRequestExample(typeof(SwaggerLoginRequestModel), typeof(LoginRequestModelSwaggerExample))]
         public virtual TokenResponseModel Login([FromBody] LoginRequestModel request)
         {
