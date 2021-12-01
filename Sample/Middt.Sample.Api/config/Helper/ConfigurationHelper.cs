@@ -1,9 +1,9 @@
 ﻿
 using Microsoft.Extensions.Configuration;
 using Middt.Framework.Common.Configuration;
-using Middt.UBKS.WebApi.config.Model;
+using Middt.Sample.Api.config.Model;
 
-namespace Middt.UBKS.WebApi.config.Helper
+namespace Middt.Sample.Api.config.Helper
 {
     public class ConfigurationHelper : BaseApiConfiguration
     {

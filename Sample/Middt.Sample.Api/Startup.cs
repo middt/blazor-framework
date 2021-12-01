@@ -7,7 +7,7 @@ using Middt.Framework.Common.Dependency;
 using Middt.Framework.Common.Email;
 using Middt.Framework.Common.Log;
 using Middt.Framework.Model.Model.Authentication;
-using Middt.UBKS.WebApi.config.Helper;
+using Middt.Sample.Api.config.Helper;
 using Swashbuckle.AspNetCore.Filters;
 
 namespace Middt.Sample.Api

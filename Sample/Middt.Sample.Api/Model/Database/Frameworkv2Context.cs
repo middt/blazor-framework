@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Middt.UBKS.WebApi.config.Helper;
-using Middt.UBKS.WebApi.config.Model;
+using Middt.Sample.Api.config.Helper;
+using Middt.Sample.Api.config.Model;
 
 #nullable disable
 

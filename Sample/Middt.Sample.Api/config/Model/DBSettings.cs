@@ -1,4 +1,4 @@
-﻿namespace Middt.UBKS.WebApi.config.Model
+﻿namespace Middt.Sample.Api.config.Model
 {
     public class DBSettings
     {
