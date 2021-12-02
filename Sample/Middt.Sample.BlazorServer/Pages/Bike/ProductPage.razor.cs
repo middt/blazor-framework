@@ -8,9 +8,9 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
     {
         public BaseRadzenListPage<ProductService, IProductService, Product> baseRadzenListPage { get; set; }
 
-        public override void AfterSearch()
+        public override void OnAfterSearch()
         {
-            base.AfterSearch();
+            base.OnAfterSearch();
 
             baseRadzenListPage.SearchRequestModel.RequestModel.CategoryId = Model.CategoryId;
             baseRadzenListPage.Search();

@@ -2,6 +2,7 @@
 using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
+using Middt.Framework.Model.Model.Enumerations;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -38,6 +39,8 @@ namespace Middt.Framework.Blazor.Web.Base
 
         [Parameter]
         public Action OnAfterSearch { get; set; }
+        [Parameter]
+        public Action OnBeforeSearch { get; set; }
 
 
         protected override void CustomOnAfterRenderAsync(bool firstRender)
@@ -65,6 +68,9 @@ namespace Middt.Framework.Blazor.Web.Base
         {
             ExecuteMethod(() =>
             {
+                BeforeSearch();
+                OnBeforeSearch?.Invoke();
+
                 Type serviceType = Service.GetType();
                 //  MethodInfo getMethod = serviceType.GetMethod(GetMethod);
                 MethodInfo getMethod = serviceType.GetMethods()
@@ -72,25 +78,43 @@ namespace Middt.Framework.Blazor.Web.Base
       .Single(mi => mi.Name == GetMethod
                  && mi.GetParameters().Length == 1);
 
-                BaseResponseDataModel<TModel> result = null;
+                BaseResponseDataModel<TModel> SearchResultModel = null;
                 if (id.HasValue)
-                    result = getMethod.Invoke(Service, new object[] { id }) as BaseResponseDataModel<TModel>;
+                    SearchResultModel = getMethod.Invoke(Service, new object[] { id }) as BaseResponseDataModel<TModel>;
                 else
-                    result = getMethod.Invoke(Service, null) as BaseResponseDataModel<TModel>;
+                    SearchResultModel = getMethod.Invoke(Service, null) as BaseResponseDataModel<TModel>;
 
-                if (result.Result == Framework.Model.Model.Enumerations.ResultEnum.Success)
+
+                if (SearchResultModel.Result != ResultEnum.Success)
                 {
-                    Model = result.Data;
+                    Log.Error(SearchResultModel.ErrorText);
+                    Notification.ShowErrorMessage("Arama yapılırken bir hata oluştu.", SearchResultModel.MessageList.FirstOrDefault());
                 }
                 else
                 {
-                    Log.Error(result.ErrorText);
-                    Notification.ShowErrorMessage("Bilgiler erişirken bir hata oluştu.", result.MessageList.FirstOrDefault());
+                    if (SearchResultModel.Data == null)
+                    {
+                        Notification.ShowInfoMessage("Bilgi", "Kayıt bulunamadı.");
+                    }
+                    else
+                    {
+                        Model = SearchResultModel.Data;
+                    }
                 }
 
+                AfterSearch();
                 OnAfterSearch?.Invoke();
-
             });
         }
+
+        protected virtual void AfterSearch()
+        {
+
+        }
+        public virtual void BeforeSearch()
+        {
+;
+        }
+
     }
 }

@@ -45,10 +45,16 @@ namespace Middt.Framework.Blazor.Web.Base.Page
 
             if (firstRender)
             {
+                baseListCrudPage.OnBeforeSearch += OnBeforeSearch;
                 baseListCrudPage.OnAfterSearch += OnAfterSearch;
+
                 baseListCrudPage.OnBeforeModalOpen += OnBeforeModalOpen;
                 baseListCrudPage.OnAfterModalClose += OnAfterModalClose;
             }
+        }
+        public virtual void OnBeforeSearch()
+        {
+
         }
 
         public virtual void OnAfterSearch()
@@ -67,9 +73,7 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         }
         public override void ExecuteMethod(Action action)
         {
-
             baseListCrudPage.ExecuteMethod(action);
-
         }
     }
 }

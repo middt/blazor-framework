@@ -17,7 +17,19 @@ namespace Middt.Framework.Blazor.Web.Base.Page
 
         public TService Service { get { return baseDetailCrudPage.Service; } }
 
+        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        {
+            base.CustomOnAfterRenderAsync(firstRender);
 
+            if (firstRender)
+            {
+                if (baseDetailCrudPage != null)
+                {
+                    baseDetailCrudPage.OnBeforeSearch += OnBeforeSearch;
+                    baseDetailCrudPage.OnAfterSearch += OnAfterSearch;
+                }
+            }
+        }
         public override void ExecuteMethod(Action action)
         {
             baseDetailCrudPage.ExecuteMethod(action);
@@ -41,6 +53,14 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         public virtual void New()
         {
             baseDetailCrudPage.New();
+        }
+        public virtual void OnAfterSearch()
+        {
+
+        }
+        public virtual void OnBeforeSearch()
+        {
+
         }
     }
 }

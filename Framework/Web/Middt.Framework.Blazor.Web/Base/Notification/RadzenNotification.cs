@@ -40,5 +40,10 @@ namespace Middt.Framework.Blazor.Web.Base.Notification
         {
             ShowMessage(NotificationSeverity.Warning, title, message);
         }
+
+        public void Clear()
+        {
+            notificationService.Messages.Clear();
+        }
     }
 }

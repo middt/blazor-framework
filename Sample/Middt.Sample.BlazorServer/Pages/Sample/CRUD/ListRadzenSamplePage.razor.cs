@@ -33,9 +33,9 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
         {
             ExcelDisable = true;
         }
-        public override void AfterSearch()
+        public override void OnAfterSearch()
         {
-            base.AfterSearch();
+            base.OnAfterSearch();
 
             Console.WriteLine(SearchResultModel.Count);
         }

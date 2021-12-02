@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Middt.Framework.Blazor.Web.Base.Component.Modal;
-using Middt.Framework.Blazor.Web.Base.Component.Modal;
 using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Notification;
 using Middt.Framework.Common.Security;
@@ -65,34 +64,23 @@ namespace Middt.Framework.Blazor.Web.Base
         [Inject]
         public BaseTokenHelper baseTokenHelper { get; set; }
 
-
-        //protected Timer timer { get; set; }
-
-        //public int ExpireIn { get; set; }
-
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender)
             {
-                //ExecuteMethod(() =>
-                //{
+                Notification.Clear();
+
                 LoadCustomOnAfterRenderAsync(firstRender);
-                //});
+
             }
             else
             {
                 CustomOnAfterRenderAsync(firstRender);
             }
-
-            //ExpireIn = 30000;
         }
 
         private async Task LoadCustomOnAfterRenderAsync(bool firstRender)
         {
-            //timer = new Timer(1000);
-            //timer.Elapsed += Timer_Elapsed;
-            //timer.Start();
-
             await Task.Run(() =>
             {
                 baseTokenHelper.GetClaimsPrincipal();
@@ -103,20 +91,7 @@ namespace Middt.Framework.Blazor.Web.Base
             {
                 InvokeAsync(() => StateHasChanged()).Wait();
             });
-
         }
-
-        //private void Timer_Elapsed(object sender, ElapsedEventArgs e)
-        //{
-        //    ExpireIn--;
-        //}
-        //~BaseComponent()
-        //{
-        //    if (timer != null)
-        //    {
-        //        timer.Stop();
-        //    }
-        //}
 
         protected virtual void CustomOnAfterRenderAsync(bool firstRender)
         {

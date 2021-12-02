@@ -26,7 +26,8 @@ namespace Middt.Framework.Blazor.Web.Base.Page
             {
                 if (baseDetailPage != null)
                 {
-                    baseDetailPage.OnAfterSearch += AfterSearch;
+                    baseDetailPage.OnBeforeSearch += OnBeforeSearch;
+                    baseDetailPage.OnAfterSearch += OnAfterSearch;
                 }
             }
         }
@@ -41,7 +42,11 @@ namespace Middt.Framework.Blazor.Web.Base.Page
             baseDetailPage.ExecuteMethod(action);
         }
 
-        public virtual void AfterSearch()
+        public virtual void OnAfterSearch()
+        {
+
+        }
+        public virtual void OnBeforeSearch()
         {
 
         }

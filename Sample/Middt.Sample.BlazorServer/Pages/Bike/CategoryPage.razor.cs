@@ -10,5 +10,10 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
         {
             NavigationManager.NavigateTo("/Bike/Product?ID=" + model.CategoryId);
         }
+        //public override void OnBeforeSearch()
+        //{
+        //    SearchRequestModel.RequestModel.CategoryId = 1;
+        //    base.OnBeforeSearch();
+        //}
     }
 }

@@ -2,6 +2,8 @@
 {
     public interface INotification
     {
+        void Clear();
+
         void ShowErrorMessage(string title, string message);
 
         void ShowInfoMessage(string title, string message);

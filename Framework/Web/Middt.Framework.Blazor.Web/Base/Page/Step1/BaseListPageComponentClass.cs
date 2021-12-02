@@ -42,8 +42,13 @@ namespace Middt.Framework.Blazor.Web.Base
         [Parameter]
         public bool IsFirstLoad { get; set; } = true;
 
+
         [Parameter]
         public Action OnAfterSearch { get; set; }
+        [Parameter]
+        public Action OnBeforeSearch { get; set; }
+
+
 
         public BasePaginationComponent Pagination { get; set; }
 
@@ -85,7 +90,8 @@ namespace Middt.Framework.Blazor.Web.Base
             ExecuteMethod(() =>
             {
                 BeforeSearch();
-
+                OnBeforeSearch?.Invoke();
+                
                 Type serviceType = Service.GetType();
                 MethodInfo searchMethod = serviceType.GetMethods()
 
@@ -124,7 +130,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
             Pagination.CalculateTotalPage();
         }
-        protected virtual void BeforeSearch()
+        public virtual void BeforeSearch()
         {
             SearchRequestModel.CurrentPage = Pagination.CurrentPage;
             SearchRequestModel.RequestItemSize = Pagination.PageSize;
