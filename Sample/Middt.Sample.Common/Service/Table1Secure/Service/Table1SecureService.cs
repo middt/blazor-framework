@@ -5,7 +5,6 @@ using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Service;
 using Middt.Sample.Api.Model.Database;
 using System.Collections.Generic;
-using System.Dynamic;
 
 namespace Middt.Sample.Common.Service
 {
@@ -21,7 +20,7 @@ namespace Middt.Sample.Common.Service
 
         }
 
-        public BaseResponseDataModel<List<ExpandoObject>> GetDataTable(BaseSearchRequestModel<Table1Secure> model)
+        public BaseResponseDataModel<List<ExpandoResponse>> GetDataTable(BaseSearchRequestModel<Table1Secure> model)
         {
             return ExecutePolly(() =>
             {

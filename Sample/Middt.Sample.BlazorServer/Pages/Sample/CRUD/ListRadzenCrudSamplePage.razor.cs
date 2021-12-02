@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Radzen.Blazor;
 using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Model;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Common.Service;
+using Radzen.Blazor;
 using System.Collections.Generic;
 using System.Dynamic;
 
@@ -19,7 +19,7 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
     [Authorize]
     public partial class ListRadzenCrudSamplePage : BaseListCrudPageCode<Table1SecureService, ITable1SecureService, Table1Secure>
     {
-        public RadzenGrid<ExpandoObject> radzenGridTest { get; set; }
+        public RadzenGrid<ExpandoResponse> radzenGridTest { get; set; }
         public List<RadzenColumn> radzenColumnList { get; set; }
         public override void OnAfterModalClose()
         {
@@ -58,7 +58,7 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
             InvokeAsync(() =>
             {
 
-                BaseResponseDataModel<List<ExpandoObject>> baseResponseDataModel = Service.GetDataTable(baseListCrudPage.SearchRequestModel);
+                BaseResponseDataModel<List<ExpandoResponse>> baseResponseDataModel = Service.GetDataTable(baseListCrudPage.SearchRequestModel);
 
 
                 radzenColumnList.Clear();
@@ -67,12 +67,12 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.CRUD
                 {
                     if (baseResponseDataModel.Data != null && baseResponseDataModel.Data.Count > 0)
                     {
-                        IDictionary<string, object> propertyValues = baseResponseDataModel.Data[0];
+                        //IDictionary<string, object> propertyValues = baseResponseDataModel.Data[0].properties;
 
-                        foreach (var property in propertyValues.Keys)
-                        {
-                            radzenColumnList.Add(new RadzenColumn() { Property = property, Title = property });
-                        }
+                        //foreach (var property in propertyValues.Keys)
+                        //{
+                        //    radzenColumnList.Add(new RadzenColumn() { Property = property, Title = property });
+                        //}
                     }
                 }
 

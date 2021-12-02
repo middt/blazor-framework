@@ -35,6 +35,32 @@ namespace Middt.Framework.Blazor.Web.Base
         [Parameter]
         public bool IsFirstLoad { get; set; } = true;
 
+
+        [Parameter]
+        public Action OnAfterSearch { get; set; }
+
+
+        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        {
+            base.CustomOnAfterRenderAsync(firstRender);
+
+            if (firstRender)
+            {
+                if (!id.HasValue && !string.IsNullOrEmpty(NavigationManager.QueryString(QueryStringID)))
+                {
+                    id = Convert.ToInt32(NavigationManager.QueryString(QueryStringID));
+                }
+
+
+                if (IsFirstLoad)
+                {
+                    Search();
+                }
+            }
+        }
+
+
+
         public virtual async Task Search()
         {
             ExecuteMethod(() =>
@@ -61,6 +87,9 @@ namespace Middt.Framework.Blazor.Web.Base
                     Log.Error(result.ErrorText);
                     Notification.ShowErrorMessage("Bilgiler erişirken bir hata oluştu.", result.MessageList.FirstOrDefault());
                 }
+
+                OnAfterSearch?.Invoke();
+
             });
         }
     }

@@ -13,30 +13,17 @@ namespace Middt.Sample.BlazorServer.Service
             Name = "Home",
             Path = "/",
             Icon = "&#xe88a"
-        }
-        ,new MenuItem()
+        },
+                new MenuItem()
         {
-            Name = "List Sample Page",
-            Path = "ListSamplePage",
-            Icon = "&#xe88a"
-        }
-        , new MenuItem()
-        {
-            Name = "List Crud Sample Page",
-            Path = "ListCrudSamplePage",
-            Icon = "&#xe88a"
-        }
-        ,new MenuItem()
-        {
-            Name = "Radzen List Sample Page",
-            Path = "ListRadzenSamplePage",
-            Icon = "&#xe88a"
-        }
-        , new MenuItem()
-        {
-            Name = "Radzen List Crud Sample Page",
-            Path = "ListRadzenCrudSamplePage",
-            Icon = "&#xe88a"
+            Name = "Bike",
+            Icon = "&#xe7fd",
+            Children = new [] {
+            new MenuItem() {
+                Name="Category",
+                Path ="/Bike/Category",
+            }
+            }
         }
     };
 
@@ -46,21 +33,6 @@ namespace Middt.Sample.BlazorServer.Service
             {
                 return allMenuItems;
             }
-        }
-
-        public IEnumerable<MenuItem> Filter(string term)
-        {
-            Func<string, bool> contains = value => value.Contains(term, StringComparison.OrdinalIgnoreCase);
-
-            Func<MenuItem, bool> filter = (MenuItem) => contains(MenuItem.Name) || (MenuItem.Tags != null && MenuItem.Tags.Any(contains));
-
-            return MenuItems.Where(category => category.Children != null && category.Children.Any(filter))
-                           .Select(category => new MenuItem()
-                           {
-                               Name = category.Name,
-                               Expanded = true,
-                               Children = category.Children.Where(filter).ToArray()
-                           }).ToList();
         }
 
         public MenuItem FindCurrent(Uri uri)

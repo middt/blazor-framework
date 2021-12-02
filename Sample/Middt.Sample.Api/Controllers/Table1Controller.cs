@@ -35,7 +35,5 @@ namespace Middt.Sample.Api.Controllers
 
             return response;
         }
-
-
     }
 }

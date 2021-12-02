@@ -8,11 +8,12 @@ using Middt.Sample.Api.Repository;
 using Middt.Sample.Common.Service;
 using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 
 namespace Middt.Sample.Api.Controllers
 {
+
+
     [ApiController]
     //[Route("api/[controller]")]
     [Route("api/v{version:apiVersion}/[controller]")]
@@ -24,10 +25,10 @@ namespace Middt.Sample.Api.Controllers
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = false)]
 
-        public BaseResponseDataModel<List<ExpandoObject>> GetDataTable([FromBody] BaseSearchRequestModel<Table1> model)
+        public BaseResponseDataModel<List<ExpandoResponse>> GetDataTable([FromBody] BaseSearchRequestModel<Table1> model)
         {
-            BaseResponseDataModel<List<ExpandoObject>> response = new BaseResponseDataModel<List<ExpandoObject>>();
-            response.Data = new List<ExpandoObject>();
+            BaseResponseDataModel<List<ExpandoResponse>> response = new BaseResponseDataModel<List<ExpandoResponse>>();
+            response.Data = new List<ExpandoResponse>();
 
             response.Result = Framework.Model.Model.Enumerations.ResultEnum.Success;
 
@@ -36,16 +37,15 @@ namespace Middt.Sample.Api.Controllers
             {
                 if (responseDataModel.Data != null && responseDataModel.Data.Count > 0)
                 {
-                    ExpandoObject expandoObject;
+                    ExpandoResponse expandoObject;
 
                     foreach (Table1 table1 in responseDataModel.Data)
                     {
-                        expandoObject = new ExpandoObject();
+                        expandoObject = new ExpandoResponse();                  
+                        //expandoObject.properties.Add("Ad", table1.Ad);
+                        //expandoObject.properties.Add("Tarih", table1.Tarih);
 
-                        expandoObject.Add("Ad", table1.Ad);
-                        expandoObject.Add("Tarih", table1.Tarih);
-
-                        response.Data.Add(expandoObject);
+                        //response.Data.Add(expandoObject);
                     }
                 }
             }

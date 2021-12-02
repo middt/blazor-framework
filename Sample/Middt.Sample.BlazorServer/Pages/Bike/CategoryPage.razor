@@ -1,0 +1,49 @@
+﻿@page "/Bike/Category"
+@inherits BaseListCrudPageCode<CategoryService, ICategoryService, Category>
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Sample.Common.Service
+@using Middt.Sample.Api.Model.Database;
+
+
+
+<BaseRadzenListCrudPage ModalTitle="Category"
+                        TService="CategoryService"
+                        TInterface="ICategoryService"
+                        TModel="Category"
+                        @ref="baseListCrudPage">
+    <SearchContent>
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                Name :
+            </div>
+            <div class="col-md-9">
+                <InputText id="name" @bind-Value="SearchRequestModel.RequestModel.CategoryName" class="form-control" />
+            </div>
+        </div>
+    </SearchContent>
+    <ListContent>
+        <RadzenGridColumn TItem="Category" Property="CategoryName" Title="Name"/>        
+                <RadzenGridColumn TItem="Category" Width="70px">
+            <Template Context="item">
+                <RadzenButton Click="() => Detail(item)" Icon="search" />
+            </Template>
+        </RadzenGridColumn>
+        <RadzenGridColumn TItem="Category" Width="70px">
+            <Template Context="item">
+                <RadzenButton Click="() => Edit(item)" Icon="edit" />
+            </Template>
+        </RadzenGridColumn>
+    </ListContent>
+    <EditContent>
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="name">Name</label>
+            </div>
+            <div class="col-md-9">
+                <InputText id="name" @bind-Value="Model.CategoryName" class="form-control" />
+                <ValidationMessage For="() => Model.CategoryName"></ValidationMessage>
+            </div>
+        </div>
+    </EditContent>
+</BaseRadzenListCrudPage>

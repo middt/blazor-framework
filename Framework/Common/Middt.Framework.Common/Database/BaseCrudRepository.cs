@@ -217,7 +217,7 @@ namespace Middt.Framework.Common.Database
                     paramName = queryDateAttribute.PropertyName;
                 }
 
-                if (!value.ToString().Equals("01.01.0001 00:00:00"))
+                if ((DateTime)value != default(DateTime))
                 {
                     if (queryDateAttribute.SearchType == DateSearchType.Equal)
                     {
@@ -244,7 +244,10 @@ namespace Middt.Framework.Common.Database
             }
             else
             {
-                itemList = itemList.Where(p.Name + " == @0", value);
+                if ( (DateTime)value != default(DateTime))
+                {
+                    itemList = itemList.Where(p.Name + " == @0", value);
+                }
             }
 
             return itemList;

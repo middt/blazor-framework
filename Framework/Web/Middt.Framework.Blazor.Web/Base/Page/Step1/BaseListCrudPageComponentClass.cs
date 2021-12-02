@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Middt.Framework.Blazor.Web.Base.Component.Modal;
-using Middt.Framework.Blazor.Web.Base.Component.Modal;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using Middt.Framework.Model.Model.Enumerations;
@@ -44,10 +43,13 @@ namespace Middt.Framework.Blazor.Web.Base
         [Parameter]
         public string InsertText { get; set; } = "Yeni Kayıt";
 
+        [Parameter]
         public Action<TModel> OnAfterSave { get; set; }
 
+        [Parameter]
         public Action OnAfterModalClose { get; set; }
 
+        [Parameter]
         public Action OnBeforeModalOpen { get; set; }
 
         public TModel Model { get; set; }

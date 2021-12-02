@@ -16,27 +16,8 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         public BaseDetailCrudPage<TService, TInterface, TModel> baseDetailCrudPage { get; set; }
 
         public TService Service { get { return baseDetailCrudPage.Service; } }
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
-        {
-            base.CustomOnAfterRenderAsync(firstRender);
 
 
-            if (firstRender)
-            {
-                if (baseDetailCrudPage.id.HasValue || !string.IsNullOrEmpty(NavigationManager.QueryString(baseDetailCrudPage.QueryStringID)))
-                {
-                    if (!string.IsNullOrEmpty(NavigationManager.QueryString(baseDetailCrudPage.QueryStringID)))
-                    {
-                        baseDetailCrudPage.id = Convert.ToInt32(NavigationManager.QueryString(baseDetailCrudPage.QueryStringID));
-                    }
-                }
-
-                if (baseDetailCrudPage.IsFirstLoad)
-                {
-                    Search();
-                }
-            }
-        }
         public override void ExecuteMethod(Action action)
         {
             baseDetailCrudPage.ExecuteMethod(action);
@@ -52,7 +33,6 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         {
             baseDetailCrudPage.SaveButtonClick();
         }
-
 
         public virtual void Edit(TModel model)
         {

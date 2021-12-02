@@ -48,13 +48,9 @@ namespace Middt.Framework.Blazor.Web.Base.Page
                 baseListCrudPage.OnAfterSearch += OnAfterSearch;
                 baseListCrudPage.OnBeforeModalOpen += OnBeforeModalOpen;
                 baseListCrudPage.OnAfterModalClose += OnAfterModalClose;
-
-                if (baseListCrudPage.IsFirstLoad)
-                {
-                    Search();
-                }
             }
         }
+
         public virtual void OnAfterSearch()
         {
 

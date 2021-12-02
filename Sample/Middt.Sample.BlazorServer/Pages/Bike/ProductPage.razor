@@ -1,0 +1,37 @@
+﻿@page "/Bike/Product"
+
+@inherits BaseDetailPageCode<CategoryService, ICategoryService, Category>
+
+
+@using Middt.Framework.Blazor.Web.Base
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Sample.Common.Service
+@using Middt.Sample.Api.Model.Database;
+
+
+
+
+<BaseDetailPage TService="CategoryService"
+                TInterface="ICategoryService"
+                TModel="Category"
+                QueryStringID="ID"
+                @ref="baseDetailPage">
+    <DetailContent>
+        <RadzenCard>
+            <div class="row" style="margin-top:10px;">
+                <h3>@Model.CategoryName</h3>
+            </div>
+        </RadzenCard>
+    </DetailContent>
+</BaseDetailPage>
+<BaseRadzenListPage TService="ProductService"
+                    TInterface="IProductService"
+                    TModel="Product"
+                    IsFirstLoad="false"
+                    @ref="baseRadzenListPage">
+    <ListContent>
+        <RadzenGridColumn TItem="Product" Property="ProductName" Title="Name" />
+        <RadzenGridColumn TItem="Product" Property="ModelYear" Title="Year" />
+        <RadzenGridColumn TItem="Product" Property="ListPrice" Title="Price" />
+    </ListContent>
+</BaseRadzenListPage>

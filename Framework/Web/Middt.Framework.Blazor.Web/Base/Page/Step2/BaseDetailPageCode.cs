@@ -17,25 +17,23 @@ namespace Middt.Framework.Blazor.Web.Base.Page
 
         public TService Service { get { return baseDetailPage.Service; } }
 
+
         protected override void CustomOnAfterRenderAsync(bool firstRender)
         {
             base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
-                if (baseDetailPage.id.HasValue || !string.IsNullOrEmpty(NavigationManager.QueryString(baseDetailPage.QueryStringID)))
+                if (baseDetailPage != null)
                 {
-                    if (!string.IsNullOrEmpty(NavigationManager.QueryString(baseDetailPage.QueryStringID)))
-                    {
-                        baseDetailPage.id = Convert.ToInt32(NavigationManager.QueryString(baseDetailPage.QueryStringID));
-                    }
-                }
-
-                if (baseDetailPage.IsFirstLoad)
-                {
-                    Search();
+                    baseDetailPage.OnAfterSearch += AfterSearch;
                 }
             }
+        }
+
+        public virtual void Search()
+        {
+            baseDetailPage.Search();
         }
 
         public override void ExecuteMethod(Action action)
@@ -43,9 +41,9 @@ namespace Middt.Framework.Blazor.Web.Base.Page
             baseDetailPage.ExecuteMethod(action);
         }
 
-        public virtual void Search()
+        public virtual void AfterSearch()
         {
-            baseDetailPage.Search();
+
         }
     }
 }

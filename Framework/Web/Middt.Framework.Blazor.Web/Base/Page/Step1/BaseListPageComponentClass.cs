@@ -19,19 +19,15 @@ namespace Middt.Framework.Blazor.Web.Base
     {
         [Parameter]
         public int PageSize { get; set; } = 20;
-
-
         [Parameter]
         public bool HideSearchButton { get; set; } = false;
         [Parameter]
         public bool HideSearch { get; set; } = false;
 
-
         [Parameter]
         public RenderFragment SearchContent { get; set; }
         [Parameter]
         public RenderFragment ListContent { get; set; }
-
 
 
         [Inject]
@@ -45,6 +41,8 @@ namespace Middt.Framework.Blazor.Web.Base
         public string SearchMethod { get; set; } = "GetItems";
         [Parameter]
         public bool IsFirstLoad { get; set; } = true;
+
+        [Parameter]
         public Action OnAfterSearch { get; set; }
 
         public BasePaginationComponent Pagination { get; set; }

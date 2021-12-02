@@ -93,23 +93,22 @@
         </div>
     </EditContent>
 </BaseRadzenListCrudPage>
-<br />
 boşluk
 <br />
-<RadzenGrid AllowColumnResize="true" @ref="radzenGridTest" TItem="ExpandoObject">
+@*<br />
+
+<RadzenGrid AllowColumnResize="true" @ref="radzenGridTest" TItem="ExpandoResponse">
     <Columns>
         @if (radzenColumnList != null && radzenColumnList.Count > 0)
         {
             foreach (RadzenColumn radzenColumn in radzenColumnList)
             {
-                @*                <RadzenGridColumn TItem="ExpandoObject" Property="@radzenColumn.Property" Title="@radzenColumn.Title"  />*@
-
-                <RadzenGridColumn TItem="ExpandoObject" Property="@radzenColumn.Property" Title="@radzenColumn.Title">
+                <RadzenGridColumn TItem="ExpandoResponse" Property="@radzenColumn.Property" Title="@radzenColumn.Title">
                     <Template Context="data">
 
-                        @if ((data as IDictionary<string, object>)[radzenColumn.Property] is not null)
+                        @if (data.properties.ContainsKey(radzenColumn.Property) && data.properties[radzenColumn.Property] is not null)
                         {
-                            <span>@((data as IDictionary<string, object>)[radzenColumn.Property].ToString())</span>
+                            <span>@(data.properties[radzenColumn.Property].ToString())</span>
                         }
 
                     </Template>
@@ -117,7 +116,7 @@ boşluk
             }
         }
     </Columns>
-</RadzenGrid>
+</RadzenGrid>*@
 
 
 

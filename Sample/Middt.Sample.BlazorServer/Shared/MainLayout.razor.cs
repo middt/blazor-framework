@@ -85,13 +85,6 @@ namespace Middt.Sample.BlazorServer.Shared
             }
         }
 
-        void FilterPanelMenu(ChangeEventArgs args)
-        {
-            var term = args.Value.ToString();
-
-            examples = MenuService.Filter(term);
-        }
-
         void ChangeTheme(object value)
         {
             ThemeState.CurrentTheme = value.ToString();

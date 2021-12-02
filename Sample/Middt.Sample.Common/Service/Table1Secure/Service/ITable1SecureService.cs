@@ -1,9 +1,8 @@
-﻿using RestEase;
-using Middt.Framework.Common.Model.Data;
+﻿using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using Middt.Sample.Api.Model.Database;
+using RestEase;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Threading.Tasks;
 
 namespace Middt.Sample.Common.Service
@@ -12,7 +11,7 @@ namespace Middt.Sample.Common.Service
     {
         [Post("/api/v{version}/{controllerName}/getdatatable")]
         [Header("Authorization", "Bearer")]
-        Task<BaseResponseDataModel<List<ExpandoObject>>> GetDataTable([Path] string version, [Path] string controllerName, [Body(BodySerializationMethod.Serialized)] BaseSearchRequestModel<Table1Secure> model);
+        Task<BaseResponseDataModel<List<ExpandoResponse>>> GetDataTable([Path] string version, [Path] string controllerName, [Body(BodySerializationMethod.Serialized)] BaseSearchRequestModel<Table1Secure> model);
 
 
 

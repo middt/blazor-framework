@@ -53,7 +53,7 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
 
         List<int> PageList;
 
-        List<int> PageSizeList = new List<int>() { 5, 10, 20, 40, 50, 100 };
+        List<int> PageSizeList = new List<int>() { 5, 10, 20, 40, 50, 100, 1000 };
 
         public void CalculateTotalPage()
         {

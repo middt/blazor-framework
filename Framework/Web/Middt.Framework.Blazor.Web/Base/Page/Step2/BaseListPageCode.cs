@@ -28,11 +28,6 @@ namespace Middt.Framework.Blazor.Web.Base.Page
                 if (baseListPage != null)
                 {
                     baseListPage.OnAfterSearch += AfterSearch;
-
-                    if (baseListPage.IsFirstLoad)
-                    {
-                        Search();
-                    }
                 }
             }
         }
