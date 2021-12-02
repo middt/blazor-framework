@@ -4,6 +4,8 @@ using Middt.Sample.Common.Service;
 
 namespace Middt.Sample.BlazorServer.Pages.Bike
 {
+
+
     public partial class ProductPage : BaseDetailPageCode<CategoryService, ICategoryService, Category>
     {
         public BaseRadzenListPage<ProductService, IProductService, Product> baseRadzenListPage { get; set; }
