@@ -1,0 +1,73 @@
+﻿@page "/Bike/Order"
+@inherits BaseListPageCode<ViewOrderService, IViewOrderService, ViewOrder>
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Sample.Common.Service
+@using Middt.Sample.Api.Model.Database;
+
+
+
+<BaseRadzenListPage TService="ViewOrderService"
+                    TInterface="IViewOrderService"
+                    TModel="ViewOrder"
+                    @ref="baseListPage">
+    <SearchContent>
+        <div class="row top-space" style="width:100%;">
+            <div class="align-items-center d-flex col-md-3">
+                Order Id :
+            </div>
+            <div class="col-md-3">
+               @* <InputText id="name" @bind-Value="SearchRequestModel.RequestModel.OrderId" class="form-control" />*@
+            </div>
+            <div class="align-items-center d-flex col-md-3">
+                Store :
+            </div>
+            <div class="col-md-3">
+                                  <RadzenDropDown AllowClear="true" Style="width: 35%;"
+                                            AllowFiltering="true"
+                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                            @bind-Value=@SearchRequestModel.RequestModel.StoreId
+                                            Data=@ListStore
+                                            TextProperty="StoreName"
+                                            ValueProperty="StoreId" />
+            </div>
+        </div>
+        <div class="row top-space" style="width:100%;">
+            <div class="align-items-center d-flex col-md-3">
+                Name :
+            </div>
+            <div class="col-md-3">
+                Name :
+                @* <InputText id="name" @bind-Value="SearchRequestModel.RequestModel.CategoryName" class="form-control" />*@
+            </div>
+            <div class="align-items-center d-flex col-md-3">
+                Name :
+            </div>
+            <div class="col-md-3">
+                Name :
+                @*  <InputText id="name" @bind-Value="SearchRequestModel.RequestModel.CategoryName" class="form-control" />*@
+            </div>
+        </div>
+        <div class="row top-space" style="width:100%;">
+            <div class="align-items-center d-flex col-md-3">
+                Start Date :
+            </div>
+            <div class="col-md-3">
+                <RadzenDatePicker @bind-Value="SearchRequestModel.RequestModel.OrderStartDate" Style="width:190px;"></RadzenDatePicker>
+
+            </div>
+            <div class="align-items-center d-flex col-md-3">
+                End Date :
+            </div>
+            <div class="col-md-3">
+                <RadzenDatePicker @bind-Value="SearchRequestModel.RequestModel.OrderEndDate" Style="width:190px;"></RadzenDatePicker>
+            </div>
+        </div>
+    </SearchContent>
+    <ListContent>
+        <RadzenGridColumn TItem="ViewOrder" Property="StoreName" Title="Store" />
+        <RadzenGridColumn TItem="ViewOrder" Property="StaffName" Title="Staff Name" />
+        <RadzenGridColumn TItem="ViewOrder" Property="CustomerName" Title="Customer Name" />
+        <RadzenGridColumn TItem="ViewOrder" Property="OrderDate" Title="Order Date" />
+    </ListContent>
+</BaseRadzenListPage>

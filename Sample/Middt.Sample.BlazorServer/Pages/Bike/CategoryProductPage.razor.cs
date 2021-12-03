@@ -6,7 +6,7 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
 {
 
 
-    public partial class ProductPage : BaseDetailPageCode<CategoryService, ICategoryService, Category>
+    public partial class CategoryProductPage : BaseDetailPageCode<CategoryService, ICategoryService, Category>
     {
         public BaseRadzenListPage<ProductService, IProductService, Product> baseRadzenListPage { get; set; }
 
@@ -14,8 +14,11 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
         {
             base.OnAfterSearch();
 
-            baseRadzenListPage.SearchRequestModel.RequestModel.CategoryId = Model.CategoryId;
-            baseRadzenListPage.Search();
+            if (Model != null)
+            {
+                baseRadzenListPage.SearchRequestModel.RequestModel.CategoryId = Model.CategoryId;
+                baseRadzenListPage.Search();
+            }
         }
     }
 }

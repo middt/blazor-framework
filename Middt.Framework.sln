@@ -21,7 +21,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{BB0ED2
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{ED428952-3463-4067-9388-A93919AD9F9E}"
 	ProjectSection(SolutionItems) = preProject
-		Sample\SQL-Server-Sample-Database.zip = Sample\SQL-Server-Sample-Database.zip
+		database.sql = database.sql
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Api", "Framework\Web\Middt.Framework.Api\Middt.Framework.Api.csproj", "{C97732B9-8ADA-4C7A-95BC-145268B73751}"

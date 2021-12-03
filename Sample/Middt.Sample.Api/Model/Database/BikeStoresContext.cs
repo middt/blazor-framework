@@ -25,6 +25,7 @@ namespace Middt.Sample.Api.Model.Database
         public virtual DbSet<Staff> Staffs { get; set; }
         public virtual DbSet<Stock> Stocks { get; set; }
         public virtual DbSet<Store> Stores { get; set; }
+        public virtual DbSet<ViewOrder> ViewOrders { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -330,6 +331,57 @@ namespace Middt.Sample.Api.Model.Database
                     .HasMaxLength(5)
                     .IsUnicode(false)
                     .HasColumnName("zip_code");
+            });
+
+            modelBuilder.Entity<ViewOrder>(entity =>
+            {
+                entity.HasNoKey();
+
+                entity.ToView("viewOrders");
+
+                entity.Property(e => e.CustomerFirstName)
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .IsUnicode(false)
+                    .HasColumnName("customer_first_name");
+
+                entity.Property(e => e.CustomerId).HasColumnName("customer_id");
+
+                entity.Property(e => e.CustomerLastName)
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .IsUnicode(false)
+                    .HasColumnName("customer_last_name");
+
+                entity.Property(e => e.OrderDate)
+                    .HasColumnType("date")
+                    .HasColumnName("order_date");
+
+                entity.Property(e => e.OrderId).HasColumnName("order_id");
+
+                entity.Property(e => e.OrderStatus).HasColumnName("order_status");
+
+                entity.Property(e => e.StaffFirstName)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .IsUnicode(false)
+                    .HasColumnName("staff_first_name");
+
+                entity.Property(e => e.StaffId).HasColumnName("staff_id");
+
+                entity.Property(e => e.StaffLastName)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .IsUnicode(false)
+                    .HasColumnName("staff_last_name");
+
+                entity.Property(e => e.StoreId).HasColumnName("store_id");
+
+                entity.Property(e => e.StoreName)
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .IsUnicode(false)
+                    .HasColumnName("store_name");
             });
 
             OnModelCreatingPartial(modelBuilder);

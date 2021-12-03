@@ -53,6 +53,8 @@ namespace Middt.Sample.BlazorServer
             // Rest Servisler Bolumu
             services.AddScoped<CategoryService>();
             services.AddScoped<ProductService>();
+            services.AddScoped<ViewOrderService>();
+            services.AddScoped<StoreService>();
 
 
             services.AddScoped<WeatherForecastService>();

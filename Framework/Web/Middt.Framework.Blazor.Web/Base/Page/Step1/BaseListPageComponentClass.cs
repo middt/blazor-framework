@@ -82,7 +82,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
         protected void SearchButton()
         {
-            SearchRequestModel.CurrentPage = 1;
+            Pagination.CurrentPage = 1;
             Search();
         }
         public virtual void Search()

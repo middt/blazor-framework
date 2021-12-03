@@ -25,18 +25,21 @@
                 <span class="rz-paginator-icon rzi rzi-caret-left" @onclick="() => Previous()"></span>
             </span>
         }
+
         Sayfa @CurrentPage / @TotalPage
         <RadzenDropDown TValue="int"
                     Style="width:75px"
                     @bind-Value=@CurrentPage
                     Data=@PageList
                     Change=@(args => GotoPage(Convert.ToInt32(args))) />
+
         Gösterilecek Kayıt Sayısı:
         <RadzenDropDown TValue="int"
                     Style="width:75px"
                     @bind-Value=@PageSize
                     Data=@PageSizeList
                     Change=@(args => ChangeRecordSize()) />
+
         @if (CurrentPage == TotalPage)
         {
             <span class="rz-paginator-next rz-paginator-element rz-state-disabled">

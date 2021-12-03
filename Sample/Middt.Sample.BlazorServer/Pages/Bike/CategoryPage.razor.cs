@@ -8,7 +8,7 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
     {
         public void Detail(Category model)
         {
-            NavigationManager.NavigateTo("/Bike/Product?ID=" + model.CategoryId);
+            NavigationManager.NavigateTo("/Bike/CategoryProduct?ID=" + model.CategoryId);
         }
         //public override void OnBeforeSearch()
         //{

@@ -22,6 +22,10 @@ namespace Middt.Sample.BlazorServer.Service
             new MenuItem() {
                 Name="Category",
                 Path ="/Bike/Category",
+            },
+                      new MenuItem() {
+                Name="Order",
+                Path ="/Bike/Order",
             }
             }
         }
