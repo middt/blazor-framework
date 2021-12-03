@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Middt.Sample.Api.Model.Database
 {
-    public partial class Customer : BaseRequestModel
+    public partial class Staff : BaseRequestModel
     {
         [NotMapped]
         [QueryIsNoFilter]

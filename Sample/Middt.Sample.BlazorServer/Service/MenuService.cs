@@ -14,21 +14,19 @@ namespace Middt.Sample.BlazorServer.Service
             Path = "/",
             Icon = "&#xe88a"
         },
-                new MenuItem()
-        {
-            Name = "Bike",
-            Icon = "&#xe7fd",
-            Children = new [] {
-            new MenuItem() {
-                Name="Category",
-                Path ="/Bike/Category",
-            },
-                      new MenuItem() {
-                Name="Order",
-                Path ="/Bike/Order",
-            }
-            }
+        new MenuItem() {
+            Name="Category",
+            Path ="/Bike/Category",
+        },
+        new MenuItem() {
+            Name="Order",
+            Path ="/Bike/Order",
+        },
+                new MenuItem() {
+            Name="Product",
+            Path ="  /Bike/Product",
         }
+
     };
 
         public IEnumerable<MenuItem> MenuItems

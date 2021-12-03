@@ -55,8 +55,9 @@ namespace Middt.Sample.BlazorServer
             services.AddScoped<ProductService>();
             services.AddScoped<ViewOrderService>();
             services.AddScoped<StoreService>();
-
-
+            services.AddScoped<CustomerService>();
+            services.AddScoped<StaffService>();
+            
             services.AddScoped<WeatherForecastService>();
             services.AddScoped<Table1SecureService>();
             services.AddScoped<Table1Service>();

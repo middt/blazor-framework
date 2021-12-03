@@ -45,6 +45,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
         [Parameter]
         public Action OnAfterSearch { get; set; }
+
         [Parameter]
         public Action OnBeforeSearch { get; set; }
 

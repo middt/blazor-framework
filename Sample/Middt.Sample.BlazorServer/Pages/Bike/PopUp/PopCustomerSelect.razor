@@ -1,0 +1,49 @@
+﻿@inherits Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Framework.Common.Model.Data
+@using Middt.Sample.Api.Model.Database
+@using Middt.Sample.Common.Service
+
+<BaseModal Title="@Title" @ref="baseModal" IsFullScreen="true">
+    <ChildContent>
+        <BaseRadzenListPage TService="CustomerService"
+                            TInterface="ICustomerService"
+                            TModel="Customer"
+                            @ref="baseListPage">
+            <SearchContent>
+                <div class="row top-space" style="width:100%;">
+                    <div class="col-md-2">
+                        First Name
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenTextBox @bind-Value=baseListPage.SearchRequestModel.RequestModel.FirstName Style="width:250px"></RadzenTextBox>
+                    </div>
+                    <div class="col-md-2">
+                        Last Name
+                    </div>
+                    <div class="col-md-4">
+                        <RadzenTextBox @bind-Value=baseListPage.SearchRequestModel.RequestModel.LastName Style="width:250px"></RadzenTextBox>
+                    </div>
+                </div>
+            </SearchContent>
+            <ListContent>
+                <RadzenGridColumn TItem="Customer" Property="FirstName" Title="First Name" />
+                <RadzenGridColumn TItem="Customer" Property="LastName" Title="Last Name" />
+                <RadzenGridColumn TItem="Customer" Width="70px">
+                    <Template Context="item">
+                        <RadzenButton Click="() => Select(item)" Icon="edit" />
+                    </Template>
+                </RadzenGridColumn>
+            </ListContent>
+        </BaseRadzenListPage>
+
+        <div class="row top-space">
+            <div class="col-md-12">
+                <button type="reset" class="btn btn-secondary" data-dismiss="modal" @onclick="() => Close()">İptal</button>
+            </div>
+        </div>
+    </ChildContent>
+    <FooterContent>
+        @FooterContent
+    </FooterContent>
+</BaseModal>
