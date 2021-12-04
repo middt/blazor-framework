@@ -18,15 +18,14 @@ namespace Middt.Sample.BlazorServer.Service
             Name="Category",
             Path ="/Bike/Category",
         },
-        new MenuItem() {
-            Name="Order",
-            Path ="/Bike/Order",
-        },
                 new MenuItem() {
             Name="Product",
             Path ="  /Bike/Product",
+        },
+                        new MenuItem() {
+            Name="Order",
+            Path ="/Bike/Order",
         }
-
     };
 
         public IEnumerable<MenuItem> MenuItems
@@ -45,17 +44,12 @@ namespace Middt.Sample.BlazorServer.Service
 
         public string TitleFor(MenuItem MenuItem)
         {
-            if (MenuItem != null && MenuItem.Name != "First Look")
+            if (MenuItem != null)
             {
-                return MenuItem.Title ?? $"Blazor {MenuItem.Name} | a free UI component by Radzen";
+                return MenuItem.Title ?? "";
             }
 
-            return "Free Blazor Components | 60+ controls by Radzen";
-        }
-
-        public string DescriptionFor(MenuItem MenuItem)
-        {
-            return MenuItem?.Description ?? "The Radzen Blazor component library provides more than 50 UI controls for building rich ASP.NET Core web applications.";
+            return "";
         }
     }
 }

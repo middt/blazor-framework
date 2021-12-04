@@ -79,9 +79,9 @@ namespace Middt.Sample.BlazorServer.Shared
         {
             if (!firstRender)
             {
-                var example = MenuService.FindCurrent(UriHelper.ToAbsoluteUri(UriHelper.Uri));
+                MenuItem menuItem = MenuService.FindCurrent(UriHelper.ToAbsoluteUri(UriHelper.Uri));
 
-                await JSRuntime.InvokeVoidAsync("setTitle", MenuService.TitleFor(example));
+                await JSRuntime.InvokeVoidAsync("setTitle", MenuService.TitleFor(menuItem));
             }
         }
 

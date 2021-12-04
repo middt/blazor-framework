@@ -27,12 +27,11 @@ namespace Middt.Sample.Api.Model.Database
         public virtual DbSet<Store> Stores { get; set; }
         public virtual DbSet<ViewOrder> ViewOrders { get; set; }
 
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Brand>(entity =>
             {
-                entity.ToTable("brands", "production");
+                entity.ToTable("brands");
 
                 entity.Property(e => e.BrandId).HasColumnName("brand_id");
 
@@ -45,7 +44,7 @@ namespace Middt.Sample.Api.Model.Database
 
             modelBuilder.Entity<Category>(entity =>
             {
-                entity.ToTable("categories", "production");
+                entity.ToTable("categories");
 
                 entity.Property(e => e.CategoryId).HasColumnName("category_id");
 
@@ -58,7 +57,7 @@ namespace Middt.Sample.Api.Model.Database
 
             modelBuilder.Entity<Customer>(entity =>
             {
-                entity.ToTable("customers", "sales");
+                entity.ToTable("customers");
 
                 entity.Property(e => e.CustomerId).HasColumnName("customer_id");
 
@@ -108,7 +107,7 @@ namespace Middt.Sample.Api.Model.Database
 
             modelBuilder.Entity<Order>(entity =>
             {
-                entity.ToTable("orders", "sales");
+                entity.ToTable("orders");
 
                 entity.Property(e => e.OrderId).HasColumnName("order_id");
 
@@ -136,26 +135,26 @@ namespace Middt.Sample.Api.Model.Database
                     .WithMany(p => p.Orders)
                     .HasForeignKey(d => d.CustomerId)
                     .OnDelete(DeleteBehavior.Cascade)
-                    .HasConstraintName("FK__orders__customer__47DBAE45");
+                    .HasConstraintName("FK__orders__customer__5812160E");
 
                 entity.HasOne(d => d.Staff)
                     .WithMany(p => p.Orders)
                     .HasForeignKey(d => d.StaffId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK__orders__staff_id__49C3F6B7");
+                    .HasConstraintName("FK__orders__staff_id__19DFD96B");
 
                 entity.HasOne(d => d.Store)
                     .WithMany(p => p.Orders)
                     .HasForeignKey(d => d.StoreId)
-                    .HasConstraintName("FK__orders__store_id__48CFD27E");
+                    .HasConstraintName("FK__orders__store_id__59FA5E80");
             });
 
             modelBuilder.Entity<OrderItem>(entity =>
             {
                 entity.HasKey(e => new { e.OrderId, e.ItemId })
-                    .HasName("PK__order_it__837942D422F4EA95");
+                    .HasName("PK__order_it__837942D46BD5688F");
 
-                entity.ToTable("order_items", "sales");
+                entity.ToTable("order_items");
 
                 entity.Property(e => e.OrderId).HasColumnName("order_id");
 
@@ -176,17 +175,17 @@ namespace Middt.Sample.Api.Model.Database
                 entity.HasOne(d => d.Order)
                     .WithMany(p => p.OrderItems)
                     .HasForeignKey(d => d.OrderId)
-                    .HasConstraintName("FK__order_ite__order__4D94879B");
+                    .HasConstraintName("FK__order_ite__order__5629CD9C");
 
                 entity.HasOne(d => d.Product)
                     .WithMany(p => p.OrderItems)
                     .HasForeignKey(d => d.ProductId)
-                    .HasConstraintName("FK__order_ite__produ__4E88ABD4");
+                    .HasConstraintName("FK__order_ite__produ__571DF1D5");
             });
 
             modelBuilder.Entity<Product>(entity =>
             {
-                entity.ToTable("products", "production");
+                entity.ToTable("products");
 
                 entity.Property(e => e.ProductId).HasColumnName("product_id");
 
@@ -209,19 +208,28 @@ namespace Middt.Sample.Api.Model.Database
                 entity.HasOne(d => d.Brand)
                     .WithMany(p => p.Products)
                     .HasForeignKey(d => d.BrandId)
-                    .HasConstraintName("FK__products__brand___3C69FB99");
+                    .HasConstraintName("FK__products__brand___52593CB8");
 
                 entity.HasOne(d => d.Category)
                     .WithMany(p => p.Products)
                     .HasForeignKey(d => d.CategoryId)
-                    .HasConstraintName("FK__products__catego__3B75D760");
+                    .HasConstraintName("FK__products__catego__534D60F1");
             });
 
             modelBuilder.Entity<Staff>(entity =>
             {
-                entity.ToTable("staffs", "sales");
+                entity.ToTable("staffs");
 
-                entity.HasIndex(e => e.Email, "UQ__staffs__AB6E6164B6FB62E8")
+                entity.HasIndex(e => e.Email, "UQ__staffs__AB6E61641698DDCE")
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Email, "UQ__staffs__AB6E616493C9B50D")
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Email, "UQ__staffs__AB6E6164C78EDC27")
+                    .IsUnique();
+
+                entity.HasIndex(e => e.Email, "UQ__staffs__AB6E6164CB7F06B3")
                     .IsUnique();
 
                 entity.Property(e => e.StaffId).HasColumnName("staff_id");
@@ -258,20 +266,20 @@ namespace Middt.Sample.Api.Model.Database
                 entity.HasOne(d => d.Manager)
                     .WithMany(p => p.InverseManager)
                     .HasForeignKey(d => d.ManagerId)
-                    .HasConstraintName("FK__staffs__manager___44FF419A");
+                    .HasConstraintName("FK__staffs__manager___00200768");
 
                 entity.HasOne(d => d.Store)
                     .WithMany(p => p.staff)
                     .HasForeignKey(d => d.StoreId)
-                    .HasConstraintName("FK__staffs__store_id__440B1D61");
+                    .HasConstraintName("FK__staffs__store_id__5BE2A6F2");
             });
 
             modelBuilder.Entity<Stock>(entity =>
             {
                 entity.HasKey(e => new { e.StoreId, e.ProductId })
-                    .HasName("PK__stocks__E68284D37B9C9375");
+                    .HasName("PK__stocks__E68284D3580E7DC3");
 
-                entity.ToTable("stocks", "production");
+                entity.ToTable("stocks");
 
                 entity.Property(e => e.StoreId).HasColumnName("store_id");
 
@@ -282,17 +290,17 @@ namespace Middt.Sample.Api.Model.Database
                 entity.HasOne(d => d.Product)
                     .WithMany(p => p.Stocks)
                     .HasForeignKey(d => d.ProductId)
-                    .HasConstraintName("FK__stocks__product___52593CB8");
+                    .HasConstraintName("FK__stocks__product___5441852A");
 
                 entity.HasOne(d => d.Store)
                     .WithMany(p => p.Stocks)
                     .HasForeignKey(d => d.StoreId)
-                    .HasConstraintName("FK__stocks__store_id__5165187F");
+                    .HasConstraintName("FK__stocks__store_id__5535A963");
             });
 
             modelBuilder.Entity<Store>(entity =>
             {
-                entity.ToTable("stores", "sales");
+                entity.ToTable("stores");
 
                 entity.Property(e => e.StoreId).HasColumnName("store_id");
 
