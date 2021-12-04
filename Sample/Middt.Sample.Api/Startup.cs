@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Api;
 using Middt.Framework.Common.Configuration;
@@ -10,6 +11,7 @@ using Middt.Framework.Common.Email;
 using Middt.Framework.Common.Log;
 using Middt.Framework.Model.Model.Authentication;
 using Middt.Sample.Api.config.Helper;
+using Middt.Sample.Api.config.Model;
 using Swashbuckle.AspNetCore.Filters;
 
 namespace Middt.Sample.Api
@@ -24,12 +26,21 @@ namespace Middt.Sample.Api
 
         public override void CustomConfigureServices(IServiceCollection services)
         {
+
             services.AddSingleton<IBaseConfiguration, ConfigurationHelper>();
             services.AddSingleton<IBaseLog, Log4Net>();
             services.AddSingleton<IEmailSender, ExchangeEmailSender>();
 
+            var sp = services.BuildServiceProvider();
+
+            services.AddStackExchangeRedisCache(action =>
+            {
+                action.Configuration = sp.GetService<IBaseConfiguration>().Get<RedisSettings>().Connection;
+            });
+
             // 
             services.AddSingleton<IMemoryCache, MemoryCache>();
+            services.AddSingleton<IDistributedCache,RedisCache>();
 
             //   var sp = services.BuildServiceProvider();
             //   services.AddDbContext<Frameworkv2Context>(options =>

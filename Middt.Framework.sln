@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Api", "Fram
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Blazor.Web", "Framework\Web\Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj", "{C52B4EFE-EF72-49C4-AA2A-696FB23CF996}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugin", "Plugin", "{D5175DDE-6A56-4C79-B2DE-310BF082BE29}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Ad-Hoc|Any CPU = Ad-Hoc|Any CPU
@@ -226,6 +228,7 @@ Global
 		{BB0ED23F-C404-4617-9855-517E061B2A12} = {26622C5A-146B-4421-B44F-698B0476B826}
 		{C97732B9-8ADA-4C7A-95BC-145268B73751} = {2E765D18-ED85-4B11-B45A-1D5854B3E0B1}
 		{C52B4EFE-EF72-49C4-AA2A-696FB23CF996} = {2E765D18-ED85-4B11-B45A-1D5854B3E0B1}
+		{D5175DDE-6A56-4C79-B2DE-310BF082BE29} = {26622C5A-146B-4421-B44F-698B0476B826}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0FB274A6-01B1-4C78-8FDD-EEE8E31F8AB9}
