@@ -91,8 +91,7 @@ namespace Middt.Framework.Blazor.Web.Base
             ExecuteMethod(() =>
             {
                 BeforeSearch();
-                OnBeforeSearch?.Invoke();
-                
+   
                 Type serviceType = Service.GetType();
                 MethodInfo searchMethod = serviceType.GetMethods()
 
@@ -116,7 +115,7 @@ namespace Middt.Framework.Blazor.Web.Base
                 }
 
                 AfterSearch();
-                OnAfterSearch?.Invoke();
+              
             });
         }
 
@@ -130,11 +129,15 @@ namespace Middt.Framework.Blazor.Web.Base
             Pagination.Count = SearchResultModel.Count;
 
             Pagination.CalculateTotalPage();
+
+            OnAfterSearch?.Invoke();
         }
         public virtual void BeforeSearch()
         {
             SearchRequestModel.CurrentPage = Pagination.CurrentPage;
             SearchRequestModel.RequestItemSize = Pagination.PageSize;
+
+            OnBeforeSearch?.Invoke();
         }
 
     }

@@ -81,7 +81,8 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
         }
         void OnChange(string value, string name)
         {
-           // console.Log($"{name} value changed to {value}");
+           // Added radzen blazor bug
         }
+
     }
 }

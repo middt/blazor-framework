@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Api;
 using Middt.Framework.Common.Configuration;
@@ -26,23 +28,21 @@ namespace Middt.Sample.Api
             services.AddSingleton<IBaseLog, Log4Net>();
             services.AddSingleton<IEmailSender, ExchangeEmailSender>();
 
+            // 
+            services.AddSingleton<IMemoryCache, MemoryCache>();
+
             //   var sp = services.BuildServiceProvider();
             //   services.AddDbContext<Frameworkv2Context>(options =>
             //options.UseSqlServer(sp.GetService<BaseConfiguration>().Get<DBSettings>().TestDB));
 
-            //services.AddHangfire(_ => _.UseSqlServerStorage(ConfigurationHelper.Instance.Get<DBSettings>().HANGFIREDB));
-            //services.AddDbContext<UBKS_DevelopmentContext>(ServiceLifetime.Transient);
 
             services.Configure<ApiBehaviorOptions>(options =>
             {
                 options.SuppressModelStateInvalidFilter = true;
             });
 
-            //services.Configure<MvcOptions>(x => x.Filters.Add(new ValidateModelAttribute()));
-
             services.AddSwaggerExamplesFromAssemblyOf<LoginRequestModelSwaggerExample>();
             FrameworkDependencyHelper.Instance.LoadServiceCollection(services);
-
         }
 
         public override void CustomSignalRHub(IApplicationBuilder app)

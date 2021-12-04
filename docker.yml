@@ -1,0 +1,4 @@
+version: latest
+services:
+  redis:
+    image: "redis:alpine"
