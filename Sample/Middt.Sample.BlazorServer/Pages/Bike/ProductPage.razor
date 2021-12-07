@@ -1,0 +1,65 @@
+﻿@page "/Bike/Product"
+@inherits BaseListCrudPageCode<ProductService, IProductService, Product>
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Sample.Common.Service
+@using Middt.Sample.Api.Model.Database;
+
+
+
+<BaseRadzenListCrudPage ModalTitle="Product"
+                        TService="ProductService"
+                        TInterface="IProductService"
+                        TModel="Product"
+                        @ref="baseListCrudPage">
+    <SearchContent>
+        <div class="row top-space" style="width:100%;">
+            <div class="col-md-2">
+                Name
+            </div>
+            <div class="col-md-4">
+                <RadzenTextBox @bind-Value=SearchRequestModel.RequestModel.ProductName Style="width:250px"></RadzenTextBox>
+            </div>
+        </div>
+    </SearchContent>
+    <ListContent>
+        <RadzenGridColumn TItem="Product" Property="ProductName" Title="Name" />
+        <RadzenGridColumn TItem="Product" Property="ModelYear" Title="Year" />
+        <RadzenGridColumn TItem="Product" Property="ListPrice" Title="Price" />
+        <RadzenGridColumn TItem="Product" Width="70px">
+            <Template Context="item">
+                <RadzenButton Click="() => Edit(item)" Icon="edit" />
+            </Template>
+        </RadzenGridColumn>
+    </ListContent>
+    <EditContent>
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="name">Name</label>
+            </div>
+            <div class="col-md-9">
+                <RadzenTextBox @bind-Value="Model.ProductName" class="form-control" />
+                <ValidationMessage For="() => Model.ProductName"></ValidationMessage>
+            </div>
+        </div>
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="name">Model Year</label>
+            </div>
+            <div class="col-md-9">
+                <RadzenNumeric @bind-Value="Model.ModelYear" class="form-control" />
+                <ValidationMessage For="() => Model.ModelYear"></ValidationMessage>
+            </div>
+        </div>
+        <div class="row top-space">
+            <div class="align-items-center d-flex col-md-3">
+                <label for="name">List Price</label>
+            </div>
+            <div class="col-md-9">
+                <RadzenNumeric @bind-Value="Model.ListPrice" class="form-control" />
+                <ValidationMessage For="() => Model.ListPrice"></ValidationMessage>
+            </div>
+        </div>
+
+    </EditContent>
+</BaseRadzenListCrudPage>

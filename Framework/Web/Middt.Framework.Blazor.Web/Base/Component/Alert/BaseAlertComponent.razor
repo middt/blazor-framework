@@ -1,0 +1,23 @@
+﻿@inherits BaseComponent
+
+@using Middt.Framework.Blazor.Web.Base
+@using Middt.Framework.Model.Model.Enumerations
+@using Middt.Framework.Common.Model.Data
+
+
+@if (Result != null)
+{
+
+    @if (Result.Result == ResultEnum.Success)
+    {
+        <div class="col-10 alert alert-info">
+            <span>İşlem başarı ile gerçekleştirildi.</span>
+        </div>
+    }
+    else
+    {
+        <div class="col-10 alert alert-danger">
+            <span>İşlem gerçekleştirilemedi, bir hata oluştu.</span>
+        </div>
+    }
+}

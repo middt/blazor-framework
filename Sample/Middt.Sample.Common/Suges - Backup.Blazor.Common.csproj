@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="9.3.0" />
+    <PackageReference Include="Polly" Version="7.2.1" />
+    <PackageReference Include="RestEase" Version="1.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Suges.NetCore.Common\Suges.Framework.Common.csproj" />
+    <ProjectReference Include="..\Suges.Framework.Model\Suges.Framework.Model.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Service\WeatherForecast\Validation\" />
+  </ItemGroup>
+
+</Project>

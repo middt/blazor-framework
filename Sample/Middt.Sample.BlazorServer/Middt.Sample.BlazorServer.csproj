@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <UserSecretsId>719e5362-1dd0-4f2e-993e-f68394a4583e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Override\**" />
+    <Content Remove="Override\**" />
+    <EmbeddedResource Remove="Override\**" />
+    <None Remove="Override\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="config\log4net.config" />
+    <None Include="Pages\Error.cshtml" />
+    <None Include="Pages\Index.razor" />
+    <None Include="Pages\Sample\Login\LoginPage.razor" />
+    <None Include="Pages\Sample\SignalR\Component\TestSignalRComponent.razor" />
+    <None Include="Pages\_Host.cshtml" />
+    <None Include="Properties\PublishProfiles\30.101.pubxml.user" />
+    <None Include="Properties\PublishProfiles\local.pubxml.user" />
+    <None Include="Shared\LayoutWithoutAuth.razor" />
+    <None Include="Shared\MainLayout.razor" />
+    <None Include="wwwroot\css\bootstrap\bootstrap.min.css.map" />
+    <None Include="wwwroot\css\open-iconic\FONT-LICENSE" />
+    <None Include="wwwroot\css\open-iconic\font\fonts\open-iconic.svg" />
+    <None Include="wwwroot\css\open-iconic\ICON-LICENSE" />
+    <None Include="wwwroot\css\open-iconic\README.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SlowCheetah" Version="4.0.8">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Radzen.Blazor" Version="3.13.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Framework\Web\Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj" />
+    <ProjectReference Include="..\Middt.Sample.Common\Middt.Sample.Common.csproj" />
+  </ItemGroup>
+
+</Project>

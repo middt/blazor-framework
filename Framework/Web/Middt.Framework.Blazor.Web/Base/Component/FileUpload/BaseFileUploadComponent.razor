@@ -1,0 +1,65 @@
+﻿@inherits Middt.Framework.Blazor.Web.Base.BaseComponent
+
+@using Middt.Framework.Blazor.Web.Base
+@using Middt.Framework.Blazor.Web.Model
+@using Middt.Framework.Model.Model.Enumerations;
+@using Radzen.Blazor;
+
+@using Microsoft.AspNetCore.Components;
+@using Middt.Framework.Common.Log;
+@using Middt.Framework.Common.Model.Data;
+@using Middt.Framework.Common.Notification;
+@using Syncfusion.Blazor;
+@using Syncfusion.Blazor.Inputs
+<style>
+   .e-custom.e-input-group.e-input-focus:not(.e-success):not(.e-warning):not(.e-error) {  
+        box-shadow: 0 0 0 3px rgb(255 0 0 / 25%);  
+        border-color: #e41616;  
+    }  
+
+
+    .e-file-drop
+    {
+        display:none;
+    }
+</style>
+<div class="input-group">
+    <div class="custom-file">
+        <SfUploader style="display: none;"
+                    Locale="tr"
+                    AutoUpload="true"
+                    AllowedExtensions="@acceptedFileTypes"
+                    ShowFileList="false"
+                    MaxFileSize="@MaxFileSize">
+            <UploaderEvents ValueChange="HandleSelection"></UploaderEvents>
+        </SfUploader>
+    </div>
+</div>
+@if (
+ActiveFileUploadModelList != null
+&& ActiveFileUploadModelList.Count > 0)
+{
+    <RadzenGrid Data="ActiveFileUploadModelList">
+        <Columns>
+            <RadzenGridColumn TItem="FileUploadModel" Title="DOSYA ADI" Width="80%">
+                <Template Context="fileUploadModel">
+                    @if (!string.IsNullOrEmpty(fileUploadModel.FilePath))
+                {
+                    <a href="@fileUploadModel.FilePath" target="_blank" download>@fileUploadModel.Name</a>
+                }
+                else
+                {
+                    @fileUploadModel.Name
+                }
+
+            </Template>
+        </RadzenGridColumn>
+
+        <RadzenGridColumn TItem="FileUploadModel">
+            <Template Context="fileUploadModel">
+                <RadzenButton Click="() => Delete(fileUploadModel)" Icon="delete" />
+            </Template>
+        </RadzenGridColumn>
+    </Columns>
+</RadzenGrid>
+}

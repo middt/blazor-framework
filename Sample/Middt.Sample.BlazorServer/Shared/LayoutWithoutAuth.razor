@@ -1,0 +1,37 @@
+﻿@inherits LayoutComponentBase
+
+@*@using Microsoft.AspNetCore.Components
+    @using Microsoft.AspNetCore.Http
+    @using Radzen.Blazor
+    @using Middt.Sample.BlazorServer.Service;
+    @using Middt.Sample.BlazorServer.Model;*@
+
+
+
+@if (Theme != "default.css")
+{
+                <link href="_content/Radzen.Blazor/css/@(Theme)" rel="stylesheet" />
+}
+<RadzenDialog />
+<RadzenNotification />
+<RadzenTooltip />
+<RadzenContextMenu />
+<RadzenHeader>
+    <ChildContent>
+    </ChildContent>
+</RadzenHeader>
+<div style="width:100%">
+    <RadzenBody @ref="@body0" @bind-Expanded="@bodyExpanded">
+        <ChildContent>
+            <RadzenContentContainer Name="main">
+                @Body
+            </RadzenContentContainer>
+        </ChildContent>
+    </RadzenBody>
+</div>
+        <RadzenFooter>
+            <ChildContent>
+                <RadzenLabel Text="Middt Framework, Copyright &copy; 2022">
+                </RadzenLabel>
+            </ChildContent>
+        </RadzenFooter>

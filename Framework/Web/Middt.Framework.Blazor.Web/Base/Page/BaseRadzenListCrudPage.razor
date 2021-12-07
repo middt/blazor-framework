@@ -1,0 +1,69 @@
+﻿@inherits BaseListCrudPageComponentClass<TService, TInterface, TModel>
+
+@using Middt.Framework.Blazor.Web.Base
+@using Middt.Framework.Blazor.Web.Base.Page
+@using Middt.Framework.Blazor.Web.Base.Component.Modal;
+
+
+@using Middt.Framework.Common.Model.Data
+@using Middt.Framework.Common.Service
+@using Middt.Framework.Model.Model.Enumerations
+
+@using Radzen.Blazor;
+@using Radzen;
+
+@using Middt.Framework.Blazor.Web.Base.Component.Pagination;
+
+@typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
+@typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
+@typeparam TModel where TModel : BaseRequestModel, new()
+
+
+@if (SearchContent != null && !HideSearch)
+{
+    <RadzenCard>
+        <EditForm Model="@SearchRequestModel">
+            <div class="row" style="margin-top:10px;">
+                @SearchContent
+            </div>
+            @if (!HideSearchButton)
+            {
+                <div class="row" style="margin-top:10px;">
+                    <div class="col-lg-5">
+                        <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
+
+                        <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+                    </div>
+                </div>
+            }
+        </EditForm>
+    </RadzenCard>
+}
+<br />
+@if (!HideInsertButton)
+{
+    <RadzenButton Icon="add_circle_outline" style="margin-bottom: 10px" Text="@InsertText" Click="() => New()" />
+
+}
+
+<RadzenGrid AllowColumnResize="true"
+            @ref="radzenGrid"
+            TItem=TModel
+            style="height: 500px">
+    <Columns>
+        @ListContent
+
+
+    </Columns>
+</RadzenGrid>
+<BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
+</BasePaginationComponent>
+
+<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight">
+    <ChildContent>
+        @EditContent
+    </ChildContent>
+</BaseCrudModal>
+
+<BaseLoadingModal @ref="LoadingModal">
+</BaseLoadingModal>

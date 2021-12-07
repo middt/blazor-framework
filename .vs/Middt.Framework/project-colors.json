@@ -1,0 +1,81 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "e1538a22-398e-4086-a699-937cd22ad626": {
+      "ProjectGuid": "e1538a22-398e-4086-a699-937cd22ad626",
+      "DisplayName": "Suges.Framework.Api",
+      "ColorIndex": 0
+    },
+    "b083cab8-5503-4aba-82e6-4992ebc2fa5e": {
+      "ProjectGuid": "b083cab8-5503-4aba-82e6-4992ebc2fa5e",
+      "DisplayName": "Suges.Framework.Blazor.Web",
+      "ColorIndex": 1
+    },
+    "e40f806c-425d-4800-87cf-7ae51d179739": {
+      "ProjectGuid": "e40f806c-425d-4800-87cf-7ae51d179739",
+      "DisplayName": "Suges.Framework.Common",
+      "ColorIndex": 2
+    },
+    "b0d86627-e289-469c-a568-8366822317b6": {
+      "ProjectGuid": "b0d86627-e289-469c-a568-8366822317b6",
+      "DisplayName": "Suges.Framework.Model",
+      "ColorIndex": 3
+    },
+    "f7e48bff-81ed-41a2-a96d-45b2005299be": {
+      "ProjectGuid": "f7e48bff-81ed-41a2-a96d-45b2005299be",
+      "DisplayName": "Suges.Template.Common",
+      "ColorIndex": 4
+    },
+    "bb9d3172-fe34-4c85-82b2-f577dd4d28fe": {
+      "ProjectGuid": "bb9d3172-fe34-4c85-82b2-f577dd4d28fe",
+      "DisplayName": "Suges.Template.Api",
+      "ColorIndex": 5
+    },
+    "874252e7-8a58-42b3-b421-9d2776d7fe87": {
+      "ProjectGuid": "874252e7-8a58-42b3-b421-9d2776d7fe87",
+      "DisplayName": "Suges.Template.BlazorServer",
+      "ColorIndex": 6
+    },
+    "a2fe74e1-b743-11d0-ae1a-00a0c90fffc3": {
+      "ProjectGuid": "a2fe74e1-b743-11d0-ae1a-00a0c90fffc3",
+      "DisplayName": "Miscellaneous Files",
+      "ColorIndex": -1
+    },
+    "c97732b9-8ada-4c7a-95bc-145268b73751": {
+      "ProjectGuid": "c97732b9-8ada-4c7a-95bc-145268b73751",
+      "DisplayName": "Suges.Framework.Api",
+      "ColorIndex": 7
+    },
+    "99d888e5-879c-4418-8a76-ac9f88e80310": {
+      "ProjectGuid": "99d888e5-879c-4418-8a76-ac9f88e80310",
+      "DisplayName": "Suges.Framework.Blazor.Web2",
+      "ColorIndex": 8
+    },
+    "accd39b1-b628-466e-a49b-074ec7a60962": {
+      "ProjectGuid": "accd39b1-b628-466e-a49b-074ec7a60962",
+      "DisplayName": "Suges.Framework.Blazor.Web3",
+      "ColorIndex": 9
+    },
+    "c52b4efe-ef72-49c4-aa2a-696fb23cf996": {
+      "ProjectGuid": "c52b4efe-ef72-49c4-aa2a-696fb23cf996",
+      "DisplayName": "Suges.Framework.Blazor.Web",
+      "ColorIndex": 10
+    },
+    "d4b7bce8-a63e-4436-9189-2d8922ad6fff": {
+      "ProjectGuid": "d4b7bce8-a63e-4436-9189-2d8922ad6fff",
+      "DisplayName": "Solution Items",
+      "ColorIndex": 11
+    },
+    "ed428952-3463-4067-9388-a93919ad9f9e": {
+      "ProjectGuid": "ed428952-3463-4067-9388-a93919ad9f9e",
+      "DisplayName": "Sample",
+      "ColorIndex": 12
+    },
+    "ac37e2cf-a81a-43a7-9b87-feb6be21c872": {
+      "ProjectGuid": "ac37e2cf-a81a-43a7-9b87-feb6be21c872",
+      "DisplayName": "Middt.Framework.Plugin.Redis",
+      "ColorIndex": 13
+    }
+  },
+  "NextColorIndex": 14
+}

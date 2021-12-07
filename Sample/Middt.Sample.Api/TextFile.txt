@@ -1,0 +1,4 @@
+﻿Scaffold-DbContext "data source=192.168.30.101\SQLEXPRESS;initial catalog=Frameworkv2;persist security info=True;user id=akdeniz;password=akdeniz;MultipleActiveResultSets=True;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Model/Database -force
+
+
+http://127.0.0.1:7010/swagger/index.html - swagger

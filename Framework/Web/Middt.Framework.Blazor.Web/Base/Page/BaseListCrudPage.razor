@@ -1,0 +1,53 @@
+﻿@inherits BaseListCrudPageComponentClass<TService, TInterface, TModel>
+
+@using Middt.Framework.Blazor.Web.Base
+@using Middt.Framework.Blazor.Web.Base.Page
+@using Middt.Framework.Blazor.Web.Base.Component.Modal
+
+
+@using Middt.Framework.Common.Model.Data
+@using Middt.Framework.Common.Service
+@using Middt.Framework.Model.Model.Enumerations
+
+@using Middt.Framework.Blazor.Web.Base.Component.Pagination;
+@using Radzen.Blazor;
+@using Radzen;
+
+
+@typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
+@typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
+@typeparam TModel where TModel : BaseRequestModel, new()
+
+@if (SearchContent != null && !HideSearch)
+{
+    <EditForm Model="@SearchRequestModel">
+        <div class="row" style="margin-top:10px;">
+            @SearchContent
+        </div>
+        @if (!HideSearchButton)
+        {
+
+
+            <div class="row" style="margin-top:10px;">
+                <div class="col-lg-5">
+                    <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
+                    <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+                </div>
+            </div>
+        }
+    </EditForm>
+}
+<br />
+
+@ListContent
+
+<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight" ShowClose="false">
+    <ChildContent>
+        @EditContent
+    </ChildContent>
+</BaseCrudModal>
+<BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
+</BasePaginationComponent>
+
+<BaseLoadingModal @ref="LoadingModal">
+</BaseLoadingModal>

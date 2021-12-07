@@ -1,0 +1,14 @@
+﻿List<TableHistory> tableHistories = new List<TableHistory>();
+
+TableHistory tableHistory;
+    for (int i = 0; i < 100; i++)
+    {
+        tableHistory = new TableHistory();
+        tableHistory.Ad = "Ad " + i.ToString();
+        tableHistories.Add(tableHistory);
+    }
+
+TableHistoryRepository tableHistoryRepository = new TableHistoryRepository();
+tableHistoryRepository.BulkInsert(tableHistories, new EFCore.BulkExtensions.BulkConfig() { PropertiesToExclude = new List<string>(){ nameof(tableHistory.ValidTill),nameof(tableHistory.ValidFrom) } });
+tableHistoryRepository.BulkDelete(x => x.Id > 99);
+tableHistoryRepository.BulkUpdate(x => x.Id > 90, a => new TableHistory { Ad = a.Ad + "10" });

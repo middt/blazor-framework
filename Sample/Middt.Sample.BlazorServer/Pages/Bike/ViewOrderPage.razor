@@ -1,0 +1,84 @@
+﻿@page "/Bike/Order"
+@inherits BaseListPageCode<ViewOrderService, IViewOrderService, ViewOrder>
+
+@using Middt.Framework.Blazor.Web.Base.Page;
+@using Middt.Sample.BlazorServer.Pages.Bike.PopUp
+@using Middt.Sample.Common.Service
+@using Middt.Sample.Api.Model.Database;
+
+
+
+<BaseRadzenListPage TService="ViewOrderService"
+                    TInterface="IViewOrderService"
+                    TModel="ViewOrder"
+                    @ref="baseListPage">
+    <SearchContent>
+        <div class="row top-space" style="width:100%;">
+            <div class="col-md-2">
+                Order Id
+            </div>
+            <div class="col-md-4">
+                <RadzenNumeric @bind-Value=@SearchRequestModel.RequestModel.OrderId Style="width:250px"></RadzenNumeric>
+            </div>
+            <div class="col-md-2">
+                Store
+            </div>
+            <div class="col-md-4">
+                <RadzenDropDown AllowClear="true"
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                @bind-Value=@SearchRequestModel.RequestModel.StoreId
+                                Data=@ListStore
+                                TextProperty="StoreName"
+                                ValueProperty="StoreId" 
+                                Style="width:250px"/>
+            </div>
+        </div>
+        <div class="row top-space" style="width:100%;">
+            <div class="col-md-2">
+                Customer
+            </div>
+            <div class="col-md-4">
+                <RadzenTextBox @ref="txtCustomerName" Change=@(args => OnChange(args, "")) Disabled="true" Style="width:250px"/>
+                <RadzenButton Click="() => OpenCustomerModel()" Icon="search" />
+            </div>
+            <div class="col-md-2">
+                Staff
+            </div>
+            <div class="col-md-4">
+                <RadzenDropDown AllowClear="true" 
+                                AllowFiltering="true"
+                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                @bind-Value=@SearchRequestModel.RequestModel.StaffId
+                                Data=@ListStaff
+                                TextProperty="Name"
+                                ValueProperty="StaffId"
+                                Style="width:250px"/>
+            </div>
+        </div>
+        <div class="row top-space" style="width:100%;">
+            <div class="col-md-2">
+                Start Date
+            </div>
+            <div class="col-md-4">
+                <RadzenDatePicker @bind-Value="SearchRequestModel.RequestModel.OrderStartDate" Style="width:250px"></RadzenDatePicker>
+
+            </div>
+            <div class="col-md-2">
+                End Date
+            </div>
+            <div class="col-md-4"> 
+                <RadzenDatePicker @bind-Value="SearchRequestModel.RequestModel.OrderEndDate" Style="width:250px"></RadzenDatePicker>
+            </div>
+        </div>
+    </SearchContent>
+    <ListContent>
+        <RadzenGridColumn TItem="ViewOrder" Property="StoreName" Title="Store" />
+        <RadzenGridColumn TItem="ViewOrder" Property="StaffName" Title="Staff Name" />
+        <RadzenGridColumn TItem="ViewOrder" Property="CustomerName" Title="Customer Name" />
+        <RadzenGridColumn TItem="ViewOrder" Property="OrderDate" Title="Order Date" />
+    </ListContent>
+</BaseRadzenListPage>
+
+<PopCustomerSelect @ref="popCustomerSelect">
+</PopCustomerSelect>
