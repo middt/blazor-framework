@@ -9,14 +9,13 @@
 @using Middt.Framework.Common.Service
 @using Middt.Framework.Model.Model.Enumerations
 
-
 @typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
 @typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
 @typeparam TModel where TModel : BaseRequestModel, new()
 
 @if (Model != null)
 {
-    <EditForm Model="@Model">
+    <EditForm Model="@Model" OnValidSubmit="@SaveButtonClick">
         <DataAnnotationsValidator />
         @DetailContent
     </EditForm>
@@ -25,22 +24,5 @@
 <BaseLoadingModal @ref="LoadingModal">
 </BaseLoadingModal>
 @code{
-    protected override void CustomOnAfterRenderAsync(bool firstRender)
-        {
-            base.CustomOnAfterRenderAsync(firstRender);
 
-
-            if (firstRender)
-            {
-                if (Model != null)
-                {
-                    IsUpdate = true;
-                }
-                else
-                {
-                    IsUpdate = false;
-                    New();
-                }
-            }
-        }
 }

@@ -75,7 +75,22 @@
       "ProjectGuid": "ac37e2cf-a81a-43a7-9b87-feb6be21c872",
       "DisplayName": "Middt.Framework.Plugin.Redis",
       "ColorIndex": 13
+    },
+    "b1f16dbb-f1b9-4e7b-881c-20e9f9501879": {
+      "ProjectGuid": "b1f16dbb-f1b9-4e7b-881c-20e9f9501879",
+      "DisplayName": "Middt.Framework.Plugin.RabbitMQ",
+      "ColorIndex": 14
+    },
+    "61d32820-eb48-480b-9c2c-a773161ab690": {
+      "ProjectGuid": "61d32820-eb48-480b-9c2c-a773161ab690",
+      "DisplayName": "Middt.Framework.Plugin.MassTransit",
+      "ColorIndex": 15
+    },
+    "72bf7ae1-3171-4aef-bdbd-8845b99ff832": {
+      "ProjectGuid": "72bf7ae1-3171-4aef-bdbd-8845b99ff832",
+      "DisplayName": "Middt.Sample.CategoryConsumer",
+      "ColorIndex": 0
     }
   },
-  "NextColorIndex": 14
+  "NextColorIndex": 1
 }

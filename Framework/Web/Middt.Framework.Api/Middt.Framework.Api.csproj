@@ -1,15 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
+		<ImplicitUsings>enable</ImplicitUsings>
+		
 		<TargetFramework>net6.0</TargetFramework>
 		<Product>Middt Framework Api</Product>
+		<Owners>Mehmet TOSUN</Owners>
+		<PackageProjectUrl>https://github.com/middt/blazor-framework</PackageProjectUrl>
 		<IsPackable>true</IsPackable>
-		<ImplicitUsings>enable</ImplicitUsings>
+		<PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
+
 		<VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
 		<AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
 		<AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>
 		<Version Condition=" '$(VersionSuffix)' == '' ">0.0.1.0</Version>
 		<Version Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</Version>
+		<Authors>$(Owners)</Authors>
+		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
 	</PropertyGroup>
 
 	<ItemGroup>

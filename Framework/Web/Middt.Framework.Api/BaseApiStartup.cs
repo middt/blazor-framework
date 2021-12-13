@@ -13,6 +13,13 @@ using Middt.Framework.Model.Model.Authentication;
 using Middt.Framework.Model.Model.Configuration;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder;
+using System;
+using System.IO;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Api
 {

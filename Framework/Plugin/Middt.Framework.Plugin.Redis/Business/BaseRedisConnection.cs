@@ -17,18 +17,16 @@ namespace Middt.Framework.Plugin.Redis
 
         public  RedLockFactory redLockFactory { get; set; }
 
-
-
-        IBaseConfiguration baseConfiguration;
-        public BaseRedisConnection(IBaseConfiguration _baseConfiguration)
+        RedisSettings redisSettings;
+        public BaseRedisConnection(RedisSettings _redisSettings)
         {
-            baseConfiguration = _baseConfiguration;
-
+            redisSettings = _redisSettings;
             ConfigurationOptions configurationOptions = GetConfig();
             CreateConnection(configurationOptions);
+            CreateLock();
         }
 
-        private void CreateLock(ConfigurationOptions configurationOptions)
+        private void CreateLock()
         {
             redLockFactory = RedLockFactory.Create(new List<RedLockMultiplexer>
             {
@@ -46,8 +44,7 @@ namespace Middt.Framework.Plugin.Redis
             configurationOptions.SyncTimeout = 500000;
             configurationOptions.AbortOnConnectFail = false;
 
-            List<RedisModel> redisModelList = baseConfiguration.Get<RedisSettings>().RedisModelList;
-
+            List<RedisModel> redisModelList = redisSettings.RedisModelList;
 
             foreach (RedisModel redisModel in redisModelList)
             {

@@ -9,29 +9,22 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Plugin.Redis
 {
-    public class BaseRedisCache<T> where T : class
+    public abstract class BaseRedisCache<T> where T : class
     {
-        TimeSpan wait = TimeSpan.FromSeconds(10);
-        TimeSpan retry = TimeSpan.FromSeconds(1);
+        TimeSpan lockWait = TimeSpan.FromSeconds(10);
+        TimeSpan lockRetry = TimeSpan.FromSeconds(1);
 
-        TimeSpan timeout = TimeSpan.FromSeconds(30);
+        public int DBIndex { get; set; } = 0;
 
+        public abstract string CacheName { get; }
 
-
-        public string CacheName { get; set; } = typeof(T).Name;
-
-        public string LockName
+        protected string LockName
         {
             get
             {
                 return CacheName + "_Lock";
             }
         }
-
-
-        public int DBIndex { get; set; } = 0;
-
-
 
         private readonly JsonHelper<T> jsonHelper;
 
@@ -47,10 +40,10 @@ namespace Middt.Framework.Plugin.Redis
             jsonHelper = new JsonHelper<T>();
         }
 
-        public bool WriteWithLock(Func<T> RunMethod, int timeOutSecond)
+        public bool WriteWithLock(Func<T> RunMethod, int lockTimeOutSecond)
         {
-            timeout = TimeSpan.FromSeconds(timeOutSecond);
-            using (var redLock = baseRedislock.CreateLock(LockName, timeout, wait, retry)) // there are also non async Create() methods
+            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
+            using (var redLock = baseRedislock.CreateLock(LockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
             {
                 if (redLock.IsAcquired)
                 {
@@ -63,26 +56,11 @@ namespace Middt.Framework.Plugin.Redis
             }
             return true;
         }
-        public bool WriteWithLock(Func<T> RunMethod)
+        public T ReadWrite(Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
         {
+            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
+            TimeSpan cacheTimeout = TimeSpan.FromSeconds(cacheTimeOutSecond);
 
-            using (var redLock = baseRedislock.CreateLock(LockName, timeout, wait, retry)) // there are also non async Create() methods
-            {
-                if (redLock.IsAcquired)
-                {
-                    T result = RunMethod();
-                    string json = jsonHelper.SerializeObject(result);
-
-                    IDatabase database = GetDatabase();
-                    database.StringSet(CacheName, json);
-                }
-            }
-            return true;
-        }
-
-        public T ReadWrite(Func<T> RunMethod, int timeOutSecond)
-        {
-            timeout = TimeSpan.FromSeconds(timeOutSecond);
 
             T returnModel = Read();
 
@@ -101,19 +79,19 @@ namespace Middt.Framework.Plugin.Redis
                 string json = jsonHelper.SerializeObject(result);
 
                 IDatabase database = GetDatabase();
-                database.StringSet(CacheName, json, timeout);
+                database.StringSet(CacheName, json, cacheTimeout);
 
                 return result;
-            }, LockName, timeout, wait, retry);
+            }, LockName, lockTimeout, lockWait, lockRetry);
 
             return returnModel;
 
         }
 
-        public void DeleteKey(int timeOutSecond)
+        public void DeleteKey(int lockTimeOutSecond)
         {
-            timeout = TimeSpan.FromSeconds(timeOutSecond);
-            using (var redLock = baseRedislock.CreateLock(LockName, timeout, wait, retry)) // there are also non async Create() methods
+            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
+            using (var redLock = baseRedislock.CreateLock(LockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
             {
                 if (redLock.IsAcquired)
                 {
@@ -123,37 +101,7 @@ namespace Middt.Framework.Plugin.Redis
             }
 
         }
-        public T ReadWrite(Func<T> RunMethod)
-        {
-            T returnModel;
 
-            returnModel = Read();
-
-            if (returnModel != null)
-                return returnModel;
-
-
-            using (var redLock = baseRedislock.CreateLock(LockName, timeout, wait, retry)) // there are also non async Create() methods
-            {
-                if (redLock.IsAcquired)
-                {
-                    returnModel = Read();
-
-                    if (returnModel != null)
-                        return returnModel;
-
-
-                    T result = RunMethod();
-                    string json = jsonHelper.SerializeObject(result);
-
-                    IDatabase database = GetDatabase();
-                    database.StringSet(CacheName, json);
-                    returnModel = result;
-                }
-            }
-
-            return returnModel;
-        }
         private T Deserialize(string value)
         {
             T result = default(T);

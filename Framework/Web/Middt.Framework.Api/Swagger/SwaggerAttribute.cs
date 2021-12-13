@@ -1,4 +1,6 @@
-﻿namespace Middt.Framework.Api.Swagger
+﻿using System;
+
+namespace Middt.Framework.Api.Swagger
 {
     public class SwaggerTagAttribute : Attribute
     {

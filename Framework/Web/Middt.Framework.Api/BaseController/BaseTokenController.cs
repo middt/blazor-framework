@@ -8,6 +8,7 @@ using Middt.Framework.Model.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
 using Swashbuckle.AspNetCore.Annotations;
 using Swashbuckle.AspNetCore.Filters;
+using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;

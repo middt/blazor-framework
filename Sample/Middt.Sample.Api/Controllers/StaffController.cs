@@ -19,25 +19,38 @@ namespace Middt.Sample.Api.Controllers
     public class StaffController : BaseCrudControllerWithAuth<Staff, StaffRepository>
     {
         IBaseCache baseCache;
-        public StaffController(IBaseCache _baseCache)
+
+        StaffRedisCache staffRedisCache;
+        public StaffController(IBaseCache _baseCache, StaffRedisCache _staffRedisCache )
         {
             baseCache = _baseCache;
+            staffRedisCache = _staffRedisCache;
         }
 
         [Authorize]
         [HttpGet("[action]")]
         public override BaseResponseDataModel<List<Staff>> GetAll()
         {
-            string cacheKey = nameof(StaffController) + nameof(GetAll);
-
-            BaseResponseDataModel<List<Staff>> result = baseCache.GetSetValue<BaseResponseDataModel<List<Staff>>>(cacheKey, 1, 1,
-                () =>
-                {
-                    return base.GetAll();
-                }
-                );
-
-            return result;
+            return staffRedisCache.ReadWrite(() =>
+            {
+                return base.GetAll();
+            }, 60,60*60);
         }
+
+        //[Authorize]
+        //[HttpGet("[action]")]
+        //public override BaseResponseDataModel<List<Staff>> GetAll()
+        //{
+        //    string cacheKey = nameof(StaffController) + nameof(GetAll);
+
+        //    BaseResponseDataModel<List<Staff>> result = baseCache.GetSetValue<BaseResponseDataModel<List<Staff>>>(cacheKey, 1, 1,
+        //        () =>
+        //        {
+        //            return base.GetAll();
+        //        }
+        //        );
+
+        //    return result;
+        //}
     }
 }

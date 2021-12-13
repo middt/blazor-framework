@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Middt.Framework.Model.Model.Configuration
+namespace Middt.Framework.Plugin.Redis
 {
     public class RedisModel
     {

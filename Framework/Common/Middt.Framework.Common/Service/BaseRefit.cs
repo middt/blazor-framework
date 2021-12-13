@@ -42,9 +42,10 @@ namespace Middt.Framework.Common.Service
                            {
                                // See if the request has an authorize header
                                var auth = request.Headers.Authorization;
-                               if (auth != null)
+                               string token = baseSessionState.Token().Result;
+                               if (auth != null && !string.IsNullOrEmpty(token))
                                {
-                                   request.Headers.Authorization = new AuthenticationHeaderValue(auth.Scheme, baseSessionState.Token().Result);
+                                   request.Headers.Authorization = new AuthenticationHeaderValue(auth.Scheme, token);
                                }
                            });
 

@@ -1,4 +1,6 @@
-﻿namespace Middt.Framework.Api.Cache
+﻿using System;
+
+namespace Middt.Framework.Api.Cache
 {
     public interface IBaseCache
     {

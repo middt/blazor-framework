@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Api;
@@ -12,9 +11,9 @@ using Middt.Framework.Common.Email;
 using Middt.Framework.Common.Log;
 using Middt.Framework.Model.Model.Authentication;
 using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Plugin.MassTransit;
 using Middt.Framework.Plugin.Redis;
 using Middt.Sample.Api.config.Helper;
-using Middt.Sample.Api.config.Model;
 using StackExchange.Redis;
 using Swashbuckle.AspNetCore.Filters;
 using System.Collections.Generic;
@@ -62,6 +61,11 @@ namespace Middt.Sample.Api
             });
 
 
+
+            services.AddRedisCache(sp.GetService<IBaseConfiguration>().Get<RedisSettings>());
+            services.AddSingleton<StaffRedisCache>();
+            
+
             // 
             // services.AddSingleton<IMemoryCache, MemoryCache>();
             services.AddSingleton<IDistributedCache, RedisCache>();
@@ -70,6 +74,8 @@ namespace Middt.Sample.Api
             //   var sp = services.BuildServiceProvider();
             //   services.AddDbContext<Frameworkv2Context>(options =>
             //options.UseSqlServer(sp.GetService<BaseConfiguration>().Get<DBSettings>().TestDB));
+            
+            services.AddSingleton<BaseMassTransitConnection>();
 
 
             services.Configure<ApiBehaviorOptions>(options =>

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-	  <Product>Middt Framework Plugin Redis</Product>
+	  <Product>Middt Framework Plugin MassTransit</Product>
 	  <Owners>Mehmet TOSUN</Owners>
 	  <PackageProjectUrl>https://github.com/middt/blazor-framework</PackageProjectUrl>
 	  <IsPackable>true</IsPackable>
@@ -17,8 +17,8 @@
 	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="RedLock.net" Version="2.3.1" />
-    <PackageReference Include="StackExchange.Redis" Version="2.2.88" />
+    <PackageReference Include="MassTransit" Version="7.3.0" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="7.3.0" />
   </ItemGroup>
 
   <ItemGroup>
