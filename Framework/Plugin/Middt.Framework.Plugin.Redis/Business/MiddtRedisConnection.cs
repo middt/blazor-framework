@@ -11,14 +11,14 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Plugin.Redis
 {
-    public class BaseRedisConnection
+    public class MiddtRedisConnection
     {
         public ConnectionMultiplexer connectionMultiplexer { get; set; }
 
         public  RedLockFactory redLockFactory { get; set; }
 
         RedisSettings redisSettings;
-        public BaseRedisConnection(RedisSettings _redisSettings)
+        public MiddtRedisConnection(RedisSettings _redisSettings)
         {
             redisSettings = _redisSettings;
             ConfigurationOptions configurationOptions = GetConfig();

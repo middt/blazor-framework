@@ -18,14 +18,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="6.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="6.0.1" />
 		<PackageReference Include="Microsoft.AspNetCore.Hosting" Version="2.2.7" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.0" />
 		<PackageReference Include="Microsoft.VisualStudio.SlowCheetah" Version="4.0.8">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Radzen.Blazor" Version="3.13.4" />
+		<PackageReference Include="Radzen.Blazor" Version="3.13.6" />
 		<PackageReference Include="Syncfusion.Blazor" Version="18.4.0.49" />
 		<PackageReference Include="System.Drawing.Common" Version="6.0.0" />
 	</ItemGroup>

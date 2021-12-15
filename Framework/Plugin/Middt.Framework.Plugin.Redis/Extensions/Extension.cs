@@ -10,10 +10,11 @@ namespace Middt.Framework.Plugin.Redis
 {
     public static class RedisExtension
     {
-        public static void AddRedisCache(this IServiceCollection services, RedisSettings redisSettings)
+        public static void AddMiddtRedisCache(this IServiceCollection services, RedisSettings redisSettings)
         {
-            services.AddSingleton(new BaseRedisConnection(redisSettings));
-            services.AddSingleton<BaseRedislock>();
+            services.AddSingleton(new MiddtRedisConnection(redisSettings));
+            services.AddSingleton<MiddtRedislock>();
+            services.AddSingleton<MiddtRedisCache>();
         }
 
     }

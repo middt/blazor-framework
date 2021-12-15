@@ -9,115 +9,115 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Plugin.Redis
 {
-    public abstract class BaseRedisCache<T> where T : class
+    public class MiddtRedisCache
     {
         TimeSpan lockWait = TimeSpan.FromSeconds(10);
         TimeSpan lockRetry = TimeSpan.FromSeconds(1);
 
         public int DBIndex { get; set; } = 0;
 
-        public abstract string CacheName { get; }
 
-        protected string LockName
-        {
-            get
-            {
-                return CacheName + "_Lock";
-            }
-        }
+        MiddtRedisConnection baseRedisConnection;
+        MiddtRedislock baseRedislock;
 
-        private readonly JsonHelper<T> jsonHelper;
-
-        BaseRedisConnection baseRedisConnection;
-        BaseRedislock baseRedislock;
-
-        public BaseRedisCache(BaseRedisConnection _baseRedisConnection, BaseRedislock _baseRedislock)
+        public MiddtRedisCache(MiddtRedisConnection _baseRedisConnection, MiddtRedislock _baseRedislock)
         {
             baseRedisConnection = _baseRedisConnection;
             baseRedislock = _baseRedislock;
-
-
-            jsonHelper = new JsonHelper<T>();
         }
 
-        public bool WriteWithLock(Func<T> RunMethod, int lockTimeOutSecond)
-        {
-            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
-            using (var redLock = baseRedislock.CreateLock(LockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
-            {
-                if (redLock.IsAcquired)
-                {
-                    T result = RunMethod();
-                    string json = jsonHelper.SerializeObject(result);
-
-                    IDatabase database = GetDatabase();
-                    database.StringSet(CacheName, json);
-                }
-            }
-            return true;
-        }
-        public T ReadWrite(Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
+        public bool WriteWithLock<T>(string cacheName, Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
         {
             TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
             TimeSpan cacheTimeout = TimeSpan.FromSeconds(cacheTimeOutSecond);
 
+            string lockName = cacheName + "_Lock";
 
-            T returnModel = Read();
 
-            if (returnModel != null)
+            using (var redLock = baseRedislock.CreateLock(lockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
+            {
+                if (redLock.IsAcquired)
+                {
+                    T result = RunMethod();
+
+                    JsonHelper<T> jsonHelper = new JsonHelper<T>();
+                    string json = jsonHelper.SerializeObject(result);
+
+                    IDatabase database = GetDatabase();
+                    database.StringSet(cacheName, json, cacheTimeout);
+                }
+            }
+            return true;
+        }
+        public T ReadWrite<T>(string cacheName, Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
+        {
+            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
+            TimeSpan cacheTimeout = TimeSpan.FromSeconds(cacheTimeOutSecond);
+
+            string lockName = cacheName + "_Lock";
+
+
+            T returnModel = Read<T>(cacheName);
+
+            if (returnModel != null && !returnModel.Equals(default(T)))
                 return returnModel;
 
 
             returnModel = baseRedislock.ExecuteMethod<T>(() =>
             {
-                T result = Read();
+                T result = Read<T>(cacheName);
 
-                if (result != null)
-                    return result;
+
+                if (result != null && !result.Equals(default(T)))
+                    return returnModel;
 
                 result = RunMethod();
+
+                JsonHelper<T> jsonHelper = new JsonHelper<T>();
                 string json = jsonHelper.SerializeObject(result);
 
                 IDatabase database = GetDatabase();
-                database.StringSet(CacheName, json, cacheTimeout);
+                database.StringSet(cacheName, json, cacheTimeout);
 
                 return result;
-            }, LockName, lockTimeout, lockWait, lockRetry);
+            }, lockName, lockTimeout, lockWait, lockRetry);
 
             return returnModel;
 
         }
 
-        public void DeleteKey(int lockTimeOutSecond)
+        public void DeleteKey(string cacheName, int lockTimeOutSecond)
         {
+            string lockName = cacheName + "_Lock";
             TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
-            using (var redLock = baseRedislock.CreateLock(LockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
+            using (var redLock = baseRedislock.CreateLock(lockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
             {
                 if (redLock.IsAcquired)
                 {
                     IDatabase database = GetDatabase();
-                    database.KeyDelete(CacheName);
+                    database.KeyDelete(cacheName);
                 }
             }
 
         }
 
-        private T Deserialize(string value)
+        private T Deserialize<T>(string value)
         {
             T result = default(T);
             if (!string.IsNullOrEmpty(value))
             {
+                JsonHelper<T> jsonHelper = new JsonHelper<T>();
                 result = jsonHelper.DeserializeObject(value);
             }
 
             return result;
         }
 
-        public T Read()
+        public T Read<T>(string cacheName)
         {
             IDatabase database = GetDatabase();
-            RedisValue result = database.StringGet(CacheName);
-            return Deserialize(result);
+            RedisValue result = database.StringGet(cacheName);
+            return Deserialize<T>(result);
         }
 
         private IDatabase GetDatabase()

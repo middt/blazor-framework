@@ -17,8 +17,8 @@
 		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="EFCore.BulkExtensions" Version="6.1.4" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.0" />
+		<PackageReference Include="EFCore.BulkExtensions" Version="6.2.1" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.1" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />

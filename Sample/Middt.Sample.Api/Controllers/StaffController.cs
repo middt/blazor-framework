@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Middt.Framework.Api;
 using Middt.Framework.Api.Cache;
 using Middt.Framework.Common.Model.Data;
+using Middt.Framework.Plugin.Redis;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
 using System;
@@ -20,18 +21,18 @@ namespace Middt.Sample.Api.Controllers
     {
         IBaseCache baseCache;
 
-        StaffRedisCache staffRedisCache;
-        public StaffController(IBaseCache _baseCache, StaffRedisCache _staffRedisCache )
+        MiddtRedisCache middtRedisCache;
+        public StaffController(IBaseCache _baseCache, MiddtRedisCache _middtRedisCache)
         {
             baseCache = _baseCache;
-            staffRedisCache = _staffRedisCache;
+            middtRedisCache = _middtRedisCache;
         }
 
         [Authorize]
         [HttpGet("[action]")]
         public override BaseResponseDataModel<List<Staff>> GetAll()
         {
-            return staffRedisCache.ReadWrite(() =>
+            return middtRedisCache.ReadWrite("StaffCache",() =>
             {
                 return base.GetAll();
             }, 60,60*60);

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Helper
 {
-    public class JsonHelper<T> where T : class
+    public class JsonHelper<T>
     {
         JsonSerializerSettings settings;
         public JsonHelper()

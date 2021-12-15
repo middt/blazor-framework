@@ -3,6 +3,7 @@ using Radzen.Blazor;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 
 namespace Middt.Framework.Blazor.Web.Base.Page
 {
@@ -11,6 +12,9 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         where TInterface : IBaseListRefit<TModel>
         where TService : BaseListRefit<TInterface, TModel>
     {
+        [Parameter]
+        public RenderFragment TemplateContent { get; set; }
+
         public RadzenGrid<TModel> radzenGrid { get; set; }
 
         protected override void AfterSearch()

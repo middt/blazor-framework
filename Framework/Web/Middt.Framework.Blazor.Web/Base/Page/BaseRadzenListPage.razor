@@ -26,27 +26,46 @@
             {
                 <div class="row" style="margin-top:10px;">
                     <div class="col-lg-5">
-                    <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
-                    <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+                        <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
+                        <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
 
+                    </div>
                 </div>
-            </div>
             }
         </EditForm>
     </RadzenCard>
 }
 <br />
 
-
-<RadzenGrid 
-AllowColumnResize="true" 
-@ref="radzenGrid"
+@if (@TemplateContent != null)
+{
+    <RadzenGrid AllowColumnResize="true"
+            @ref="radzenGrid"
             TItem=TModel
-style="height: 500px">
-    <Columns>
-        @ListContent
-    </Columns>
-</RadzenGrid>
+            style="height: 500px">
+        <Template>
+            @TemplateContent
+        </Template>
+        <Columns>
+            @ListContent
+        </Columns>
+    </RadzenGrid>
+}
+else
+{
+        <RadzenGrid AllowColumnResize="true"
+            @ref="radzenGrid"
+            TItem=TModel
+            style="height: 500px">
+        <Columns>
+            @ListContent
+        </Columns>
+    </RadzenGrid>
+}
+
+
+
+
 <BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
 </BasePaginationComponent>
 

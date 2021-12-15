@@ -62,8 +62,8 @@ namespace Middt.Sample.Api
 
 
 
-            services.AddRedisCache(sp.GetService<IBaseConfiguration>().Get<RedisSettings>());
-            services.AddSingleton<StaffRedisCache>();
+            services.AddMiddtRedisCache(sp.GetService<IBaseConfiguration>().Get<RedisSettings>());
+            
             
 
             // 

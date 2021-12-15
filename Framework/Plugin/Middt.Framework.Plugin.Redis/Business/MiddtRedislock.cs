@@ -12,11 +12,11 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Plugin.Redis
 {
-    public class BaseRedislock
+    public class MiddtRedislock
     {
-        private BaseRedisConnection baseRedisConnection;
+        private MiddtRedisConnection baseRedisConnection;
         private IBaseLog baseLog;
-        public BaseRedislock(BaseRedisConnection _baseRedisConnection, IBaseLog _baseLog)
+        public MiddtRedislock(MiddtRedisConnection _baseRedisConnection, IBaseLog _baseLog)
         {
             baseLog = _baseLog;
             baseRedisConnection = _baseRedisConnection;
