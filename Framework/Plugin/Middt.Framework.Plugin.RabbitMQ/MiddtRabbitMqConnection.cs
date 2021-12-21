@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿using Middt.Framework.Common.Log;
+using RabbitMQ.Client;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,9 +22,11 @@ namespace Middt.Framework.Plugin.RabbitMQ
         private readonly ConnectionFactory _connectionFactory;
         private readonly ExchangeTypes _exchangeType;
         private readonly bool _isPublisher;
+        protected IBaseLog _baselog;
 
-        protected MiddtRabbitMqConnection(ConnectionFactory connectionFactory, ExchangeTypes exchangeType, bool isPublisher)
+        protected MiddtRabbitMqConnection(IBaseLog baselog,ConnectionFactory connectionFactory, ExchangeTypes exchangeType, bool isPublisher)
         {
+            _baselog = baselog;
             _connectionFactory = connectionFactory;
             this._exchangeType = exchangeType;
             this._isPublisher = isPublisher;

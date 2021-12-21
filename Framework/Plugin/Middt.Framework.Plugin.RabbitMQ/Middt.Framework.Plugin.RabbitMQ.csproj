@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Common\Middt.Framework.Common\Middt.Framework.Common.csproj" />
     <ProjectReference Include="..\..\Common\Middt.Framework.Model\Middt.Framework.Model.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Middt.Framework.Common.Log;
+using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
@@ -13,8 +14,8 @@ namespace Middt.Framework.Plugin.RabbitMQ
     {
         public Action<TMessage> OnReceiveAction { get; set; }
 
-        public MiddRabbitMqConsumerBase(ConnectionFactory connectionFactory, ExchangeTypes exchangeType)
-            : base(connectionFactory, exchangeType, false)
+        public MiddRabbitMqConsumerBase(IBaseLog baselog, ConnectionFactory connectionFactory, ExchangeTypes exchangeType)
+            : base(baselog,connectionFactory, exchangeType, false)
         {
         }
 
@@ -44,7 +45,7 @@ namespace Middt.Framework.Plugin.RabbitMQ
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error occurred in OnEventReceived. Message: {ex?.Message}");
+                _baselog.Error($"Error occurred in OnEventReceived. Message: {ex?.Message}");                
                 Channel.BasicNack(@event.DeliveryTag, false, true);
                 throw;
             }

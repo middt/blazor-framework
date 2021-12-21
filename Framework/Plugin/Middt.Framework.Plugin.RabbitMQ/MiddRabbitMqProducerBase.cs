@@ -1,4 +1,5 @@
-﻿using Middt.Framework.Common.Model.Data;
+﻿using Middt.Framework.Common.Log;
+using Middt.Framework.Common.Model.Data;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using System;
@@ -14,8 +15,8 @@ namespace Middt.Framework.Plugin.RabbitMQ
     public abstract class MiddRabbitMqProducerBase<T> : MiddtRabbitMqConnection
     {
 
-        protected MiddRabbitMqProducerBase(ConnectionFactory connectionFactory, ExchangeTypes exchangeType)
-            : base(connectionFactory, exchangeType, true) { }
+        protected MiddRabbitMqProducerBase(IBaseLog baselog, ConnectionFactory connectionFactory, ExchangeTypes exchangeType)
+            : base(baselog,connectionFactory, exchangeType, true) { }
 
         public BaseResponseModel Publish(T @event)
         {
@@ -36,6 +37,8 @@ namespace Middt.Framework.Plugin.RabbitMQ
             }
             catch (Exception ex)
             {
+                _baselog.Error($"Error occurred in Publish. Message: {ex?.Message}");
+
                 result.Result = Model.Model.Enumerations.ResultEnum.Error;
                 result.MessageList.Add(ex.ToString());
             }
