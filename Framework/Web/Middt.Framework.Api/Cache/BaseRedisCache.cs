@@ -12,7 +12,7 @@ namespace Middt.Framework.Api.Cache
         {
             distributedCache = _distributedCache;
         }
-        public T GetSetValue<T>(string cacheKey, int SlidingExpiration, int AbsoluteExpiration, Func<T> func)
+        public async Task<T> GetSetValue<T>(string cacheKey, int SlidingExpiration, int AbsoluteExpiration, Func<T> func)
         {
             T result = default(T);
 
@@ -34,7 +34,7 @@ namespace Middt.Framework.Api.Cache
                         .SetAbsoluteExpiration(DateTime.Now.AddMonths(AbsoluteExpiration));
 
 
-                distributedCache.SetAsync(cacheKey, cacheValue, options);
+               await distributedCache.SetAsync(cacheKey, cacheValue, options);
             }
 
             return result;

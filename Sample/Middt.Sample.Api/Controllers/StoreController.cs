@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 //using Syncfusion.DocIO;
 //using Syncfusion.DocIO.DLS;
 
@@ -28,17 +29,17 @@ namespace Middt.Sample.Api.Controllers
 
         [Authorize]
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<List<Store>> GetAll()
+        public override Task<BaseResponseDataModel<List<Store>>> GetAll()
         {
             string cacheKey = nameof(CategoryController) + nameof(GetAll);
 
 
-            BaseResponseDataModel<List<Store>> result = baseCache.GetSetValue<BaseResponseDataModel<List<Store>>>(cacheKey, 1, 1,
+           Task<BaseResponseDataModel<List<Store>>> result = baseCache.GetSetValue(cacheKey, 1, 1,
                 () =>
                 {
                     return base.GetAll();
                 }
-                );
+                ).Result;
 
             return result;
         }

@@ -20,7 +20,7 @@ namespace Middt.Framework.Api
             repository = new TRepository();
         }
 
-        public virtual BaseResponseDataModel<TModel> Insert([FromBody] TModel model)
+        public virtual async Task<BaseResponseDataModel<TModel>> Insert([FromBody] TModel model)
         {
             BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
             try
@@ -47,8 +47,8 @@ namespace Middt.Framework.Api
 
 
 
-                repository.Insert(model);
-                repository.Save();
+                await repository.Insert(model);
+                await repository.Save();
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -62,7 +62,7 @@ namespace Middt.Framework.Api
             }
             return response;
         }
-        public virtual BaseResponseDataModel<TModel> Update(TModel model)
+        public virtual async Task<BaseResponseDataModel<TModel>> Update(TModel model)
         {
             BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
             try
@@ -87,8 +87,8 @@ namespace Middt.Framework.Api
                     return response;
                 }
 
-                repository.Update(model);
-                repository.Save();
+                await repository.Update(model);
+                await repository.Save();
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -102,13 +102,13 @@ namespace Middt.Framework.Api
             }
             return response;
         }
-        public virtual BaseResponseDataModel<TModel> Delete(TModel model)
+        public virtual async Task<BaseResponseDataModel<TModel>> Delete(TModel model)
         {
             BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
             try
             {
-                repository.Delete(model);
-                repository.Save();
+                await repository.Delete(model);
+                await repository.Save();
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");

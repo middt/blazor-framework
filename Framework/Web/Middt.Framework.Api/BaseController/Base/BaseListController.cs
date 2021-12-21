@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Common.Database;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Model.Model.Enumerations;
@@ -19,13 +20,13 @@ namespace Middt.Framework.Api
             repository = new TRepository();
         }
 
-        public virtual BaseResponseDataModel<TModel> GetById(int id)
+        public virtual async Task<BaseResponseDataModel<TModel>> GetById(int id)
         {
             BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
 
             try
             {
-                response.Data = repository.GetById(id);
+                response.Data = repository.GetById(id).Result;
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -40,13 +41,13 @@ namespace Middt.Framework.Api
         }
 
 
-        public virtual BaseResponseDataModel<List<TModel>> GetAll()
+        public virtual async Task<BaseResponseDataModel<List<TModel>>> GetAll()
         {
             BaseResponseDataModel<List<TModel>> response = new BaseResponseDataModel<List<TModel>>();
 
             try
             {
-                response.Data = repository.GetAll().ToList();
+                response.Data = repository.GetAll().ToListAsync().Result;
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -62,13 +63,13 @@ namespace Middt.Framework.Api
 
 
 
-        public virtual BaseResponseDataModel<List<TModel>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
+        public virtual async Task<BaseResponseDataModel<List<TModel>>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
         {
             BaseResponseDataModel<List<TModel>> response = new BaseResponseDataModel<List<TModel>>();
 
             try
             {
-                response = repository.GetItems(model);
+                response = repository.GetItems(model).Result;
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");

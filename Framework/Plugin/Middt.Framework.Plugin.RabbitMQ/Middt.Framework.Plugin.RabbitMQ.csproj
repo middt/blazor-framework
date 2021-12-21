@@ -16,4 +16,13 @@
 	  <Authors>$(Owners)</Authors>
 	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="RabbitMQ.Client" Version="6.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Common\Middt.Framework.Model\Middt.Framework.Model.csproj" />
+  </ItemGroup>
 </Project>

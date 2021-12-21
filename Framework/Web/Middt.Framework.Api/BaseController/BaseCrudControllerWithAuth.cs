@@ -12,7 +12,7 @@ namespace Middt.Framework.Api
     {
         [Authorize]
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<TModel> GetById(int id)
+        public override Task<BaseResponseDataModel<TModel>> GetById(int id)
         {
             return base.GetById(id);
         }
@@ -20,7 +20,7 @@ namespace Middt.Framework.Api
 
         [Authorize]
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<List<TModel>> GetAll()
+        public override Task<BaseResponseDataModel<List<TModel>>> GetAll()
         {
             return base.GetAll();
         }
@@ -28,28 +28,28 @@ namespace Middt.Framework.Api
         [Authorize]
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = false)]
-        public override BaseResponseDataModel<List<TModel>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
+        public override Task<BaseResponseDataModel<List<TModel>>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
         {
             return base.GetItems(model);
         }
         [Authorize]
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = true)]
-        public override BaseResponseDataModel<TModel> Insert([FromBody] TModel model)
+        public override Task<BaseResponseDataModel<TModel>> Insert([FromBody] TModel model)
         {
             return base.Insert(model);
         }
         [Authorize]
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = true)]
-        public override BaseResponseDataModel<TModel> Update([FromBody] TModel model)
+        public override Task<BaseResponseDataModel<TModel>> Update([FromBody] TModel model)
         {
             return base.Update(model);
         }
         [Authorize]
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = false)]
-        public override BaseResponseDataModel<TModel> Delete([FromBody] TModel model)
+        public override Task<BaseResponseDataModel<TModel>> Delete([FromBody] TModel model)
         {
             return base.Delete(model);
         }

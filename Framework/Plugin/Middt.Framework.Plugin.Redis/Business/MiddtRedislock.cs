@@ -21,13 +21,13 @@ namespace Middt.Framework.Plugin.Redis
             baseLog = _baseLog;
             baseRedisConnection = _baseRedisConnection;
         }
-        public IRedLock CreateLock(string resource, TimeSpan expiryTime)
+        public Task<IRedLock> CreateLock(string resource, TimeSpan expiryTime)
         {
-            return baseRedisConnection.redLockFactory.CreateLock(resource, expiryTime);
+            return baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime);
         }
-        public IRedLock CreateLock(string resource, TimeSpan expiryTime, TimeSpan waitTime, TimeSpan retryTime, CancellationToken? cancellationToken = null)
+        public Task<IRedLock> CreateLock(string resource, TimeSpan expiryTime, TimeSpan waitTime, TimeSpan retryTime, CancellationToken? cancellationToken = null)
         {
-            return baseRedisConnection.redLockFactory.CreateLock(resource, expiryTime, waitTime, retryTime, cancellationToken);
+            return baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime, cancellationToken);
         }
 
 
@@ -37,9 +37,9 @@ namespace Middt.Framework.Plugin.Redis
             T result = default(T);
             try
             {
-                using (var redLock = baseRedisConnection.redLockFactory.CreateLock(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
+                using (var redLock = baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
                 {
-                    if (redLock.IsAcquired)
+                    if (redLock.Result.IsAcquired)
                     {
                         try
                         {
@@ -64,9 +64,9 @@ namespace Middt.Framework.Plugin.Redis
         {
             try
             {
-                using (var redLock = baseRedisConnection.redLockFactory.CreateLock(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
+                using (var redLock = baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
                 {
-                    if (redLock.IsAcquired)
+                    if (redLock.Result.IsAcquired)
                     {
                         try
                         {

@@ -3,6 +3,7 @@ using MassTransit.RabbitMqTransport;
 
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Common.Configuration;
+using Middt.Framework.Plugin.MassTransit.Settings;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace Middt.Framework.Plugin.MassTransit
 
         private void Create()
         {
-            RabbitMQSettings rabbitMQSettings = baseConfiguration.Get<RabbitMQSettings>();
+            RabbitMqSettings rabbitMQSettings = baseConfiguration.Get<RabbitMqSettings>();
 
 
             bus = Bus.Factory.CreateUsingRabbitMq(factory =>

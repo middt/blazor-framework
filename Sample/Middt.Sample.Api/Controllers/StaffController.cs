@@ -9,6 +9,7 @@ using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 //using Syncfusion.DocIO;
 //using Syncfusion.DocIO.DLS;
 
@@ -30,11 +31,11 @@ namespace Middt.Sample.Api.Controllers
 
         [Authorize]
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<List<Staff>> GetAll()
+        public override Task<BaseResponseDataModel<List<Staff>>> GetAll()
         {
             return middtRedisCache.ReadWrite("StaffCache",() =>
             {
-                return base.GetAll();
+                return base.GetAll().Result;
             }, 60,60*60);
         }
 

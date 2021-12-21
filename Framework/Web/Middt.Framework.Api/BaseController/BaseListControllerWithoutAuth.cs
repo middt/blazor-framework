@@ -11,13 +11,13 @@ namespace Middt.Framework.Api
         where TRepository : BaseRepository<TModel>, new()
     {
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<TModel> GetById(int id)
+        public override Task<BaseResponseDataModel<TModel>> GetById(int id)
         {
             return base.GetById(id);
         }
 
         [HttpGet("[action]")]
-        public override BaseResponseDataModel<List<TModel>> GetAll()
+        public override Task<BaseResponseDataModel<List<TModel>>> GetAll()
         {
             return base.GetAll();
         }
@@ -25,7 +25,7 @@ namespace Middt.Framework.Api
 
         [HttpPost("[action]")]
         [ValidateModelAttribute(enableValidation = false)]
-        public override BaseResponseDataModel<List<TModel>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
+        public override Task<BaseResponseDataModel<List<TModel>>> GetItems([FromBody] BaseSearchRequestModel<TModel> model)
         {
             return base.GetItems(model);
         }

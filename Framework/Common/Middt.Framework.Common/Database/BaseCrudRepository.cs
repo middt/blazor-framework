@@ -9,6 +9,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Database
 {
@@ -38,9 +39,9 @@ namespace Middt.Framework.Common.Database
 
         }
 
-        public override TModel GetById(int id)
+        public override async Task<TModel> GetById(int id)
         {
-            return entities.Find(id);
+            return await entities.FindAsync(id);
         }
 
         public override IQueryable<TModel> GetAll()
@@ -52,40 +53,40 @@ namespace Middt.Framework.Common.Database
             return entities.AsNoTracking().Where(queryExpression);
         }
 
+
         public override IQueryable<TModel> FromSql(string sql, params object[] parameters)
         {
             return entities.FromSqlRaw(sql, parameters).AsNoTracking();
         }
-        public override TModel FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
+        public override Task<TModel> FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
         {
 
-            return entities.AsNoTracking().FirstOrDefault(queryExpression);
+            return entities.AsNoTracking().FirstOrDefaultAsync(queryExpression);
         }
 
-        public override void Insert(TModel entity)
+        public override async Task Insert(TModel entity)
         {
             if (entity == null)
             {
                 throw new ArgumentNullException("entity");
             }
-            entities.Add(entity);
-
+            await entities.AddAsync(entity);
         }
-        public override void Insert(List<TModel> entityList)
+        public override async Task Insert(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
-                entities.Add(entity);
+                await entities.AddAsync(entity);
             }
         }
 
 
-        public override void Update(TModel entity)
+        public override async Task Update(TModel entity)
 
         {
             context.Entry(entity).State = EntityState.Modified;
         }
-        public override void Update(List<TModel> entityList)
+        public override async Task Update(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
@@ -93,11 +94,11 @@ namespace Middt.Framework.Common.Database
             }
         }
 
-        public override void Delete(TModel entity)
+        public override async Task Delete(TModel entity)
         {
             entities.Remove(entity);
         }
-        public override void Delete(List<TModel> entityList)
+        public override async Task Delete(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
@@ -105,15 +106,14 @@ namespace Middt.Framework.Common.Database
             }
         }
 
-        public override void Save()
+        public override async Task Save()
         {
-            context.SaveChanges();
+            await context.SaveChangesAsync();
         }
 
-        public override BaseResponseDataModel<List<TModel>> GetItems(BaseSearchRequestModel<TModel> model)
+        public override async Task<BaseResponseDataModel<List<TModel>>> GetItems(BaseSearchRequestModel<TModel> model)
         {
-
-            return GetItems<TModel>(model, entities.AsNoTracking());
+            return await GetItems<TModel>(model, entities.AsNoTracking());
         }
 
         private IQueryable<TNewModel> StringQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
@@ -254,7 +254,7 @@ namespace Middt.Framework.Common.Database
         }
 
         //
-        public override BaseResponseDataModel<List<TNewModel>> GetItems<TNewModel>(BaseSearchRequestModel<TNewModel> model, IQueryable<TNewModel> itemList)
+        public override async Task<BaseResponseDataModel<List<TNewModel>>> GetItems<TNewModel>(BaseSearchRequestModel<TNewModel> model, IQueryable<TNewModel> itemList)
         {
             var properties = typeof(TNewModel).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (model.RequestModel != null)
@@ -340,7 +340,7 @@ namespace Middt.Framework.Common.Database
                             .Skip(((model.CurrentPage) - 1) * model.RequestItemSize)
                             .Take(model.RequestItemSize).ToList();
             else
-                response.Data = itemList.ToList();
+                response.Data = await itemList.ToListAsync();
 
             return response;
         }
@@ -370,7 +370,7 @@ namespace Middt.Framework.Common.Database
 
         public void BulkInsert(List<TModel> entityList, BulkConfig bulkConfig)
         {
-            context.BulkInsert<TModel>(entityList, bulkConfig);
+            context.BulkInsertAsync<TModel>(entityList, bulkConfig);
         }
         public void BulkUpdate(List<TModel> entityList)
         {
@@ -380,7 +380,7 @@ namespace Middt.Framework.Common.Database
 
         public void BulkUpdate(List<TModel> entityList, BulkConfig bulkConfig)
         {
-            context.BulkUpdate<TModel>(entityList, bulkConfig);
+            context.BulkUpdateAsync<TModel>(entityList, bulkConfig);
         }
         public void BulkUpdate(Expression<Func<TModel, bool>> queryExpression, Expression<Func<TModel, TModel>> updateExpression)
         {
@@ -394,7 +394,7 @@ namespace Middt.Framework.Common.Database
         }
         public void BulkDelete(List<TModel> entityList, BulkConfig bulkConfig)
         {
-            context.BulkDelete<TModel>(entityList, bulkConfig);
+            context.BulkDeleteAsync<TModel>(entityList, bulkConfig);
         }
         public void BulkDelete(Expression<Func<TModel, bool>> queryExpression)
         {
