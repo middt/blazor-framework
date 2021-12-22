@@ -37,9 +37,9 @@ namespace Middt.Sample.Api.Controllers
            Task<BaseResponseDataModel<List<Store>>> result = baseCache.GetSetValue(cacheKey, 1, 1,
                 () =>
                 {
-                    return base.GetAll();
+                    return base.GetAll().Result;
                 }
-                ).Result;
+                );
 
             return result;
         }

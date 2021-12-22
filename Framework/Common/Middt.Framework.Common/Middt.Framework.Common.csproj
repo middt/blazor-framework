@@ -17,7 +17,7 @@
 		<RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="EFCore.BulkExtensions" Version="6.2.1" />
+		<PackageReference Include="EFCore.BulkExtensions" Version="6.2.3" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.1" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
@@ -34,7 +34,7 @@
 		<PackageReference Include="Syncfusion.Licensing" Version="18.4.0.49" />
 		<PackageReference Include="Syncfusion.XlsIO.Net.Core" Version="18.4.0.49" />
 		<PackageReference Include="Syncfusion.XlsIORenderer.Net.Core" Version="18.4.0.49" />
-		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.2.14" />
+		<PackageReference Include="System.Linq.Dynamic.Core" Version="1.2.15" />
 	</ItemGroup>
 
 	<ItemGroup>
