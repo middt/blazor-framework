@@ -4,8 +4,8 @@
 @using Middt.Framework.Blazor.Web.Base
 @using Radzen
 
-       @if (TotalPage > 1)
-{
+@*       @if (TotalPage > 1)
+{*@
     <div class="rz-paginator rz-unselectable-text rz-helper-clearfix rz-paginator-bottom">
         @if (CurrentPage == 1)
         {
@@ -32,8 +32,7 @@
                     @bind-Value=@CurrentPage
                     Data=@PageList
                     Change=@(args => GotoPage(Convert.ToInt32(args))) />
-
-        Gösterilecek Kayıt Sayısı:
+        &nbsp;&nbsp;&nbsp;Satır Sayısı
         <RadzenDropDown TValue="int"
                     Style="width:75px"
                     @bind-Value=@PageSize
@@ -61,4 +60,4 @@
             </span>
         }
     </div>
-}
+@*}*@
