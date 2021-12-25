@@ -1,9 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+	  <TargetFramework>net6.0</TargetFramework>
+	  <Product>Middt Framework Plugin Consul</Product>
+	  <Owners>Mehmet TOSUN</Owners>
+	  <PackageProjectUrl>https://github.com/middt/blazor-framework</PackageProjectUrl>
+	  <IsPackable>true</IsPackable>
+	  <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
+
+	  <VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
+	  <AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
+	  <AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>
+	  <Version Condition=" '$(VersionSuffix)' == '' ">0.0.1.0</Version>
+	  <Version Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</Version>
+	  <Authors>$(Owners)</Authors>
+	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
   </PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Consul" Version="1.6.10.3" />
