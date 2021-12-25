@@ -56,7 +56,7 @@
 	  <None Include="wwwroot\framework.js" />
 	</ItemGroup>
 	<ItemGroup>
-	  <ProjectReference Include="..\..\Common\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+		<ProjectReference Include="..\Middt.Framework.Common\Middt.Framework.Common.csproj" />
 	</ItemGroup>
 
 </Project>
