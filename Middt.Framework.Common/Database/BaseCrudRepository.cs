@@ -336,9 +336,9 @@ namespace Middt.Framework.Common.Database
             response.Count = itemList.Count();
 
             if (model.RequestItemSize > 0)
-                response.Data = itemList
+                response.Data = await itemList
                             .Skip(((model.CurrentPage) - 1) * model.RequestItemSize)
-                            .Take(model.RequestItemSize).ToList();
+                            .Take(model.RequestItemSize).ToListAsync();
             else
                 response.Data = await itemList.ToListAsync();
 

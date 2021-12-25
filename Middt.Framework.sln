@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31717.71
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Model", "Framework\Common\Middt.Framework.Model\Middt.Framework.Model.csproj", "{B0D86627-E289-469C-A568-8366822317B6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Model", "Middt.Framework.Model\Middt.Framework.Model.csproj", "{B0D86627-E289-469C-A568-8366822317B6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Common", "Framework\Common\Middt.Framework.Common\Middt.Framework.Common.csproj", "{E40F806C-425D-4800-87CF-7AE51D179739}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Common", "Middt.Framework.Common\Middt.Framework.Common.csproj", "{E40F806C-425D-4800-87CF-7AE51D179739}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Sample.Api", "Sample\Middt.Sample.Api\Middt.Sample.Api.csproj", "{BB9D3172-FE34-4C85-82B2-F577DD4D28FE}"
 EndProject
@@ -24,17 +24,19 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{ED4289
 		docker-compose.yml = docker-compose.yml
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Api", "Framework\Web\Middt.Framework.Api\Middt.Framework.Api.csproj", "{C97732B9-8ADA-4C7A-95BC-145268B73751}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Api", "Middt.Framework.Api\Middt.Framework.Api.csproj", "{C97732B9-8ADA-4C7A-95BC-145268B73751}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Blazor.Web", "Framework\Web\Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj", "{C52B4EFE-EF72-49C4-AA2A-696FB23CF996}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Blazor.Web", "Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj", "{C52B4EFE-EF72-49C4-AA2A-696FB23CF996}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugin", "Plugin", "{D5175DDE-6A56-4C79-B2DE-310BF082BE29}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.Redis", "Framework\Plugin\Middt.Framework.Plugin.Redis\Middt.Framework.Plugin.Redis.csproj", "{AC37E2CF-A81A-43A7-9B87-FEB6BE21C872}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.Redis", "Middt.Framework.Plugin.Redis\Middt.Framework.Plugin.Redis.csproj", "{AC37E2CF-A81A-43A7-9B87-FEB6BE21C872}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.RabbitMQ", "Framework\Plugin\Middt.Framework.Plugin.RabbitMQ\Middt.Framework.Plugin.RabbitMQ.csproj", "{B1F16DBB-F1B9-4E7B-881C-20E9F9501879}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.RabbitMQ", "Middt.Framework.Plugin.RabbitMQ\Middt.Framework.Plugin.RabbitMQ.csproj", "{B1F16DBB-F1B9-4E7B-881C-20E9F9501879}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.MassTransit", "Framework\Plugin\Middt.Framework.Plugin.MassTransit\Middt.Framework.Plugin.MassTransit.csproj", "{61D32820-EB48-480B-9C2C-A773161AB690}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Middt.Framework.Plugin.MassTransit", "Middt.Framework.Plugin.MassTransit\Middt.Framework.Plugin.MassTransit.csproj", "{61D32820-EB48-480B-9C2C-A773161AB690}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Middt.Framework.Plugin.Consul", "Middt.Framework.Plugin.Consul\Middt.Framework.Plugin.Consul.csproj", "{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -292,6 +294,30 @@ Global
 		{61D32820-EB48-480B-9C2C-A773161AB690}.Release|iPhone.Build.0 = Release|Any CPU
 		{61D32820-EB48-480B-9C2C-A773161AB690}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
 		{61D32820-EB48-480B-9C2C-A773161AB690}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|Any CPU.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|Any CPU.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|iPhone.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|iPhone.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Ad-Hoc|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|Any CPU.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|Any CPU.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|iPhone.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|iPhone.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.AppStore|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|iPhone.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|iPhone.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|iPhoneSimulator.ActiveCfg = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Debug|iPhoneSimulator.Build.0 = Debug|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|iPhone.ActiveCfg = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|iPhone.Build.0 = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|iPhoneSimulator.ActiveCfg = Release|Any CPU
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4}.Release|iPhoneSimulator.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -310,6 +336,7 @@ Global
 		{AC37E2CF-A81A-43A7-9B87-FEB6BE21C872} = {D5175DDE-6A56-4C79-B2DE-310BF082BE29}
 		{B1F16DBB-F1B9-4E7B-881C-20E9F9501879} = {D5175DDE-6A56-4C79-B2DE-310BF082BE29}
 		{61D32820-EB48-480B-9C2C-A773161AB690} = {D5175DDE-6A56-4C79-B2DE-310BF082BE29}
+		{A751B8B0-69DB-4C77-B709-DEC09F9D31B4} = {D5175DDE-6A56-4C79-B2DE-310BF082BE29}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0FB274A6-01B1-4C78-8FDD-EEE8E31F8AB9}

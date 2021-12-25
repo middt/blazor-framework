@@ -90,7 +90,12 @@
       "ProjectGuid": "72bf7ae1-3171-4aef-bdbd-8845b99ff832",
       "DisplayName": "Middt.Sample.CategoryConsumer",
       "ColorIndex": 0
+    },
+    "a751b8b0-69db-4c77-b709-dec09f9d31b4": {
+      "ProjectGuid": "a751b8b0-69db-4c77-b709-dec09f9d31b4",
+      "DisplayName": "Middt.Framework.Plugin.Consul",
+      "ColorIndex": 1
     }
   },
-  "NextColorIndex": 1
+  "NextColorIndex": 2
 }
