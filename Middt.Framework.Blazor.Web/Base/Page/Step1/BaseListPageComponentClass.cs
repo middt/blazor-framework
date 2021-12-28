@@ -86,12 +86,12 @@ namespace Middt.Framework.Blazor.Web.Base
             Pagination.CurrentPage = 1;
             Search();
         }
-        public virtual void Search()
+        public virtual async Task Search()
         {
-            ExecuteMethod(() =>
+            ExecuteMethod(async () =>
             {
                 BeforeSearch();
-   
+
                 Type serviceType = Service.GetType();
                 MethodInfo searchMethod = serviceType.GetMethods()
 
@@ -99,7 +99,7 @@ namespace Middt.Framework.Blazor.Web.Base
               .Single(mi => mi.Name == SearchMethod
                          && mi.GetParameters().Length == 1);
 
-                SearchResultModel = searchMethod.Invoke(Service, new object[] { SearchRequestModel }) as BaseResponseDataModel<List<TModel>>;
+                SearchResultModel = await (Task<BaseResponseDataModel<List<TModel>>>)searchMethod.Invoke(Service, new object[] { SearchRequestModel });
 
                 if (SearchResultModel.Result != ResultEnum.Success)
                 {
@@ -115,7 +115,7 @@ namespace Middt.Framework.Blazor.Web.Base
                 }
 
                 AfterSearch();
-              
+
             });
         }
 

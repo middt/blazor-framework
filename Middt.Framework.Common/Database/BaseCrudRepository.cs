@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Database
 {
-    public class BaseCrudRepository<TModel, TContext> : BaseRepository<TModel>
+    public class BaseCrudRepository<TModel, TContext> : IBaseRepository<TModel>
       where TModel : class, new()
       where TContext : DbContext, new()
         // where T : BaseEntity
@@ -39,32 +39,32 @@ namespace Middt.Framework.Common.Database
 
         }
 
-        public override async Task<TModel> GetById(int id)
+        public async Task<TModel> GetById(int id)
         {
             return await entities.FindAsync(id);
         }
 
-        public override IQueryable<TModel> GetAll()
+        public IQueryable<TModel> GetAll()
         {
             return entities.AsNoTracking();
         }
-        public override IQueryable<TModel> FindBy(Expression<Func<TModel, bool>> queryExpression)
+        public IQueryable<TModel> FindBy(Expression<Func<TModel, bool>> queryExpression)
         {
             return entities.AsNoTracking().Where(queryExpression);
         }
 
 
-        public override IQueryable<TModel> FromSql(string sql, params object[] parameters)
+        public IQueryable<TModel> FromSql(string sql, params object[] parameters)
         {
             return entities.FromSqlRaw(sql, parameters).AsNoTracking();
         }
-        public override Task<TModel> FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
+        public Task<TModel> FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
         {
 
             return entities.AsNoTracking().FirstOrDefaultAsync(queryExpression);
         }
 
-        public override async Task Insert(TModel entity)
+        public async Task Insert(TModel entity)
         {
             if (entity == null)
             {
@@ -72,7 +72,7 @@ namespace Middt.Framework.Common.Database
             }
             await entities.AddAsync(entity);
         }
-        public override async Task Insert(List<TModel> entityList)
+        public async Task Insert(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
@@ -81,12 +81,12 @@ namespace Middt.Framework.Common.Database
         }
 
 
-        public override async Task Update(TModel entity)
+        public async Task Update(TModel entity)
 
         {
             context.Entry(entity).State = EntityState.Modified;
         }
-        public override async Task Update(List<TModel> entityList)
+        public async Task Update(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
@@ -94,11 +94,11 @@ namespace Middt.Framework.Common.Database
             }
         }
 
-        public override async Task Delete(TModel entity)
+        public async Task Delete(TModel entity)
         {
             entities.Remove(entity);
         }
-        public override async Task Delete(List<TModel> entityList)
+        public async Task Delete(List<TModel> entityList)
         {
             foreach (TModel entity in entityList)
             {
@@ -106,17 +106,17 @@ namespace Middt.Framework.Common.Database
             }
         }
 
-        public override async Task Save()
+        public async Task Save()
         {
             await context.SaveChangesAsync();
         }
 
-        public override async Task<BaseResponseDataModel<List<TModel>>> GetItems(BaseSearchRequestModel<TModel> model)
+        public async Task<BaseResponseDataModel<List<TModel>>> GetItems(BaseSearchRequestModel<TModel> model)
         {
             return await GetItems<TModel>(model, entities.AsNoTracking());
         }
 
-        private IQueryable<TNewModel> StringQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
+        private async Task<IQueryable<TNewModel>> StringQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
         {
             QueryStringAttribute[] QueryStringAttributeList = (QueryStringAttribute[])p.GetCustomAttributes(typeof(QueryStringAttribute), true);
 
@@ -148,23 +148,23 @@ namespace Middt.Framework.Common.Database
 
             return itemList;
         }
-        private IQueryable<TNewModel> IntQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
+        private async Task<IQueryable<TNewModel>> IntQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
         {
             var IsZeroSearch = Attribute.IsDefined(p, typeof(QueryIsZeroAttribute));
             if (IsZeroSearch)
             {
-                itemList = IntQueryExtend<TNewModel>(p, itemList, value);
+                itemList = await IntQueryExtend<TNewModel>(p, itemList, value);
             }
             else
             {
                 if (Convert.ToInt64(value) != 0)
                 {
-                    itemList = IntQueryExtend<TNewModel>(p, itemList, value);
+                    itemList = await IntQueryExtend<TNewModel>(p, itemList, value);
                 }
             }
             return itemList;
         }
-        private IQueryable<TNewModel> IntQueryExtend<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
+        private async  Task<IQueryable<TNewModel>> IntQueryExtend<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
         {
 
             QueryIntAttribute[] QueryIntAttributeList = (QueryIntAttribute[])p.GetCustomAttributes(typeof(QueryIntAttribute), true);
@@ -203,7 +203,7 @@ namespace Middt.Framework.Common.Database
         }
 
 
-        private IQueryable<TNewModel> DateQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
+        private async Task<IQueryable<TNewModel>> DateQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
         {
 
             QueryDateAttribute[] QueryDateAttributeList = (QueryDateAttribute[])p.GetCustomAttributes(typeof(QueryDateAttribute), true);
@@ -254,7 +254,8 @@ namespace Middt.Framework.Common.Database
         }
 
         //
-        public override async Task<BaseResponseDataModel<List<TNewModel>>> GetItems<TNewModel>(BaseSearchRequestModel<TNewModel> model, IQueryable<TNewModel> itemList)
+        public async Task<BaseResponseDataModel<List<TNewModel>>> GetItems<TNewModel>(BaseSearchRequestModel<TNewModel> model, IQueryable<TNewModel> itemList) where TNewModel : class, new()
+
         {
             var properties = typeof(TNewModel).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (model.RequestModel != null)
@@ -270,7 +271,7 @@ namespace Middt.Framework.Common.Database
                         {
                             if (value is string)
                             {
-                                itemList = StringQuery<TNewModel>(p, itemList, value);
+                                itemList = await StringQuery<TNewModel>(p, itemList, value);
                             }
                             else if (
                                 value is long ||
@@ -287,7 +288,7 @@ namespace Middt.Framework.Common.Database
                                 value is ushort ||
                                 value is float)
                             {
-                                itemList = IntQuery<TNewModel>(p, itemList, value);
+                                itemList = await IntQuery<TNewModel>(p, itemList, value);
                             }
                             else if (value is bool)
                             {
@@ -295,7 +296,7 @@ namespace Middt.Framework.Common.Database
                             }
                             else if (value is DateTime)
                             {
-                                itemList = DateQuery<TNewModel>(p, itemList, value);
+                                itemList = await DateQuery<TNewModel>(p, itemList, value);
                             }
                         }
                     }
@@ -345,18 +346,18 @@ namespace Middt.Framework.Common.Database
             return response;
         }
 
-        public override IDbContextTransaction BeginTransaction()
+        public async Task<IDbContextTransaction> BeginTransaction()
         {
-            return Context.Database.BeginTransaction();
+            return await Context.Database.BeginTransactionAsync();
         }
 
 
 
-        public void BulkInsert(List<TModel> entityList)
+        public async Task BulkInsert(List<TModel> entityList)
         {
-            BulkInsert(entityList, new BulkConfig());
+            await BulkInsert(entityList, new BulkConfig());
         }
-        public void BulkInsert(List<TModel> entityList, params string[] propertiesToExclude)
+        public async Task BulkInsert(List<TModel> entityList, params string[] propertiesToExclude)
         {
             List<string> exlude = new List<string>();
             if (propertiesToExclude != null && propertiesToExclude.Count() > 0)
@@ -364,41 +365,41 @@ namespace Middt.Framework.Common.Database
                 exlude = new List<string>(propertiesToExclude);
             }
             BulkConfig bulkConfig = new BulkConfig() { PropertiesToExclude = exlude };
-            BulkInsert(entityList, bulkConfig);
+            await BulkInsert(entityList, bulkConfig);
         }
 
 
-        public void BulkInsert(List<TModel> entityList, BulkConfig bulkConfig)
+        public async Task BulkInsert(List<TModel> entityList, BulkConfig bulkConfig)
         {
-            context.BulkInsertAsync<TModel>(entityList, bulkConfig);
+            await context.BulkInsertAsync<TModel>(entityList, bulkConfig);
         }
-        public void BulkUpdate(List<TModel> entityList)
+        public async Task BulkUpdate(List<TModel> entityList)
         {
-            BulkUpdate(entityList, new BulkConfig());
-        }
-
-
-        public void BulkUpdate(List<TModel> entityList, BulkConfig bulkConfig)
-        {
-            context.BulkUpdateAsync<TModel>(entityList, bulkConfig);
-        }
-        public void BulkUpdate(Expression<Func<TModel, bool>> queryExpression, Expression<Func<TModel, TModel>> updateExpression)
-        {
-            entities.Where(queryExpression).BatchUpdate<TModel>(updateExpression);
+            await BulkUpdate(entityList, new BulkConfig());
         }
 
 
-        public void BulkDelete(List<TModel> entityList)
+        public async Task BulkUpdate(List<TModel> entityList, BulkConfig bulkConfig)
         {
-            BulkDelete(entityList, new BulkConfig());
+            await context.BulkUpdateAsync<TModel>(entityList, bulkConfig);
         }
-        public void BulkDelete(List<TModel> entityList, BulkConfig bulkConfig)
+        public async Task<int> BulkUpdate(Expression<Func<TModel, bool>> queryExpression, Expression<Func<TModel, TModel>> updateExpression)
         {
-            context.BulkDeleteAsync<TModel>(entityList, bulkConfig);
+            return await entities.Where(queryExpression).BatchUpdateAsync<TModel>(updateExpression);
         }
-        public void BulkDelete(Expression<Func<TModel, bool>> queryExpression)
+
+
+        public async Task BulkDelete(List<TModel> entityList)
         {
-            entities.Where(queryExpression).BatchDelete();
+            await BulkDelete(entityList, new BulkConfig());
+        }
+        public async Task BulkDelete(List<TModel> entityList, BulkConfig bulkConfig)
+        {
+            await context.BulkDeleteAsync<TModel>(entityList, bulkConfig);
+        }
+        public async Task<int> BulkDelete(Expression<Func<TModel, bool>> queryExpression)
+        {
+            return await entities.Where(queryExpression).BatchDeleteAsync();
         }
     }
 }

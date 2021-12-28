@@ -10,6 +10,7 @@ using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
 using System;
 using System.Net.Http.Headers;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Service
 {
@@ -52,7 +53,7 @@ namespace Middt.Framework.Common.Service
 
         }
 
-        protected TReturnModel ExecutePolly<TReturnModel>(Func<TReturnModel> action)
+        protected async Task<TReturnModel> ExecutePolly<TReturnModel>(Func<TReturnModel> action)
         {
 
             var policy = Policy
@@ -63,7 +64,7 @@ namespace Middt.Framework.Common.Service
                     TimeSpan.FromSeconds(2),
                     TimeSpan.FromSeconds(3),
                     TimeSpan.FromSeconds(5)
-                  }, (exception, timeSpan, retryCount, context) =>
+                  }, async (exception, timeSpan, retryCount, context) =>
                   {
                       if (exception.Message.Contains("401 (Unauthorized)"))
                       {
@@ -74,11 +75,11 @@ namespace Middt.Framework.Common.Service
                           request.refresh_token = baseSessionState.RefreshToken().Result;
 
 
-                          TokenResponseModel tokenResponseModel = tokenService.RefreshToken(request);
+                          TokenResponseModel tokenResponseModel = tokenService.RefreshToken(request).Result;
 
                           if (tokenResponseModel.Result == ResultEnum.Success)
                           {
-                              baseSessionState.SetToken(tokenResponseModel);
+                              await baseSessionState.SetToken(tokenResponseModel);
                           }
                       }
                       else
@@ -88,7 +89,7 @@ namespace Middt.Framework.Common.Service
                   });
 
 
-            return policy.Execute <TReturnModel>(action);
+            return policy.Execute<TReturnModel>(action);
         }
     }
 }

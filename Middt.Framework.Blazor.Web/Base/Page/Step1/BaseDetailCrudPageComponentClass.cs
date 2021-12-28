@@ -3,6 +3,7 @@ using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using Middt.Framework.Model.Model.Enumerations;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base
 {
@@ -34,18 +35,18 @@ namespace Middt.Framework.Blazor.Web.Base
 
             StateHasChanged();
         }
-        public virtual void SaveButtonClick()
+        public async Task SaveButtonClick()
         {
-            ExecuteMethod(() =>
+            ExecuteMethod(async () =>
             {
                 BaseResponseDataModel<TModel> result;
                 if (IsUpdate)
                 {
-                    result = Service.Update(Model);
+                    result = await Service.Update(Model);
                 }
                 else
                 {
-                    result = Service.Insert(Model);
+                    result = await Service.Insert(Model);
                 }
 
                 if (result.Result == ResultEnum.Success)

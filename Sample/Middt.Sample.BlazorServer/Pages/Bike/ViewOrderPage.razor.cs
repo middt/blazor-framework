@@ -6,6 +6,7 @@ using Middt.Sample.BlazorServer.Pages.Bike.PopUp;
 using Middt.Sample.Common.Service;
 using Radzen.Blazor;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Bike
 {
@@ -40,9 +41,9 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
                 popCustomerSelect.OnSelect += OnSelect;
             }
         }
-        private void LoadStore()
+        private async Task LoadStore()
         {
-            BaseResponseDataModel<List<Store>> response = StoreService.GetAll();
+            BaseResponseDataModel<List<Store>> response = await StoreService.GetAll();
 
             if (response.Result == Framework.Model.Model.Enumerations.ResultEnum.Success)
             {
@@ -53,9 +54,9 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
                 Notification.ShowErrorMessage("Error", response.ErrorText);
             }
         }
-        private void LoadStaff()
+        private async Task LoadStaff()
         {
-            BaseResponseDataModel<List<Staff>> response = StaffService.GetAll();
+            BaseResponseDataModel<List<Staff>> response = await StaffService.GetAll();
 
             if (response.Result == Framework.Model.Model.Enumerations.ResultEnum.Success)
             {

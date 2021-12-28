@@ -4,6 +4,7 @@ using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Security.Refit;
 using Middt.Framework.Model.Authentication;
+using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Sample.Login
 {
@@ -26,16 +27,16 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.Login
             loginRequestModel.password = "test";
         }
 
-        public void LoginSite()
+        public async Task LoginSite()
         {
-            ExecuteMethod(() =>
+            ExecuteMethod(async() =>
             {
-                TokenResponseModel tokenResponseModel = tokenService.Login(loginRequestModel);
+                TokenResponseModel tokenResponseModel = await tokenService.Login(loginRequestModel);
 
                 if (tokenResponseModel.Result == Middt.Framework.Model.Model.Enumerations.ResultEnum.Success)
                 {
 
-                    baseSessionState.SetToken(tokenResponseModel);
+                    await baseSessionState.SetToken(tokenResponseModel);
                     string returnUrl = NavigationManager.QueryString("returnUrl");
 
                     if (string.IsNullOrEmpty(returnUrl))

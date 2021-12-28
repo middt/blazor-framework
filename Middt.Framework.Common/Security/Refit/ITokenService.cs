@@ -1,11 +1,12 @@
 ﻿using Middt.Framework.Model.Authentication;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Security.Refit
 {
     public interface ITokenService
     {
-        TokenResponseModel Login(LoginRequestModel request);
-        TokenResponseModel RefreshToken(TokenRefreshRequestModel request);
+        Task<TokenResponseModel> Login(LoginRequestModel request);
+        Task<TokenResponseModel> RefreshToken(TokenRefreshRequestModel request);
 
     }
 }

@@ -8,7 +8,7 @@ namespace Middt.Framework.Api
 {
     public abstract class BaseCrudControllerWithAuth<TModel, TRepository> : BaseCrudController<TModel, TRepository>
         where TModel : class, new()
-        where TRepository : BaseRepository<TModel>, new()
+        where TRepository : IBaseRepository<TModel>, new()
     {
         [Authorize]
         [HttpGet("[action]")]

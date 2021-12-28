@@ -11,7 +11,7 @@ namespace Middt.Framework.Api
 {
     public abstract class BaseListController<TModel, TRepository> : BaseController
         where TModel : class, new()
-        where TRepository : BaseRepository<TModel>, new()
+        where TRepository : IBaseRepository<TModel>, new()
     {
 
         protected TRepository repository;

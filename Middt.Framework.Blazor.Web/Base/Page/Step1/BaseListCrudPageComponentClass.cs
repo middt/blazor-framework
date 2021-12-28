@@ -6,6 +6,7 @@ using Middt.Framework.Model.Model.Enumerations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base
 {
@@ -106,18 +107,18 @@ namespace Middt.Framework.Blazor.Web.Base
 
             StateHasChanged();
         }
-        protected virtual void SaveButtonClick()
+        protected async Task SaveButtonClick()
         {
-            ExecuteMethod(() =>
+            ExecuteMethod(async() =>
             {
                 BaseResponseDataModel<TModel> result;
                 if (IsUpdate)
                 {
-                    result = Service.Update(Model);
+                    result = await Service.Update(Model);
                 }
                 else
                 {
-                    result = Service.Insert(Model);
+                    result = await Service.Insert(Model);
                 }
 
                 if (result.Result == ResultEnum.Success)
@@ -152,9 +153,9 @@ namespace Middt.Framework.Blazor.Web.Base
         {
             OnAfterModalClose?.Invoke();
         }
-        public void Delete(TModel model)
+        public async Task Delete(TModel model)
         {
-            Service.Delete(model);
+            await Service.Delete(model);
         }
     }
 }

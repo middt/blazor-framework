@@ -2,6 +2,8 @@
 using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Security;
+using System.Threading.Tasks;
+
 namespace Middt.Framework.Common.Service
 {
     public abstract class BaseCrudRefit<TInterface, TModel> : BaseListRefit<TInterface, TModel>
@@ -17,44 +19,44 @@ namespace Middt.Framework.Common.Service
 
         }
 
-        public virtual BaseResponseDataModel<TModel> Insert(string version, TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Insert(string version, TModel model)
         {
-            return ExecutePolly(() =>
+            return await  ExecutePolly(() =>
             {
                 return api.Insert(version, controllerName, model).Result;
             }
 );
         }
-        public virtual BaseResponseDataModel<TModel> Insert(TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Insert(TModel model)
         {
-            return Insert("1.0", model);
+            return await  Insert("1.0", model);
         }
 
 
-        public virtual BaseResponseDataModel<TModel> Update(string version, TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Update(string version, TModel model)
         {
-            return ExecutePolly(() =>
+            return await  ExecutePolly(() =>
             {
                 return api.Update(version, controllerName, model).Result;
             });
         }
 
-        public virtual BaseResponseDataModel<TModel> Update(TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Update(TModel model)
         {
-            return Update("1.0", model);
+            return await  Update("1.0", model);
         }
 
 
-        public virtual BaseResponseDataModel<TModel> Delete(string version, TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Delete(string version, TModel model)
         {
-            return ExecutePolly(() =>
+            return await  ExecutePolly(() =>
             {
                 return api.Delete(version, controllerName, model).Result;
             });
         }
-        public virtual BaseResponseDataModel<TModel> Delete(TModel model)
+        public async Task<BaseResponseDataModel<TModel>> Delete(TModel model)
         {
-            return Delete("1.0", model);
+            return await Delete("1.0", model);
         }
     }
 }

@@ -66,7 +66,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
         public virtual async Task Search()
         {
-            ExecuteMethod(() =>
+            ExecuteMethod(async() =>
             {
                 BeforeSearch();
                 OnBeforeSearch?.Invoke();
@@ -80,9 +80,9 @@ namespace Middt.Framework.Blazor.Web.Base
 
                 BaseResponseDataModel<TModel> SearchResultModel = null;
                 if (id.HasValue)
-                    SearchResultModel = getMethod.Invoke(Service, new object[] { id }) as BaseResponseDataModel<TModel>;
+                    SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, new object[] { id });
                 else
-                    SearchResultModel = getMethod.Invoke(Service, null) as BaseResponseDataModel<TModel>;
+                    SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, null);
 
 
                 if (SearchResultModel.Result != ResultEnum.Success)

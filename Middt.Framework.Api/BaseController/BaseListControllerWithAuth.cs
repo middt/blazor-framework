@@ -9,7 +9,7 @@ namespace Middt.Framework.Api
 
     public abstract class BaseListControllerWithAuth<TModel, TRepository> : BaseListController<TModel, TRepository>
         where TModel : class, new()
-        where TRepository : BaseRepository<TModel>, new()
+        where TRepository : IBaseRepository<TModel>, new()
     {
 
         [Authorize]
