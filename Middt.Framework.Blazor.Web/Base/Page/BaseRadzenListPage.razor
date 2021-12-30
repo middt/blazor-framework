@@ -17,51 +17,34 @@
 @if (SearchContent != null && !HideSearch)
 {
 
-    <RadzenCard>
-        <EditForm Model="@SearchRequestModel">
-            <div class="row" style="margin-top:10px;">
+            <RadzenCard>
+                <EditForm Model="@SearchRequestModel">
+                    <div class="row" style="margin-top:10px;">
                 @SearchContent
-            </div>
+                    </div>
             @if (!HideSearchButton)
             {
-                <div class="row" style="margin-top:10px;">
-                    <div class="col-lg-5">
-                        <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
-                        <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+                                <div class="row" style="margin-top:10px;">
+                                    <div class="col-lg-5">
+                                        <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
+                                        <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
 
-                    </div>
-                </div>
+                                    </div>
+                                </div>
             }
-        </EditForm>
-    </RadzenCard>
+                </EditForm>
+            </RadzenCard>
 }
 <br />
 
-@if (@TemplateContent != null)
-{
-    <RadzenGrid AllowColumnResize="true"
+<RadzenGrid AllowColumnResize="true"
             @ref="radzenGrid"
             TItem=TModel
             style="height: 500px">
-        <Template>
-            @TemplateContent
-        </Template>
-        <Columns>
-            @ListContent
-        </Columns>
-    </RadzenGrid>
-}
-else
-{
-        <RadzenGrid AllowColumnResize="true"
-            @ref="radzenGrid"
-            TItem=TModel
-            style="height: 500px">
-        <Columns>
-            @ListContent
-        </Columns>
-    </RadzenGrid>
-}
+    <Columns>
+        @ListContent
+    </Columns>
+</RadzenGrid>
 
 
 

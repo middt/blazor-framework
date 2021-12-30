@@ -13,7 +13,7 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         where TService : BaseListRefit<TInterface, TModel>
     {
         [Parameter]
-        public RenderFragment TemplateContent { get; set; }
+        public RenderFragment<TModel> TemplateContent { get; set; }
 
         public RadzenGrid<TModel> radzenGrid { get; set; }
 
@@ -24,6 +24,9 @@ namespace Middt.Framework.Blazor.Web.Base.Page
                 InvokeAsync(() =>
                 {
                     radzenGrid.Data = SearchResultModel.Data;
+
+                    if (TemplateContent != null)
+                        radzenGrid.Template = TemplateContent;
                 });
 
             }

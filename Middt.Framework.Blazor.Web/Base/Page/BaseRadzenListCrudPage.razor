@@ -46,31 +46,16 @@
 
 }
 
-@if (@TemplateContent != null)
-{
-    <RadzenGrid AllowColumnResize="true"
+
+<RadzenGrid AllowColumnResize="true"
             @ref="radzenGrid"
             TItem=TModel
             style="height: 500px">
-        <Template>
-            @TemplateContent
-        </Template>
-        <Columns>
-            @ListContent
-        </Columns>
-    </RadzenGrid>
-}
-else
-{
-        <RadzenGrid AllowColumnResize="true"
-            @ref="radzenGrid"
-            TItem=TModel
-            style="height: 500px">
-        <Columns>
-            @ListContent
-        </Columns>
-    </RadzenGrid>
-}
+    <Columns>
+        @ListContent
+    </Columns>
+</RadzenGrid>
+
 
 <BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
 </BasePaginationComponent>
