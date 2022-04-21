@@ -27,14 +27,6 @@ namespace Middt.Framework.Blazor.Web.Base.Component.FileUpload
         [Parameter]
         public List<FileUploadModel> fileUploadModelList { get; set; }
 
-
-
-        [Inject]
-        protected INotification Notification { get; set; }
-
-        [Inject]
-        protected IBaseLog Log { get; set; }
-
         public BaseFileUploadComponent()
         {
             if (string.IsNullOrEmpty(acceptedFileTypes))

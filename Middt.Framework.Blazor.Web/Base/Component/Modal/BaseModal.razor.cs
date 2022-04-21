@@ -1,14 +1,15 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Radzen;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 {
-    public partial class BaseModal: Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+    public partial class BaseModal : BaseModalCode
     {
         [Inject]
         DialogService DialogService { get; set; }
 
-        protected override void OpenModal()
+        protected override async Task OpenModal()
         {
             DialogOptions dialogOptions = new DialogOptions();
             dialogOptions.ShowClose = ShowClose;
@@ -32,7 +33,7 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Modal
                     dialogOptions.Style = Style;
             }
 
-            DialogService.Open(Title, ds => ChildContent, dialogOptions);
+            await DialogService.OpenAsync(Title, ds => ChildContent, dialogOptions);
             //DialogService.OnClose += DialogService_OnClose;
         }
 
@@ -43,10 +44,12 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 
         //}
 
-        protected override void CloseModal()
+        protected override async Task CloseModal()
         {
             DialogService.Close();
-            OnClose?.Invoke(ModalName);
+
+            if (OnClose != null)
+                await OnClose?.InvokeAsync(ModalName);
 
         }
     }

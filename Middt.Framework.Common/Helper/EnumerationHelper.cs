@@ -24,9 +24,9 @@ namespace Middt.Framework.Common.Helper
 
             return value.ToString();
         }
-        public static List<TextValueItem> BuildSelectListItems(Type t)
+        public static List<TextValueItem> GetItems<TEnum>(this TEnum value)
         {
-            return Enum.GetValues(t)
+            return Enum.GetValues(value.GetType())
                        .Cast<Enum>()
                        .Select(e => new TextValueItem { Value = e.GetHashCode(), Text = e.GetDescription() })
                        .ToList();

@@ -4,6 +4,7 @@ using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Common.Service;
 using System;
+using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Bike.PopUp
 {
@@ -14,21 +15,24 @@ namespace Middt.Sample.BlazorServer.Pages.Bike.PopUp
         public BaseModal baseModal { get; set; }
 
         [Parameter]
-        public Action<Customer> OnSelect { get; set; }
-        public void Select(Customer model)
+        public EventCallback<Customer>? OnSelect { get; set; }
+        public async Task Select(Customer model)
         {
-            OnSelect?.Invoke(model);
-            Close();
+            if (OnSelect != null)
+                await OnSelect?.InvokeAsync(model);
+            await Close();
         }
-        public void Open()
+        public override async Task Open()
         {            
-            baseModal.Open();
+            await baseModal.Open();
         }
 
-        public void Close()
+        public override async Task Close()
         {
-            baseModal.Close();
-            OnClose?.Invoke(string.Empty);
+            await baseModal.Close();
+
+            if (OnClose != null)
+                await OnClose?.InvokeAsync(string.Empty);
         }
     }
 }

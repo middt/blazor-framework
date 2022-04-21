@@ -1,7 +1,15 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\Middt.Framework.Api",
+    "\\Middt.Framework.Api\\Cache",
+    "\\Middt.Framework.Common",
+    "\\Middt.Framework.Common\\Service",
+    "\\Middt.Framework.Plugin.Redis",
+    "\\Middt.Framework.Plugin.Redis\\Business",
+    "\\Middt.Framework.Plugin.Redis\\Extensions",
+    "\\Middt.Framework.Plugin.Redis\\Settings"
   ],
-  "SelectedNode": "\\Middt.Framework.sln",
+  "SelectedNode": "\\Middt.Framework.Common\\Service\\IBaseCrudRefit.cs",
   "PreviewInSolutionExplorer": false
 }

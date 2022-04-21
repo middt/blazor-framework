@@ -17,8 +17,8 @@
 	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="MassTransit" Version="7.3.0" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="7.3.0" />
+    <PackageReference Include="MassTransit" Version="8.0.1" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>

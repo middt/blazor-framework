@@ -44,10 +44,10 @@ namespace Middt.Framework.Blazor.Web.Base
 
 
         [Parameter]
-        public Action OnAfterSearch { get; set; }
+        public EventCallback? OnAfterSearch { get; set; }
 
         [Parameter]
-        public Action OnBeforeSearch { get; set; }
+        public EventCallback? OnBeforeSearch { get; set; }
 
 
 
@@ -57,47 +57,45 @@ namespace Middt.Framework.Blazor.Web.Base
         {
             SearchRequestModel = new BaseSearchRequestModel<TModel>();
         }
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
 
             if (firstRender)
             {
-                Pagination.OnPageChange += () =>
-                {
-                    GotoPage().Wait();
-                };
+                Pagination.OnPageChange = EventCallback.Factory.Create(this, GotoPage);
 
 
                 if (IsFirstLoad)
                 {
-                    Search();
+                    await Search();
                 }
             }
         }
         public virtual async Task GotoPage()
         {
-            Search();
+            await Search();
         }
 
-        protected void SearchButton()
+        protected async Task SearchButton()
         {
             Pagination.CurrentPage = 1;
-            Search();
+            await Search();
         }
         public virtual async Task Search()
         {
-            ExecuteMethod(async () =>
+            await ExecuteMethod(async () =>
             {
-                BeforeSearch();
+                await InvokeAsync(async () =>
+                {
+                    await BeforeSearch();
+                });
 
                 Type serviceType = Service.GetType();
-                MethodInfo searchMethod = serviceType.GetMethods()
-
-
-              .Single(mi => mi.Name == SearchMethod
-                         && mi.GetParameters().Length == 1);
+                MethodInfo searchMethod = serviceType.GetMethods().Single(
+                        mi => mi.Name == SearchMethod && 
+                        mi.GetParameters().Length == 1);
 
                 SearchResultModel = await (Task<BaseResponseDataModel<List<TModel>>>)searchMethod.Invoke(Service, new object[] { SearchRequestModel });
 
@@ -114,30 +112,34 @@ namespace Middt.Framework.Blazor.Web.Base
                     }
                 }
 
-                AfterSearch();
-
+                await InvokeAsync(async () =>
+                {
+                    await AfterSearch();
+                });
             });
         }
 
-        public virtual void Cancel()
+        public virtual async Task Cancel()
         {
             SearchRequestModel = new BaseSearchRequestModel<TModel>();
         }
-        protected virtual void AfterSearch()
+        protected virtual async Task AfterSearch()
         {
             Pagination.CurrentPage = SearchRequestModel.CurrentPage;
             Pagination.Count = SearchResultModel.Count;
 
-            Pagination.CalculateTotalPage();
+            await Pagination.CalculateTotalPage();
 
-            OnAfterSearch?.Invoke();
+            if (OnAfterSearch != null)
+                await OnAfterSearch?.InvokeAsync();
         }
-        public virtual void BeforeSearch()
+        public virtual async Task BeforeSearch()
         {
             SearchRequestModel.CurrentPage = Pagination.CurrentPage;
             SearchRequestModel.RequestItemSize = Pagination.PageSize;
 
-            OnBeforeSearch?.Invoke();
+            if (OnBeforeSearch != null)
+                await OnBeforeSearch?.InvokeAsync();
         }
 
     }

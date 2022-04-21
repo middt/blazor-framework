@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base
 {
@@ -9,9 +10,9 @@ namespace Middt.Framework.Blazor.Web.Base
         public List<string> Roles { get; set; }
 
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             //if (firstRender)
             //{

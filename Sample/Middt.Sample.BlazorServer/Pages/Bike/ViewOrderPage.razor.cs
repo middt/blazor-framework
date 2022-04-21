@@ -29,16 +29,16 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
 
         public RadzenNumeric<int?> txtCustomerID { get; set; }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
-                LoadStore();
-                LoadStaff();
+                await LoadStore();
+                await LoadStaff();
 
-                popCustomerSelect.OnSelect += OnSelect;
+                popCustomerSelect.OnSelect = EventCallback.Factory.Create<Customer>(this, OnSelect);
             }
         }
         private async Task LoadStore()
@@ -69,67 +69,21 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
         }
 
 
-        protected void OpenCustomerModel()
+        protected async Task OpenCustomerModel()
         {
-            popCustomerSelect.Open();
+           await popCustomerSelect.Open();
         }
-        protected void OnSelect(Customer customer)
+        protected async Task OnSelect(Customer customer)
         {
             SearchRequestModel.RequestModel.CustomerId = customer.CustomerId;
             txtCustomerName.Value = customer.Name;
 
             StateHasChanged();
         }
-        void OnChange(string value, string name)
+        protected async Task OnChange(string value, string name)
         {
            // Added radzen blazor bug
         }
-
-
-
-
-
-
-        //public async Task WordTemplate()
-        //{
-        //    ExecuteMethod(() =>
-        //    {
-        //        Table1Secure model = new Table1Secure();
-
-        //        BaseSearchRequestModel<Table1Secure> baseModel = new BaseSearchRequestModel<Table1Secure>();
-        //        baseModel.RequestModel = model;
-        //        BaseResponseDataModel<byte[]> resp = table1SecureService.SozlesmeBedeliDokumuWordTemplate(baseModel);
-
-        //        jsRuntime.SaveAsFileAsync("Sample-Word.docx", resp.Data, "application/ms-word");
-        //    });
-        //}
-
-        //public async Task WordToPdfTemplate()
-        //{
-        //    ExecuteMethod(() =>
-        //    {
-        //        Table1Secure model = new Table1Secure();
-
-        //        BaseSearchRequestModel<Table1Secure> baseModel = new BaseSearchRequestModel<Table1Secure>();
-        //        baseModel.RequestModel = model;
-        //        BaseResponseDataModel<byte[]> resp = table1SecureService.SozlesmeBedeliDokumuWordToPdfTemplate(baseModel);
-        //        jsRuntime.SaveAsFileAsync("Sample-WordToPDF.pdf", resp.Data, "application/pdf"); ;
-        //    });
-        //}
-
-        //public async Task ExcelTemplate()
-        //{
-        //    ExecuteMethod(() =>
-        //    {
-        //        Table1Secure model = new Table1Secure();
-
-        //        BaseSearchRequestModel<Table1Secure> baseModel = new BaseSearchRequestModel<Table1Secure>();
-        //        baseModel.RequestModel = model;
-        //        BaseResponseDataModel<byte[]> resp = table1SecureService.SozlesmeBedeliDokumuExcelTemplate(baseModel);
-
-        //        jsRuntime.SaveAsFileAsync("Sample-Excel.xlsx", resp.Data, "application/vdn.ms-excel");
-        //    });
-        //}
 
     }
 }

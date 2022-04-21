@@ -38,14 +38,14 @@ namespace Middt.Framework.Blazor.Web.Base
 
 
         [Parameter]
-        public Action OnAfterSearch { get; set; }
+        public EventCallback? OnAfterSearch { get; set; }
         [Parameter]
-        public Action OnBeforeSearch { get; set; }
+        public EventCallback? OnBeforeSearch { get; set; }
 
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+           await base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
@@ -57,7 +57,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
                 if (IsFirstLoad)
                 {
-                    Search();
+                    await Search();
                 }
             }
         }
@@ -66,52 +66,69 @@ namespace Middt.Framework.Blazor.Web.Base
 
         public virtual async Task Search()
         {
-            ExecuteMethod(async() =>
+            await ExecuteMethod(async() =>
             {
-                BeforeSearch();
-                OnBeforeSearch?.Invoke();
 
-                Type serviceType = Service.GetType();
-                //  MethodInfo getMethod = serviceType.GetMethod(GetMethod);
-                MethodInfo getMethod = serviceType.GetMethods()
-      //narrow the search before doing 'Single()'
-      .Single(mi => mi.Name == GetMethod
-                 && mi.GetParameters().Length == 1);
-
-                BaseResponseDataModel<TModel> SearchResultModel = null;
-                if (id.HasValue)
-                    SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, new object[] { id });
-                else
-                    SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, null);
-
-
-                if (SearchResultModel.Result != ResultEnum.Success)
+                await Task.Run(async () =>
                 {
-                    Log.Error(SearchResultModel.ErrorText);
-                    Notification.ShowErrorMessage("Arama yapılırken bir hata oluştu.", SearchResultModel.MessageList.FirstOrDefault());
-                }
-                else
-                {
-                    if (SearchResultModel.Data == null)
+                    await InvokeAsync(async () =>
                     {
-                        Notification.ShowInfoMessage("Bilgi", "Kayıt bulunamadı.");
+                        await BeforeSearch();
+
+                        if (OnBeforeSearch != null)
+                            await InvokeAsync(() => OnBeforeSearch?.InvokeAsync());
+                    });
+       
+                }).ContinueWith(async prev =>
+                {
+                    Type serviceType = Service.GetType();
+                    //  MethodInfo getMethod = serviceType.GetMethod(GetMethod);
+                    MethodInfo getMethod = serviceType.GetMethods()
+          //narrow the search before doing 'Single()'
+          .Single(mi => mi.Name == GetMethod
+                     && mi.GetParameters().Length == 1);
+
+                    BaseResponseDataModel<TModel> SearchResultModel = null;
+
+                    if (id.HasValue)
+                        SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, new object[] { id });
+                    else
+                        SearchResultModel = await (Task<BaseResponseDataModel<TModel>>)getMethod.Invoke(Service, null);
+
+                    if (SearchResultModel.Result != ResultEnum.Success)
+                    {
+                        Log.Error(SearchResultModel.ErrorText);
+                        Notification.ShowErrorMessage("Arama yapılırken bir hata oluştu.", SearchResultModel.MessageList.FirstOrDefault());
                     }
                     else
                     {
-                        Model = SearchResultModel.Data;
+                        if (SearchResultModel.Data == null)
+                        {
+                            Notification.ShowInfoMessage("Bilgi", "Kayıt bulunamadı.");
+                        }
+                        else
+                        {
+                            Model = SearchResultModel.Data;
+                        }
                     }
-                }
+                }).ContinueWith(async prev =>
+                {
+                    await InvokeAsync(async () =>
+                    {
+                        await AfterSearch();
 
-                AfterSearch();
-                OnAfterSearch?.Invoke();
+                        if (OnAfterSearch != null)
+                            await InvokeAsync(() => OnAfterSearch?.InvokeAsync());
+                    });
+                });
             });
         }
 
-        protected virtual void AfterSearch()
+        protected virtual async Task AfterSearch()
         {
 
         }
-        public virtual void BeforeSearch()
+        public virtual async Task BeforeSearch()
         {
 ;
         }

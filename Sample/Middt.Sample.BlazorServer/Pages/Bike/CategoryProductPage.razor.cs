@@ -1,6 +1,7 @@
 ﻿using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Common.Service;
+using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Bike
 {
@@ -10,14 +11,14 @@ namespace Middt.Sample.BlazorServer.Pages.Bike
     {
         public BaseRadzenListPage<ProductService, IProductService, Product> baseRadzenListPage { get; set; }
 
-        public override void OnAfterSearch()
+        public override async Task OnAfterSearch()
         {
-            base.OnAfterSearch();
+            await base.OnAfterSearch();
 
             if (Model != null)
             {
                 baseRadzenListPage.SearchRequestModel.RequestModel.CategoryId = Model.CategoryId;
-                baseRadzenListPage.Search();
+                await baseRadzenListPage.Search();
             }
         }
     }

@@ -31,7 +31,7 @@ namespace Middt.Sample.Api
         public override void CustomConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<IBaseConfiguration, ConfigurationHelper>();
-            services.AddSingleton<IBaseLog, Log4Net>();
+            services.AddSingleton<IBaseLog, ConsoleLog>();
             services.AddSingleton<IEmailSender, ExchangeEmailSender>();
 
             //services.AddSingleton<BaseRedisConnection>();

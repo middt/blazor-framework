@@ -26,7 +26,7 @@ namespace Middt.Framework.Api
 
             try
             {
-                response.Data = repository.GetById(id).Result;
+                response.Data = await repository.GetById(id);
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -47,7 +47,7 @@ namespace Middt.Framework.Api
 
             try
             {
-                response.Data = repository.GetAll().ToListAsync().Result;
+                response.Data = (await repository.GetAll()).ToList();
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");
@@ -69,7 +69,7 @@ namespace Middt.Framework.Api
 
             try
             {
-                response = repository.GetItems(model).Result;
+                response = await repository.GetItems(model);
 
                 response.Result = ResultEnum.Success;
                 response.MessageList.Add("Ok");

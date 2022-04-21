@@ -1,25 +1,24 @@
 ﻿using Microsoft.AspNetCore.Components;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
 {
     public partial class BasePaginationComponent : BaseComponent
     {
-        public Action OnPageChange { get; set; }
+        public EventCallback? OnPageChange { get; set; }
 
         [Parameter]
         public int PageSize { get; set; } = 20;
 
         public long Count { get; set; }
 
-        [Parameter]
         public int CurrentPage { get; set; } = 1;
 
-        [Parameter]
         public int TotalPage { get; set; }
 
-        public void GotoPage(int page)
+        public async Task GotoPage(int page)
         {
             if (page < 1)
             {
@@ -28,34 +27,36 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
             else
             {
                 CurrentPage = page;
-
             }
-            OnPageChange?.Invoke();
+
+            if (OnPageChange != null)
+                await OnPageChange?.InvokeAsync();
         }
-        public void ChangeRecordSize()
+        public async Task ChangeRecordSize()
         {
             CurrentPage = 1;
-            OnPageChange?.Invoke();
+            if (OnPageChange != null)
+                await OnPageChange?.InvokeAsync();
         }
 
 
-        public void Next()
+        public async Task Next()
         {
             CurrentPage++;
-            GotoPage(CurrentPage);
+            await GotoPage(CurrentPage);
         }
 
-        public void Previous()
+        public async Task Previous()
         {
             CurrentPage--;
-            GotoPage(CurrentPage);
+            await GotoPage(CurrentPage);
         }
 
         List<int> PageList;
 
         List<int> PageSizeList = new List<int>() { 5, 10, 20, 40, 50, 100, 1000 };
 
-        public void CalculateTotalPage()
+        public async Task CalculateTotalPage()
         {
             TotalPage = Convert.ToInt32(Math.Ceiling((decimal)Count / PageSize));
 
@@ -65,8 +66,7 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
                 PageList.Add(i);
             }
 
-
-            InvokeAsync(() => StateHasChanged()).Wait();
+            await InvokeAsync(() => StateHasChanged());
         }
     }
 }

@@ -3,7 +3,7 @@ using System;
 
 namespace Middt.Framework.Common.Dependency
 {
-    public sealed class FrameworkDependencyHelper
+    public class FrameworkDependencyHelper
     {
         private static readonly Lazy<FrameworkDependencyHelper> LazyInstance = new Lazy<FrameworkDependencyHelper>(() => new FrameworkDependencyHelper());
         public static FrameworkDependencyHelper Instance

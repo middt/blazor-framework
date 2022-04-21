@@ -3,13 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Middt.Framework.Common.Database.Attributes;
 using Middt.Framework.Common.Model.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading.Tasks;
 
 namespace Middt.Framework.Common.Database
 {
@@ -44,24 +40,23 @@ namespace Middt.Framework.Common.Database
             return await entities.FindAsync(id);
         }
 
-        public IQueryable<TModel> GetAll()
+        public async Task<IQueryable<TModel>> GetAll()
         {
             return entities.AsNoTracking();
         }
-        public IQueryable<TModel> FindBy(Expression<Func<TModel, bool>> queryExpression)
+
+        public async Task<IQueryable<TModel>> FindBy(Expression<Func<TModel, bool>> queryExpression)
         {
             return entities.AsNoTracking().Where(queryExpression);
         }
 
-
-        public IQueryable<TModel> FromSql(string sql, params object[] parameters)
+        public async Task<IQueryable<TModel>> FromSql(string sql, params object[] parameters)
         {
             return entities.FromSqlRaw(sql, parameters).AsNoTracking();
         }
-        public Task<TModel> FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
+        public async Task<TModel> FirstOrDefault(Expression<Func<TModel, bool>> queryExpression)
         {
-
-            return entities.AsNoTracking().FirstOrDefaultAsync(queryExpression);
+            return await entities.AsNoTracking().FirstOrDefaultAsync(queryExpression);
         }
 
         public async Task Insert(TModel entity)
@@ -80,9 +75,7 @@ namespace Middt.Framework.Common.Database
             }
         }
 
-
         public async Task Update(TModel entity)
-
         {
             context.Entry(entity).State = EntityState.Modified;
         }
@@ -201,7 +194,6 @@ namespace Middt.Framework.Common.Database
 
             return itemList;
         }
-
 
         private async Task<IQueryable<TNewModel>> DateQuery<TNewModel>(PropertyInfo p, IQueryable<TNewModel> itemList, object value)
         {
@@ -351,8 +343,6 @@ namespace Middt.Framework.Common.Database
             return await Context.Database.BeginTransactionAsync();
         }
 
-
-
         public async Task BulkInsert(List<TModel> entityList)
         {
             await BulkInsert(entityList, new BulkConfig());
@@ -368,7 +358,6 @@ namespace Middt.Framework.Common.Database
             await BulkInsert(entityList, bulkConfig);
         }
 
-
         public async Task BulkInsert(List<TModel> entityList, BulkConfig bulkConfig)
         {
             await context.BulkInsertAsync<TModel>(entityList, bulkConfig);
@@ -378,7 +367,6 @@ namespace Middt.Framework.Common.Database
             await BulkUpdate(entityList, new BulkConfig());
         }
 
-
         public async Task BulkUpdate(List<TModel> entityList, BulkConfig bulkConfig)
         {
             await context.BulkUpdateAsync<TModel>(entityList, bulkConfig);
@@ -387,7 +375,6 @@ namespace Middt.Framework.Common.Database
         {
             return await entities.Where(queryExpression).BatchUpdateAsync<TModel>(updateExpression);
         }
-
 
         public async Task BulkDelete(List<TModel> entityList)
         {

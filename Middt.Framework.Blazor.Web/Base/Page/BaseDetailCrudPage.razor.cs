@@ -1,5 +1,6 @@
 ﻿using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Page
 {
@@ -9,9 +10,9 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         where TInterface : IBaseCrudRefit<TModel>
         where TService : BaseCrudRefit<TInterface, TModel>
     {
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
 
             if (firstRender)

@@ -1,32 +1,35 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Middt.Framework.Common.Model.Data;
 using System;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 {
-    public partial class BaseCrudModal: Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+    public partial class BaseCrudModal : BaseModalCode
     {
         public BaseModal baseModal { get; set; }
-        [Parameter]
-        public Action OnSave { get; set; }
-        public void Save()
+        public EventCallback? OnSave { get; set; }
+
+        public async Task Save()
         {
-            OnSave?.Invoke();
+            if (OnSave != null)
+                await OnSave?.InvokeAsync();
         }
 
         public BaseRequestModel Model { get; set; }
 
-        public void Open(BaseRequestModel model)
+        public async Task Open(BaseRequestModel model)
         {
             Model = model;
 
-            baseModal.Open();
+            await baseModal.Open();
         }
 
-        public void Close()
+        public override async Task Close()
         {
-            baseModal.Close();
-            OnClose?.Invoke(string.Empty);
+            await baseModal.Close();
+            if (OnClose != null)
+                await OnClose?.InvokeAsync(string.Empty);
         }
     }
 }

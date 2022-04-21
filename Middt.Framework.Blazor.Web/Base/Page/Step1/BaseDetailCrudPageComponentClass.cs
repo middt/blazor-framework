@@ -19,16 +19,16 @@ namespace Middt.Framework.Blazor.Web.Base
 
         protected bool IsUpdate { get; set; }
 
-        public void New()
+        public async Task New()
         {
-            Open(new TModel(), false);
+            await Open(new TModel(), false);
         }
 
-        public void Edit(TModel model)
+        public async Task Edit(TModel model)
         {
-            Open(model, true);
+            await Open(model, true);
         }
-        private void Open(TModel model, bool isUpdate)
+        private async Task Open(TModel model, bool isUpdate)
         {
             IsUpdate = isUpdate;
             Model = model.Clone() as TModel;
@@ -37,7 +37,7 @@ namespace Middt.Framework.Blazor.Web.Base
         }
         public async Task SaveButtonClick()
         {
-            ExecuteMethod(async () =>
+            await ExecuteMethod(async () =>
             {
                 BaseResponseDataModel<TModel> result;
                 if (IsUpdate)

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Security
 {
@@ -11,9 +12,9 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Security
 
         public RenderFragment Display { get; set; }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             //if(firstRender)
             //{

@@ -17,25 +17,22 @@ namespace Middt.Framework.Blazor.Web.Base.Page
 
         public RadzenGrid<TModel> radzenGrid { get; set; }
 
-        protected override void AfterSearch()
+        protected override async Task AfterSearch()
         {
+            await base.AfterSearch();
+
             if (SearchRequestModel.RequestItemSize > 0)
             {
-                InvokeAsync(() =>
-                {
                     radzenGrid.Data = SearchResultModel.Data;
                     
                     if (TemplateContent != null)
                         radzenGrid.Template = TemplateContent;
-                });
-
             }
             else
             {
                 radzenGrid.Data = SearchResultModel.Data;
             }
-
-            base.AfterSearch();
+            await InvokeAsync(() => StateHasChanged());
         }
 
 
@@ -50,7 +47,7 @@ namespace Middt.Framework.Blazor.Web.Base.Page
             {
                 SearchRequestModel.CurrentPage = 1;
             }
-            Search();
+            await Search();
 
             //var query = dbContext.Employees.AsQueryable();
 

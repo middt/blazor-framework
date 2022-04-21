@@ -1,9 +1,10 @@
 ﻿using Microsoft.AspNetCore.Components;
 using System;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 {
-    public class BaseModalCode : BaseComponent
+    public abstract class BaseModalCode : BaseComponent
     {
         #region content
         [Parameter]
@@ -22,12 +23,10 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Modal
         public RenderFragment FooterContent { get; set; }
         #endregion
 
-
         [Parameter]
         public string ModalName { get; set; }
         [Parameter]
-        public Action<string> OnClose { get; set; }
-
+        public EventCallback<string>? OnClose { get; set; }
 
         public bool IsModalOpen = false;
 
@@ -42,24 +41,18 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Modal
         public string Height { get; set; }
         #endregion
 
-        public virtual void Open()
+        public virtual async Task Open()
         {
             IsModalOpen = true;
-            OpenModal();
-        }
-        protected virtual void OpenModal()
-        {
-
-        }
-        protected virtual void CloseModal()
-        {
-
+            await OpenModal();
         }
 
-        public virtual void Close()
+
+
+        public virtual async Task Close()
         {
             IsModalOpen = false;
-            CloseModal();
+            await CloseModal();
         }
     }
 }

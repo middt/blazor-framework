@@ -1,17 +1,21 @@
-﻿namespace Middt.Framework.Blazor.Web.Base.Component.Modal
+﻿using System.Threading.Tasks;
+
+namespace Middt.Framework.Blazor.Web.Base.Component.Modal
 {
-    public partial class BaseLoadingModal: Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
+    public partial class BaseLoadingModal : BaseModalCode
     {
         public BaseModal baseModal { get; set; }
 
-        public void Open()
+        public override async Task Open()
         {
-            baseModal.Open();
+            await baseModal.Open();
         }
 
-        public void Close()
+        public override async Task Close()
         {
-            baseModal.Close();
+            await baseModal.Close();
         }
+
+
     }
 }

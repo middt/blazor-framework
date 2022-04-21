@@ -12,9 +12,9 @@ namespace Middt.Framework.Common.Database
       where TModel : class, new()
     {
         Task<TModel> GetById(int id);
-        IQueryable<TModel> GetAll();
-        IQueryable<TModel> FindBy(System.Linq.Expressions.Expression<Func<TModel, bool>> predicate);
-        IQueryable<TModel> FromSql(string sql, params object[] parameters);
+        Task<IQueryable<TModel>> GetAll();
+        Task<IQueryable<TModel>> FindBy(System.Linq.Expressions.Expression<Func<TModel, bool>> predicate);
+        Task<IQueryable<TModel>> FromSql(string sql, params object[] parameters);
         Task<TModel> FirstOrDefault(System.Linq.Expressions.Expression<Func<TModel, bool>> predicate);
         Task Insert(TModel entity);
         Task Insert(List<TModel> entityList);

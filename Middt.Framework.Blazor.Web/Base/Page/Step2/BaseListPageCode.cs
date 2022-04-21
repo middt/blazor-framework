@@ -1,7 +1,9 @@
-﻿using Middt.Framework.Common.Model.Data;
+﻿using Microsoft.AspNetCore.Components;
+using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Page
 {
@@ -19,35 +21,35 @@ namespace Middt.Framework.Blazor.Web.Base.Page
 
         public TService Service { get { return baseListPage.Service; } }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
                 if (baseListPage != null)
                 {
-                    baseListPage.OnBeforeSearch += OnBeforeSearch;
-                    baseListPage.OnAfterSearch += OnAfterSearch;
+                    baseListPage.OnBeforeSearch = EventCallback.Factory.Create(this, OnBeforeSearch);
+                    baseListPage.OnAfterSearch = EventCallback.Factory.Create(this, OnAfterSearch);
                 }
             }
         }
 
-        public virtual void Search()
+        public virtual async Task Search()
         {
-            baseListPage.Search();
+            await baseListPage.Search();
         }
 
-        public override void ExecuteMethod(Action action)
+        public override async Task ExecuteMethod(Action action)
         {
-            baseListPage.ExecuteMethod(action);
+            await baseListPage.ExecuteMethod(action);
         }
 
-        public virtual void OnAfterSearch()
+        public virtual async Task OnAfterSearch()
         {
 
         }
-        public virtual void OnBeforeSearch()
+        public virtual async Task OnBeforeSearch()
         {
 
         }

@@ -3,6 +3,7 @@ using Middt.Framework.Blazor.Web.Base;
 using Middt.Framework.Blazor.Web.Base.SignalR;
 using Middt.Sample.BlazorServer.SignalR;
 using System;
+using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Sample.SignalR.Component
 {
@@ -12,9 +13,9 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.SignalR.Component
 
         public String Model { get { return testSignalRComponent.Model; } }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             if(firstRender)
             {

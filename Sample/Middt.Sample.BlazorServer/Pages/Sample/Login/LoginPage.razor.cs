@@ -4,6 +4,7 @@ using Middt.Framework.Blazor.Web.Base.Page;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.Security.Refit;
 using Middt.Framework.Model.Authentication;
+using Middt.Framework.Model.Model.Enumerations;
 using System.Threading.Tasks;
 
 namespace Middt.Sample.BlazorServer.Pages.Sample.Login
@@ -29,11 +30,11 @@ namespace Middt.Sample.BlazorServer.Pages.Sample.Login
 
         public async Task LoginSite()
         {
-            ExecuteMethod(async() =>
+            await ExecuteMethod(async() =>
             {
                 TokenResponseModel tokenResponseModel = await tokenService.Login(loginRequestModel);
 
-                if (tokenResponseModel.Result == Middt.Framework.Model.Model.Enumerations.ResultEnum.Success)
+                if (tokenResponseModel.Result == ResultEnum.Success)
                 {
 
                     await baseSessionState.SetToken(tokenResponseModel);

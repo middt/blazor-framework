@@ -1,18 +1,32 @@
-version: '3.8'
+﻿version: '3.4'
 
 services:
+  middt_sample_blazorserver:
+    image: ${DOCKER_REGISTRY-}middtsampleblazorserver
+    build:
+      context: .
+      dockerfile: Sample/Middt.Sample.BlazorServer/Dockerfile
+    depends_on: [middt_sample_api]
+
+  middt_sample_api:
+    image: ${DOCKER_REGISTRY-}middtsampleapi
+    build:
+      context: .
+      dockerfile: Sample/Middt.Sample.Api/Dockerfile
+
   mq:
     image: "rabbitmq:3.9-management"    
     ports:
       - "5672:5672"
       - "15672:15672"
-  redis-master:
+
+  redis_master:
     image: "redis:latest"
     ports:
       - "6379:6379" 
-  db-server:
+
+  db_server:
     image: mcr.microsoft.com/mssql/server
-    container_name: db-server 
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=yourStrong(!)Password
@@ -29,7 +43,7 @@ services:
         /opt/mssql/bin/sqlservr &
         pid=$$!
 
-        echo "Waiting for MS SQL to be available ⏳"
+        echo "Waiting for MS SQL to be available"
         /opt/mssql-tools/bin/sqlcmd -l 30 -S localhost -h-1 -V1 -U sa -P $$MSSQL_SA_PASSWORD -Q "SET NOCOUNT ON SELECT \"YAY WE ARE UP\" , @@servername"
         is_up=$$?
         while [ $$is_up -ne 0 ] ; do
@@ -45,5 +59,3 @@ services:
         echo "All scripts have been executed. Waiting for MS SQL(pid $$pid) to terminate."
 
         wait $$pid
-
-

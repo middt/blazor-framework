@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base
 {
-    public class BaseComponent : ComponentBase
+    public abstract class BaseComponent : ComponentBase
     {
         [Inject]
         protected NavigationManager NavigationManager { get; set; }
@@ -25,7 +25,7 @@ namespace Middt.Framework.Blazor.Web.Base
 
         public BaseLoadingModal LoadingModal { get; set; }
 
-        public virtual async void ExecuteMethod(Action action)
+        public virtual async Task ExecuteMethod(Action action)
         {
             try
             {
@@ -39,24 +39,25 @@ namespace Middt.Framework.Blazor.Web.Base
             }
             finally
             {
-                CloseModal();
-
-                InvokeAsync(() => StateHasChanged()).Wait();
+                await CloseModal();
+                await InvokeAsync(() => StateHasChanged());
             }
         }
 
-        protected void OpenModal()
+
+
+        protected virtual async Task OpenModal()
         {
             if (LoadingModal != null && !LoadingModal.IsModalOpen)
             {
-                LoadingModal.Open();
+                await InvokeAsync(() => LoadingModal.Open());
             }
         }
-        protected void CloseModal()
+        protected virtual async Task CloseModal()
         {
             if (LoadingModal != null)
             {
-                LoadingModal.Close();
+                await InvokeAsync(() => LoadingModal.Close());
             }
         }
         public bool IsAuthenticated { get; set; } = false;
@@ -70,12 +71,12 @@ namespace Middt.Framework.Blazor.Web.Base
             {
                 Notification.Clear();
 
-                LoadCustomOnAfterRenderAsync(firstRender);
+                await LoadCustomOnAfterRenderAsync(firstRender);
 
             }
             else
             {
-                CustomOnAfterRenderAsync(firstRender);
+                await CustomOnAfterRenderAsync(firstRender);
             }
         }
 
@@ -86,16 +87,14 @@ namespace Middt.Framework.Blazor.Web.Base
                 baseTokenHelper.GetClaimsPrincipal();
             }).ContinueWith(async prev =>
             {
-                CustomOnAfterRenderAsync(firstRender);
-            }).ContinueWith(async prev =>
+                await CustomOnAfterRenderAsync(firstRender);
+            })
+            .ContinueWith(async prev =>
             {
-                InvokeAsync(() => StateHasChanged()).Wait();
+                await InvokeAsync(() => StateHasChanged());
             });
         }
 
-        protected virtual void CustomOnAfterRenderAsync(bool firstRender)
-        {
-
-        }
+        protected virtual async Task CustomOnAfterRenderAsync(bool firstRender) { }
     }
 }

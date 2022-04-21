@@ -14,7 +14,7 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Captcha
     public class BaseCaptcha : ComponentBase
     {
         [Parameter]
-        public EventCallback<string> CaptchaWordChanged { get; set; }
+        public EventCallback<string>? CaptchaWordChanged { get; set; }
 
         [Parameter]
         public int Width { get; set; } = 170;
@@ -24,9 +24,6 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Captcha
 
         [Parameter]
         public int CharNumber { get; set; } = 4;
-
-        [Parameter]
-        public EventCallback<MouseEventArgs> OnRefresh { get; set; }
 
         protected string CaptchaWord;
 
@@ -43,7 +40,8 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Captcha
         private async Task OnRefreshInternal()
         {
             CreateCaptcha();
-            await CaptchaWordChanged.InvokeAsync(CaptchaWord);
+            if (CaptchaWordChanged != null)
+                await CaptchaWordChanged?.InvokeAsync(CaptchaWord);
         }
         protected void CreateCaptcha()
         {

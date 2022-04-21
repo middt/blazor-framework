@@ -45,13 +45,13 @@ namespace Middt.Framework.Blazor.Web.Base
         public string InsertText { get; set; } = "Yeni Kayıt";
 
         [Parameter]
-        public Action<TModel> OnAfterSave { get; set; }
+        public EventCallback<TModel>? OnAfterSave { get; set; }
 
         [Parameter]
-        public Action OnAfterModalClose { get; set; }
+        public EventCallback? OnAfterModalClose { get; set; }
 
         [Parameter]
-        public Action OnBeforeModalOpen { get; set; }
+        public EventCallback? OnBeforeModalOpen { get; set; }
 
         public TModel Model { get; set; }
 
@@ -59,33 +59,26 @@ namespace Middt.Framework.Blazor.Web.Base
 
         protected bool IsUpdate { get; set; }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
-                CrudModal.OnSave += () =>
-                {
-                    SaveButtonClick();
-                };
-
-                CrudModal.OnClose += (string ModalName) =>
-                {
-                    CloseButtonClick();
-                };
+                CrudModal.OnSave = EventCallback.Factory.Create(this, SaveButtonClick);
+                CrudModal.OnClose = EventCallback.Factory.Create<string>(this, CloseButtonClick);
             }
         }
-        public void New()
+        public async Task New()
         {
-            Open(new TModel(), false);
+            await Open(new TModel(), false);
         }
 
-        public void Edit(TModel model)
+        public async Task Edit(TModel model)
         {
-            Open(model, true);
+            await Open(model, true);
         }
-        private void Open(TModel model, bool isUpdate)
+        private async Task Open(TModel model, bool isUpdate)
         {
             IsUpdate = isUpdate;
             Model = model.Clone() as TModel;
@@ -101,15 +94,16 @@ namespace Middt.Framework.Blazor.Web.Base
 
             }
             //
-            OnBeforeModalOpen?.Invoke();
+            if (OnBeforeModalOpen != null)
+                await OnBeforeModalOpen?.InvokeAsync();
 
-            CrudModal.Open(Model);
+            await CrudModal.Open(Model);
 
             StateHasChanged();
         }
         protected async Task SaveButtonClick()
         {
-            ExecuteMethod(async() =>
+            await ExecuteMethod(async() =>
             {
                 BaseResponseDataModel<TModel> result;
                 if (IsUpdate)
@@ -133,13 +127,14 @@ namespace Middt.Framework.Blazor.Web.Base
                     }
                     // 
                     if (IsLoadAfterSave)
-                        Search();
+                        await Search();
 
 
                     if (IsCloseModalAfterEdit)
-                        CrudModal.Close();
+                        await InvokeAsync(() => CrudModal.Close());
 
-                    OnAfterSave?.Invoke(result.Data);
+                    if (OnAfterSave != null)
+                        await InvokeAsync(() => OnAfterSave?.InvokeAsync(result.Data));
                 }
                 else
                 {
@@ -149,9 +144,10 @@ namespace Middt.Framework.Blazor.Web.Base
                 }
             });
         }
-        protected virtual void CloseButtonClick()
+        protected virtual async Task CloseButtonClick()
         {
-            OnAfterModalClose?.Invoke();
+            if (OnAfterModalClose != null)
+                await OnAfterModalClose?.InvokeAsync();
         }
         public async Task Delete(TModel model)
         {

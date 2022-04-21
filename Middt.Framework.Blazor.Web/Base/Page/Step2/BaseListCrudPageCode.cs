@@ -1,7 +1,9 @@
-﻿using Middt.Framework.Common.Model.Data;
+﻿using Microsoft.AspNetCore.Components;
+using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Common.Service;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Middt.Framework.Blazor.Web.Base.Page
 {
@@ -22,58 +24,58 @@ namespace Middt.Framework.Blazor.Web.Base.Page
         public TService Service { get { return baseListCrudPage.Service; } }
 
 
-        public virtual void Edit(TModel model)
+        public virtual async Task Edit(TModel model)
         {
-            baseListCrudPage.Edit(model);
+            await baseListCrudPage.Edit(model);
         }
 
-        public virtual void Delete(TModel model)
+        public virtual async Task Delete(TModel model)
         {
-            baseListCrudPage.Delete(model);
+            await baseListCrudPage.Delete(model);
         }
 
 
 
-        public virtual void Search()
+        public virtual async Task Search()
         {
-            baseListCrudPage.Search();
+           await baseListCrudPage.Search();
         }
 
-        protected override void CustomOnAfterRenderAsync(bool firstRender)
+        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
         {
-            base.CustomOnAfterRenderAsync(firstRender);
+            await base.CustomOnAfterRenderAsync(firstRender);
 
             if (firstRender)
             {
-                baseListCrudPage.OnBeforeSearch += OnBeforeSearch;
-                baseListCrudPage.OnAfterSearch += OnAfterSearch;
+                baseListCrudPage.OnBeforeSearch = EventCallback.Factory.Create(this, OnBeforeSearch);
+                baseListCrudPage.OnAfterSearch = EventCallback.Factory.Create(this, OnAfterSearch);
 
-                baseListCrudPage.OnBeforeModalOpen += OnBeforeModalOpen;
-                baseListCrudPage.OnAfterModalClose += OnAfterModalClose;
+                baseListCrudPage.OnBeforeModalOpen = EventCallback.Factory.Create(this, OnBeforeModalOpen);
+                baseListCrudPage.OnAfterModalClose = EventCallback.Factory.Create(this, OnAfterModalClose);
             }
         }
-        public virtual void OnBeforeSearch()
+        public virtual async Task OnBeforeSearch()
         {
 
         }
 
-        public virtual void OnAfterSearch()
+        public virtual async Task OnAfterSearch()
         {
 
         }
 
-        public virtual void OnBeforeModalOpen()
+        public virtual async Task OnBeforeModalOpen()
         {
 
         }
 
-        public virtual void OnAfterModalClose()
+        public virtual async Task OnAfterModalClose()
         {
 
         }
-        public override void ExecuteMethod(Action action)
+        public override async Task ExecuteMethod(Action action)
         {
-            baseListCrudPage.ExecuteMethod(action);
+            await baseListCrudPage.ExecuteMethod(action);
         }
     }
 }
