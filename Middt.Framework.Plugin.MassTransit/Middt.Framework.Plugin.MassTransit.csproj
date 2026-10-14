@@ -1,28 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-	  <Product>Middt Framework Plugin MassTransit</Product>
-	  <Owners>Mehmet TOSUN</Owners>
-	  <PackageProjectUrl>https://github.com/middt/blazor-framework</PackageProjectUrl>
-	  <IsPackable>true</IsPackable>
-	  <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
-
-	  <VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
-	  <AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
-	  <AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>
-	  <Version Condition=" '$(VersionSuffix)' == '' ">0.0.1.0</Version>
-	  <Version Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</Version>
-	  <Authors>$(Owners)</Authors>
-	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+    <Product>Middt Framework Plugin MassTransit</Product>
+    <Description>DI-first MassTransit (RabbitMQ transport) registration and producer/consumer base classes for Middt applications.</Description>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="MassTransit" Version="8.0.1" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="8.0.1" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
-	  <ProjectReference Include="..\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
   </ItemGroup>
 
 </Project>

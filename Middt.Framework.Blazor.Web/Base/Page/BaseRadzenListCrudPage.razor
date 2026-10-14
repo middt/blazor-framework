@@ -1,28 +1,11 @@
-﻿@inherits BaseListCrudPageComponentClass<TService, TInterface, TModel>
-
-@using Middt.Framework.Blazor.Web.Base
-@using Middt.Framework.Blazor.Web.Base.Page
-@using Middt.Framework.Blazor.Web.Base.Component.Modal;
-
-
-@using Middt.Framework.Common.Model.Data
-@using Middt.Framework.Common.Service
-@using Middt.Framework.Model.Model.Enumerations
-
-@using Radzen.Blazor;
-@using Radzen;
-
-@using Middt.Framework.Blazor.Web.Base.Component.Pagination;
-
-@typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
-@typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
+@typeparam TService where TService : ICrudApiClient<TModel>
 @typeparam TModel where TModel : BaseRequestModel, new()
+@inherits BaseListCrudPageComponentClass<TService, TModel>
 
-
-@if (SearchContent != null && !HideSearch)
+@if (SearchContent is not null && !HideSearch)
 {
-    <RadzenCard>
-        <EditForm Model="@SearchRequestModel">
+    <RadzenCard class="rz-mb-4">
+        <EditForm Model="@SearchRequestModel" OnSubmit="SearchButton">
             <div class="row" style="margin-top:10px;">
                 @SearchContent
             </div>
@@ -30,41 +13,43 @@
             {
                 <div class="row" style="margin-top:10px;">
                     <div class="col-lg-5">
-                        <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
-
-                        <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
+                        <RadzenButton ButtonType="ButtonType.Submit" Icon="search" Text="Ara" />
+                        <RadzenButton Icon="search_off" Text="İptal" ButtonStyle="ButtonStyle.Light" Click="Cancel" />
                     </div>
                 </div>
             }
         </EditForm>
     </RadzenCard>
 }
-<br />
+
 @if (!HideInsertButton)
 {
-    <RadzenButton Icon="add_circle_outline" style="margin-bottom: 10px" Text="@InsertText" Click="() => New()" />
-
+    <RadzenButton Icon="add_circle_outline" class="rz-mb-2" Text="@InsertText" Click="New" />
 }
 
-
-<RadzenGrid AllowColumnResize="true"
-            @ref="radzenGrid"
-            TItem=TModel
-            style="height: 500px">
+<RadzenDataGrid @ref="DataGrid"
+                TItem="TModel"
+                Data="@SearchResultModel.Data"
+                Count="@SearchResultModel.Count"
+                LoadData="OnGridLoadData"
+                IsLoading="@IsSearching"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowColumnResize="true"
+                PageSize="@PageSize"
+                PageSizeOptions="@(new[] { 10, 20, 50, 100 })"
+                ShowPagingSummary="true"
+                Template="@TemplateContent"
+                Style="min-height: 300px">
     <Columns>
         @ListContent
     </Columns>
-</RadzenGrid>
+</RadzenDataGrid>
 
-
-<BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
-</BasePaginationComponent>
-
-<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight">
+<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight"
+               OnSave="SaveButtonClick" OnClose="_ => CloseButtonClick()">
     <ChildContent>
         @EditContent
     </ChildContent>
 </BaseCrudModal>
-
-<BaseLoadingModal @ref="LoadingModal">
-</BaseLoadingModal>
+<BaseLoadingModal @ref="LoadingModal" />

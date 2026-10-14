@@ -1,24 +1,13 @@
-﻿using System.Collections;
+using System.Collections;
 using System.ComponentModel.DataAnnotations;
 
-namespace Middt.Framework.Common.Validation
+namespace Middt.Framework.Common.Validation;
+
+/// <summary>Collection must contain at most <c>length</c> items. Null is valid (combine with [Required]).</summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
+public sealed class ArrayMaxLengthAttribute(int length) : ValidationAttribute
 {
-    public class ArrayMaxLengthAttribute : ValidationAttribute
-    {
-        readonly int length;
+    public int Length { get; } = length;
 
-        public ArrayMaxLengthAttribute(int length)
-        {
-            this.length = length;
-        }
-
-        public override bool IsValid(object value)
-        {
-            if (value is ICollection == false)
-            {
-                return false;
-            }
-            return ((ICollection)value).Count < length;
-        }
-    }
+    public override bool IsValid(object? value) => value is null || (value is ICollection collection && collection.Count <= Length);
 }

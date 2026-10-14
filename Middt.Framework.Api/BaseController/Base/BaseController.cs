@@ -1,42 +1,19 @@
-using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Globalization;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 
-namespace Middt.Framework.Api
+namespace Middt.Framework.Api;
+
+[ApiController]
+[Produces("application/json")]
+public abstract class BaseController : ControllerBase
 {
-    public abstract class BaseController : Controller
-    {
-        protected int UserId
-        {
-            get
-            {
-                var claim = ((ClaimsIdentity)User.Identity).FindFirst(ClaimTypes.Sid);
+    protected int UserId =>
+        User.FindFirst(ClaimTypes.Sid) is { } claim && int.TryParse(claim.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+            ? id
+            : -1;
 
-                if (claim != null)
-                    return Convert.ToInt32(claim.Value);
-                else
-                    return -1;
-            }
-        }
+    protected IReadOnlyList<string> RoleList => User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
 
-        protected List<string> RoleList
-        {
-            get
-            {
-                List<string> roleList = ((ClaimsIdentity)User.Identity).Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
-
-                if (roleList != null)
-                    return roleList;
-                else
-                    return new List<string>();
-            }
-        }
-
-        protected bool IsInRole(string role)
-        {
-            return RoleList.Contains(role);
-        }
-    }
+    protected bool IsInRole(string role) => User.IsInRole(role);
 }

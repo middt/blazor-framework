@@ -1,0 +1,37 @@
+@page "/Account/Login"
+@model LoginModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Giriş</title>
+    <link rel="stylesheet" href="~/_content/Middt.Framework.Blazor.Web/framework.css" />
+</head>
+<body class="middt-account">
+    <main class="middt-account-card">
+        <h1>Giriş</h1>
+
+        @if (Model.ErrorMessage is not null)
+        {
+            <p class="middt-account-error" role="alert">@Model.ErrorMessage</p>
+        }
+
+        <form method="post" autocomplete="on">
+            <input type="hidden" asp-for="ReturnUrl" />
+
+            <label asp-for="Input.Username">Kullanıcı adı</label>
+            <input asp-for="Input.Username" autocomplete="username" autofocus required maxlength="256" />
+
+            <label asp-for="Input.Password">Şifre</label>
+            <input asp-for="Input.Password" autocomplete="current-password" required maxlength="256" />
+
+            <button type="submit">Giriş yap</button>
+        </form>
+    </main>
+</body>
+</html>

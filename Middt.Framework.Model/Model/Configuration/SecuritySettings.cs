@@ -1,7 +1,11 @@
-﻿namespace Middt.Framework.Model.Model.Configuration
+namespace Middt.Framework.Model.Model.Configuration;
+
+public class SecuritySettings
 {
-    public class SecuritySettings
-    {
-        public string LoginPageURL { get; set; }
-    }
+    public const string SectionName = nameof(SecuritySettings);
+
+    /// <summary>Server rendered login page (cookie sign-in), provided by Middt.Framework.Blazor.Web.</summary>
+    public string LoginPageURL { get; set; } = "/Account/Login";
+
+    public string LogoutPageURL { get; set; } = "/Account/Logout";
 }

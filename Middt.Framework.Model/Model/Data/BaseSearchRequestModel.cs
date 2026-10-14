@@ -1,17 +1,18 @@
-﻿namespace Middt.Framework.Common.Model.Data
-{
-    public class BaseSearchRequestModel<T> : BaseRequestDataModel<T>
-        where T : new()
-    {
-        public int CurrentPage { get; set; }
-        public int RequestItemSize { get; set; }
-        public string SortProperty { get; set; }
-        public bool SortReverse { get; set; }
+namespace Middt.Framework.Common.Model.Data;
 
-        public BaseSearchRequestModel() : base()
-        {
-            CurrentPage = 1;
-            RequestItemSize = 10;
-        }
-    }
+public class BaseSearchRequestModel<T> : BaseRequestDataModel<T>
+    where T : new()
+{
+    public int CurrentPage { get; set; } = 1;
+
+    /// <summary>Page size. Zero or negative returns every matching row.</summary>
+    public int RequestItemSize { get; set; } = 10;
+
+    public string? SortProperty { get; set; }
+
+    /// <summary>
+    /// <c>true</c> sorts ascending, <c>false</c> sorts descending
+    /// (kept for wire compatibility with earlier framework versions).
+    /// </summary>
+    public bool SortReverse { get; set; }
 }

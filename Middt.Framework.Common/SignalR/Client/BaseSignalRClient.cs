@@ -1,60 +1,76 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
-using Middt.Framework.Common.Configuration;
-using Middt.Framework.Common.Log;
 using Middt.Framework.Common.Security;
-using System;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Common.SignalR
+namespace Middt.Framework.Common.SignalR;
+
+/// <summary>
+/// SignalR client for a <see cref="BaseSignalRHub{TModel}"/>. The connection is created lazily by
+/// <see cref="StartAsync"/> (not in the constructor) and closed by <see cref="DisposeAsync"/>.
+/// </summary>
+public abstract class BaseSignalRClient<TModel> : IBaseSignalRClient<TModel>, IAsyncDisposable
 {
-    public abstract class BaseSignalRClient<TModel> : IBaseSignalRClient<TModel>
+    private readonly HubConnection connection;
+    private readonly ILogger logger;
+    private readonly SemaphoreSlim startLock = new(1, 1);
+
+    protected BaseSignalRClient(IOptions<ApiSettings> apiSettings, IBaseSessionState sessionState, ILogger logger)
     {
-        public Action<TModel> OnReceive { get; set; }
+        ArgumentNullException.ThrowIfNull(apiSettings);
+        this.logger = logger;
 
-        IBaseConfiguration baseConfiguration;
-        IBaseLog baseLog;
-        IBaseSessionState baseSessionState;
+        var hubUrl = new Uri(new Uri(apiSettings.Value.URL.TrimEnd('/') + "/"), HubName.TrimStart('/'));
 
-        HubConnection connection;
+        connection = new HubConnectionBuilder()
+            .WithUrl(hubUrl, options => options.AccessTokenProvider = async () => await sessionState.Token())
+            .WithAutomaticReconnect()
+            .Build();
 
-        public abstract string hubName { get; }
+        connection.On<TModel>(nameof(Receive), Receive);
+    }
 
-        public BaseSignalRClient(
-            IBaseConfiguration _baseConfiguration,
-            IBaseLog _baseLog,
-            IBaseSessionState _baseSessionState)
+    /// <summary>Relative hub path, e.g. <c>/hubs/testhub</c>.</summary>
+    public abstract string HubName { get; }
+
+    public event Action<TModel>? OnReceive;
+
+    public HubConnectionState State => connection.State;
+
+    public async Task StartAsync(CancellationToken cancellationToken = default)
+    {
+        await startLock.WaitAsync(cancellationToken);
+        try
         {
-
-            baseConfiguration = _baseConfiguration;
-            baseLog = _baseLog;
-            baseSessionState = _baseSessionState;
-
-
-            ApiSettings apiSettings = baseConfiguration.Get<ApiSettings>();
-            string hubUrl = apiSettings.URL + hubName;
-
-            connection = new HubConnectionBuilder()
-                .WithUrl(new Uri(hubUrl), options =>
-                {
-                    options.AccessTokenProvider = () => Task.FromResult(baseSessionState.Token().Result);
-                })
-                .WithAutomaticReconnect()
-                .Build();
-
-            connection.On<TModel>(nameof(this.Receive), Receive);
-
-            connection.StartAsync();
+            if (connection.State == HubConnectionState.Disconnected)
+            {
+                await connection.StartAsync(cancellationToken);
+            }
         }
-
-        public Task Receive(TModel model)
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
         {
-            OnReceive?.Invoke(model);
-            return Task.CompletedTask;
+            logger.LogWarning(ex, "SignalR connection to {Hub} could not be started", HubName);
         }
-        ~BaseSignalRClient()
+        finally
         {
-            connection.StopAsync();
+            startLock.Release();
         }
+    }
+
+    public Task SendAsync(string methodName, object? argument, CancellationToken cancellationToken = default) =>
+        connection.InvokeAsync(methodName, argument, cancellationToken);
+
+    public Task Receive(TModel model)
+    {
+        OnReceive?.Invoke(model);
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await connection.DisposeAsync();
+        startLock.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

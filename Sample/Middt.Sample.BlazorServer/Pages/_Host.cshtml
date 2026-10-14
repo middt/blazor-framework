@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @namespace Middt.Sample.BlazorServer.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
@@ -6,44 +6,35 @@
 }
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Middt.Sample.BlazorServer</title>
+    <title>Middt Sample</title>
     <base href="~/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link href="css/site.css" rel="stylesheet" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/default-base.css">
-    <!-- Framework javascript ve css -->
-    <script src="_content/Middt.Framework.Blazor.Web/framework.js"></script>
+    <link rel="stylesheet" href="_content/Syncfusion.Blazor.Themes/bootstrap5.css" />
+    <link rel="stylesheet" href="_content/Middt.Framework.Blazor.Web/framework.css" />
+    <link rel="stylesheet" href="css/site.css" />
+    <component type="typeof(Radzen.Blazor.RadzenTheme)" render-mode="ServerPrerendered" param-Theme="@("material")" />
 </head>
 <body>
-    <app>
-        <component type="typeof(App)" render-mode="ServerPrerendered" />
-    </app>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
 
     <div id="blazor-error-ui">
         <environment include="Staging,Production">
-            An error has occurred. This application may no longer respond until reloaded.
+            Bir hata oluştu. Sayfayı yeniden yüklemeniz gerekebilir.
         </environment>
         <environment include="Development">
             An unhandled exception has occurred. See browser dev tools for details.
         </environment>
-        <a href="" class="reload">Reload</a>
+        <a href="" class="reload">Yeniden yükle</a>
         <a class="dismiss">🗙</a>
     </div>
 
     <script src="_framework/blazor.server.js"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
-
-    <script>
-        function setTitle(title) {
-        document.title = title;
-        }
-        function scrollToBottom(ref) {
-        ref.scrollTop = ref.scrollHeight;
-        }
-    </script>
+    <script src="_content/Syncfusion.Blazor.Core/scripts/syncfusion-blazor.min.js"></script>
+    <script src="_content/Middt.Framework.Blazor.Web/framework.js"></script>
 </body>
 </html>

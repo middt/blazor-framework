@@ -1,31 +1,18 @@
-﻿using MassTransit;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using MassTransit;
 
-namespace Middt.Framework.Plugin.MassTransit
+namespace Middt.Framework.Plugin.MassTransit;
+
+/// <summary>Sends <typeparamref name="TCommand"/> messages to the queue named <see cref="QueueName"/>.</summary>
+public abstract class BaseMassTransitProducer<TCommand>(ISendEndpointProvider sendEndpointProvider)
+    where TCommand : class
 {
-    public  abstract class BaseMassTransitProducer<TCommand>
-        where TCommand : class
-    {
-        public abstract string QueueName { get; }       
-        BaseMassTransitConnection baseMassTransitConnection;
-        ISendEndpoint endPoint;
+    public abstract string QueueName { get; }
 
-        public BaseMassTransitProducer(BaseMassTransitConnection _baseMassTransitConnection)
-        {
-            baseMassTransitConnection = _baseMassTransitConnection;
-        }
-        private void Create()
-        {            
-            Uri sendToUri = new Uri($"{baseMassTransitConnection.GetBus().Address.AbsoluteUri}/{QueueName}");
-            endPoint = baseMassTransitConnection.GetBus().GetSendEndpoint(sendToUri).Result;            
-        }
-        public void Send(TCommand model)
-        {
-            endPoint.Send<TCommand>(model);
-        }
+    public virtual async Task SendAsync(TCommand message, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        var endpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{QueueName}")).ConfigureAwait(false);
+        await endpoint.Send(message, cancellationToken).ConfigureAwait(false);
     }
 }

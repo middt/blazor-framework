@@ -1,128 +1,104 @@
-﻿
+using Microsoft.Extensions.Options;
 using Middt.Framework.Common.Helper;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Plugin.Redis
+namespace Middt.Framework.Plugin.Redis;
+
+/// <summary>JSON cache on Redis with distributed-lock protected population.</summary>
+public class MiddtRedisCache(MiddtRedisConnection connection, MiddtRedislock redisLock, IOptions<RedisSettings> options)
 {
-    public class MiddtRedisCache
+    private static readonly TimeSpan LockWait = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan LockRetry = TimeSpan.FromMilliseconds(200);
+
+    private readonly int _database = options.Value.Database;
+
+    public async Task<T?> ReadAsync<T>(string key, CancellationToken cancellationToken = default)
     {
-        TimeSpan lockWait = TimeSpan.FromSeconds(10);
-        TimeSpan lockRetry = TimeSpan.FromSeconds(1);
-
-        public int DBIndex { get; set; } = 0;
-
-
-        MiddtRedisConnection baseRedisConnection;
-        MiddtRedislock baseRedislock;
-
-        public MiddtRedisCache(MiddtRedisConnection _baseRedisConnection, MiddtRedislock _baseRedislock)
-        {
-            baseRedisConnection = _baseRedisConnection;
-            baseRedislock = _baseRedislock;
-        }
-
-        public async Task<bool> WriteWithLock<T>(string cacheName, Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
-        {
-            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
-            TimeSpan cacheTimeout = TimeSpan.FromSeconds(cacheTimeOutSecond);
-
-            string lockName = cacheName + "_Lock";
-
-
-            using (var redLock = baseRedislock.CreateLock(lockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
-            {
-                if (redLock.Result.IsAcquired)
-                {
-                    T result = RunMethod();
-
-                    JsonHelper<T> jsonHelper = new JsonHelper<T>();
-                    string json = jsonHelper.SerializeObject(result);
-
-                    IDatabase database = GetDatabase();
-                    await database.StringSetAsync(cacheName, json, cacheTimeout);
-                }
-            }
-            return true;
-        }
-        public async Task<T> ReadWrite<T>(string cacheName, Func<T> RunMethod, int lockTimeOutSecond, int cacheTimeOutSecond)
-        {
-            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
-            TimeSpan cacheTimeout = TimeSpan.FromSeconds(cacheTimeOutSecond);
-
-            string lockName = cacheName + "_Lock";
-
-
-            T returnModel = Read<T>(cacheName);
-
-            if (returnModel != null && !returnModel.Equals(default(T)))
-                return returnModel;
-
-
-            returnModel = baseRedislock.ExecuteMethod<T>(() =>
-            {
-                T result = Read<T>(cacheName);
-
-
-                if (result != null && !result.Equals(default(T)))
-                    return returnModel;
-
-                result = RunMethod();
-
-                JsonHelper<T> jsonHelper = new JsonHelper<T>();
-                string json = jsonHelper.SerializeObject(result);
-
-                IDatabase database = GetDatabase();
-                database.StringSetAsync(cacheName, json, cacheTimeout).Wait();
-
-                return result;
-            }, lockName, lockTimeout, lockWait, lockRetry);
-
-            return returnModel;
-
-        }
-
-        public void DeleteKey(string cacheName, int lockTimeOutSecond)
-        {
-            string lockName = cacheName + "_Lock";
-            TimeSpan lockTimeout = TimeSpan.FromSeconds(lockTimeOutSecond);
-            using (var redLock = baseRedislock.CreateLock(lockName, lockTimeout, lockWait, lockRetry)) // there are also non async Create() methods
-            {
-                if (redLock.Result.IsAcquired)
-                {
-                    IDatabase database = GetDatabase();
-                    database.KeyDeleteAsync(cacheName);
-                }
-            }
-        }
-
-        private T Deserialize<T>(string value)
-        {
-            T result = default(T);
-            if (!string.IsNullOrEmpty(value))
-            {
-                JsonHelper<T> jsonHelper = new JsonHelper<T>();
-                result = jsonHelper.DeserializeObject(value);
-            }
-
-            return result;
-        }
-
-        public T Read<T>(string cacheName)
-        {
-            IDatabase database = GetDatabase();
-            RedisValue result = database.StringGetAsync(cacheName).Result;
-            return Deserialize<T>(result);
-        }
-
-        private IDatabase GetDatabase()
-        {
-            IConnectionMultiplexer redisClient = baseRedisConnection.connectionMultiplexer;
-            return redisClient.GetDatabase(DBIndex);
-        }
+        var (_, value) = await TryReadAsync<T>(key, cancellationToken).ConfigureAwait(false);
+        return value;
     }
+
+    /// <summary>
+    /// Returns the cached value, or produces it with <paramref name="factory"/> under a distributed lock
+    /// (double-checked) and caches it for <paramref name="cacheTimeout"/>.
+    /// Returns <c>default</c> only when the value is missing and the lock could not be acquired.
+    /// </summary>
+    public async Task<T?> ReadWriteAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        TimeSpan lockTimeout,
+        TimeSpan cacheTimeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        var (found, cached) = await TryReadAsync<T>(key, cancellationToken).ConfigureAwait(false);
+        if (found)
+        {
+            return cached;
+        }
+
+        return await redisLock.ExecuteWithLockAsync(
+            async ct =>
+            {
+                var (exists, current) = await TryReadAsync<T>(key, ct).ConfigureAwait(false);
+                if (exists)
+                {
+                    return current;
+                }
+
+                var created = await factory(ct).ConfigureAwait(false);
+                await SetAsync(key, created, cacheTimeout).ConfigureAwait(false);
+                return created;
+            },
+            LockName(key),
+            lockTimeout,
+            LockWait,
+            LockRetry,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Produces a value with <paramref name="factory"/> under a distributed lock and caches it.</summary>
+    /// <returns><c>true</c> when the value was written; <c>false</c> when the lock could not be acquired.</returns>
+    public Task<bool> WriteWithLockAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        TimeSpan lockTimeout,
+        TimeSpan cacheTimeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        return redisLock.ExecuteWithLockAsync(
+            async ct =>
+            {
+                var value = await factory(ct).ConfigureAwait(false);
+                await SetAsync(key, value, cacheTimeout).ConfigureAwait(false);
+            },
+            LockName(key),
+            lockTimeout,
+            LockWait,
+            LockRetry,
+            cancellationToken);
+    }
+
+    public Task<bool> DeleteKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetDatabase().KeyDeleteAsync(key);
+    }
+
+    private async Task<(bool Found, T? Value)> TryReadAsync<T>(string key, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var value = await GetDatabase().StringGetAsync(key).ConfigureAwait(false);
+        return value.IsNullOrEmpty ? (false, default) : (true, JsonHelper.Deserialize<T>(value.ToString()));
+    }
+
+    private Task<bool> SetAsync<T>(string key, T value, TimeSpan expiry) =>
+        GetDatabase().StringSetAsync(key, JsonHelper.Serialize(value), expiry);
+
+    private static string LockName(string key) => key + "_Lock";
+
+    private IDatabase GetDatabase() => connection.GetDatabase(_database);
 }

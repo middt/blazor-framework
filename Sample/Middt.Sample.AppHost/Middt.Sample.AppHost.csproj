@@ -1,0 +1,22 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.1">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>5c1b0f8e-6a0e-4c8e-9a51-7c1f3f2e4d10</UserSecretsId>
+    <!-- Use NuGet-restored DCP/dashboard so `dotnet run` works without the Aspire CLI installed. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Middt.Sample.Api\Middt.Sample.Api.csproj" />
+    <ProjectReference Include="..\Middt.Sample.BlazorServer\Middt.Sample.BlazorServer.csproj" />
+  </ItemGroup>
+
+</Project>

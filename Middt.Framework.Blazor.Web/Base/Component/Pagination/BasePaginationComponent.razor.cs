@@ -1,72 +1,37 @@
-﻿using Microsoft.AspNetCore.Components;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
+using Radzen;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Pagination
+namespace Middt.Framework.Blazor.Web.Base.Component.Pagination;
+
+/// <summary>Pager for list pages that do not use a Radzen data grid.</summary>
+public partial class BasePaginationComponent : BaseComponent
 {
-    public partial class BasePaginationComponent : BaseComponent
+    private static readonly int[] PageSizeOptions = [5, 10, 20, 40, 50, 100, 1000];
+
+    [Parameter]
+    public int PageSize { get; set; } = 20;
+
+    [Parameter]
+    public EventCallback OnPageChange { get; set; }
+
+    public int Count { get; set; }
+
+    public int CurrentPage { get; set; } = 1;
+
+    public int TotalPage => PageSize <= 0 ? 1 : (int)Math.Ceiling((double)Count / PageSize);
+
+    public Task GotoPage(int page)
     {
-        public EventCallback? OnPageChange { get; set; }
+        CurrentPage = Math.Clamp(page, 1, Math.Max(TotalPage, 1));
+        return OnPageChange.InvokeAsync();
+    }
 
-        [Parameter]
-        public int PageSize { get; set; } = 20;
+    /// <summary>Re-renders the pager after <see cref="Count"/> changed.</summary>
+    public Task CalculateTotalPage() => InvokeAsync(StateHasChanged);
 
-        public long Count { get; set; }
-
-        public int CurrentPage { get; set; } = 1;
-
-        public int TotalPage { get; set; }
-
-        public async Task GotoPage(int page)
-        {
-            if (page < 1)
-            {
-                CurrentPage = 1;
-            }
-            else
-            {
-                CurrentPage = page;
-            }
-
-            if (OnPageChange != null)
-                await OnPageChange?.InvokeAsync();
-        }
-        public async Task ChangeRecordSize()
-        {
-            CurrentPage = 1;
-            if (OnPageChange != null)
-                await OnPageChange?.InvokeAsync();
-        }
-
-
-        public async Task Next()
-        {
-            CurrentPage++;
-            await GotoPage(CurrentPage);
-        }
-
-        public async Task Previous()
-        {
-            CurrentPage--;
-            await GotoPage(CurrentPage);
-        }
-
-        List<int> PageList;
-
-        List<int> PageSizeList = new List<int>() { 5, 10, 20, 40, 50, 100, 1000 };
-
-        public async Task CalculateTotalPage()
-        {
-            TotalPage = Convert.ToInt32(Math.Ceiling((decimal)Count / PageSize));
-
-            PageList = new List<int>();
-            for (int i = 1; i <= TotalPage; i++)
-            {
-                PageList.Add(i);
-            }
-
-            await InvokeAsync(() => StateHasChanged());
-        }
+    private Task HandlePageChanged(PagerEventArgs args)
+    {
+        PageSize = args.Top;
+        return GotoPage(args.PageIndex + 1);
     }
 }

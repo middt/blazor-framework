@@ -1,32 +1,19 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace Middt.Framework.Common.Helper
+namespace Middt.Framework.Common.Helper;
+
+/// <summary>System.Text.Json helper with lenient web defaults (camelCase, case-insensitive, nulls ignored).</summary>
+public static class JsonHelper
 {
-    public class JsonHelper<T>
+    public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
     {
-        JsonSerializerSettings settings;
-        public JsonHelper()
-        {
-            settings = new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                MissingMemberHandling = MissingMemberHandling.Ignore
-            };
-        }
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        ReferenceHandler = ReferenceHandler.IgnoreCycles,
+    };
 
-        public T DeserializeObject(string value)
-        {
-            return JsonConvert.DeserializeObject<T>(value, settings);
-        }
+    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
 
-        public string SerializeObject(T value)
-        {
-            return JsonConvert.SerializeObject(value, Newtonsoft.Json.Formatting.None, settings);
-        }
-    }
+    public static T? Deserialize<T>(string? value) =>
+        string.IsNullOrEmpty(value) ? default : JsonSerializer.Deserialize<T>(value, Options);
 }

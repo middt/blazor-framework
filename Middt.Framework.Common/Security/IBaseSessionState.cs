@@ -1,16 +1,17 @@
-﻿using Middt.Framework.Model.Authentication;
-using System.Threading.Tasks;
+using Middt.Framework.Model.Authentication;
 
-namespace Middt.Framework.Common.Security
+namespace Middt.Framework.Common.Security;
+
+/// <summary>Client side token store (e.g. protected browser storage in Blazor Server).</summary>
+public interface IBaseSessionState
 {
-    public interface IBaseSessionState
-    {
-        Task<string> Token();
-        Task<string> RefreshToken();
+    Task<string> Token();
 
-        Task<int> ExpiresIn();
+    Task<string> RefreshToken();
 
-        Task SetToken(TokenResponseModel tokenResponseModel);
-        Task ClearToken();
-    }
+    Task<int> ExpiresIn();
+
+    Task SetToken(TokenResponseModel tokenResponseModel);
+
+    Task ClearToken();
 }

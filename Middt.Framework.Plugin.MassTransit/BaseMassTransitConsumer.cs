@@ -1,28 +1,13 @@
-﻿using MassTransit;
-using MassTransit.RabbitMqTransport;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using MassTransit;
 
-namespace Middt.Framework.Plugin.MassTransit
+namespace Middt.Framework.Plugin.MassTransit;
+
+/// <summary>
+/// Base consumer for <typeparamref name="TMessage"/>. Register derived types with
+/// <c>x.AddConsumer&lt;TConsumer&gt;()</c> in the <c>AddMiddtMassTransit</c> configure callback.
+/// </summary>
+public abstract class BaseMassTransitConsumer<TMessage> : IConsumer<TMessage>
+    where TMessage : class
 {
-    public abstract class BaseMassTransitConsumer
-    {
-        public abstract string QueueName { get; }
-
-        protected BaseMassTransitConnection baseMassTransitConnection;
-        public BaseMassTransitConsumer(BaseMassTransitConnection _baseMassTransitConnection)
-        {
-            baseMassTransitConnection = _baseMassTransitConnection;
-        }
-        public virtual void Create(Action<IReceiveEndpointConfigurator> registrationAction = null)
-        {
-            var handle = baseMassTransitConnection.GetBus().ConnectReceiveEndpoint(QueueName, x =>
-            {
-                registrationAction?.Invoke(x);
-            });
-        }
-    }
+    public abstract Task Consume(ConsumeContext<TMessage> context);
 }

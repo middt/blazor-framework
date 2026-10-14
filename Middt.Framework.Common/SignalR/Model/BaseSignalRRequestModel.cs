@@ -1,24 +1,17 @@
-﻿using System.Collections.Generic;
+namespace Middt.Framework.Common.SignalR.Model;
 
-namespace Middt.Framework.Common.SignalR.Model
+public enum MessageType
 {
-    public enum MessageType
-    {
-        Broadcast = 0,
-        Group = 1,
-        User = 2
-    }
-    public class BaseSignalRRequestModel<TModel>
-    {
-        public BaseSignalRRequestModel()
-        {
-            MessageType = MessageType.Broadcast;
-            MessageTo = new List<string>();
-        }
-        public MessageType MessageType { get; set; }
+    Broadcast = 0,
+    Group = 1,
+    User = 2,
+}
 
-        public List<string> MessageTo { get; set; }
+public class BaseSignalRRequestModel<TModel>
+{
+    public MessageType MessageType { get; set; } = MessageType.Broadcast;
 
-        public TModel Data { get; set; }
-    }
+    public List<string> MessageTo { get; set; } = [];
+
+    public TModel? Data { get; set; }
 }

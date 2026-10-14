@@ -1,51 +1,33 @@
-﻿@page "/Bike/Category"
-@inherits BaseListCrudPageCode<CategoryService, ICategoryService, Category>
+@page "/Bike/Category"
+@inherits BaseListCrudPageCode<CategoryService, Category>
 
-@using Middt.Framework.Blazor.Web.Base.Page;
-@using Middt.Sample.Common.Service
-@using Middt.Sample.Api.Model.Database;
-
-
-
-<BaseRadzenListCrudPage ModalTitle="Category"
-                        TService="CategoryService"
-                        TInterface="ICategoryService"
-                        TModel="Category"
-                        @ref="baseListCrudPage">
+<BaseRadzenListCrudPage ModalTitle="Category" TService="CategoryService" TModel="Category" @ref="baseListCrudPage">
     <SearchContent>
         <div class="row top-space" style="width:100%;">
-            <div class="col-md-2">
-                Name
-            </div>
+            <div class="col-md-2">Name</div>
             <div class="col-md-4">
-                <RadzenTextBox @bind-Value=SearchRequestModel.RequestModel.CategoryName Style="width:250px"></RadzenTextBox>
+                <RadzenTextBox @bind-Value="SearchRequestModel.RequestModel.CategoryName" Style="width:250px" />
             </div>
         </div>
     </SearchContent>
-    <TemplateContent>
-        @context.CategoryName
-    </TemplateContent>
     <ListContent>
-        <RadzenGridColumn TItem="Category" Property="CategoryName" Title="Name" />
-        <RadzenGridColumn TItem="Category" Width="70px">
+        <RadzenDataGridColumn TItem="Category" Property="CategoryName" Title="Name" />
+        <RadzenDataGridColumn TItem="Category" Width="160px" Sortable="false">
             <Template Context="item">
-                <RadzenButton Click="() => Detail(item)" Icon="search" />
+                <RadzenButton Click="() => Detail(item)" Icon="search" Size="ButtonSize.Small" />
+                <RadzenButton Click="() => Edit(item)" Icon="edit" Size="ButtonSize.Small" />
+                <RadzenButton Click="() => Delete(item)" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" />
             </Template>
-        </RadzenGridColumn>
-        <RadzenGridColumn TItem="Category" Width="70px">
-            <Template Context="item">
-                <RadzenButton Click="() => Edit(item)" Icon="edit" />
-            </Template>
-        </RadzenGridColumn>
+        </RadzenDataGridColumn>
     </ListContent>
     <EditContent>
         <div class="row top-space">
             <div class="align-items-center d-flex col-md-3">
-                <label for="name">Name</label>
+                <label for="categoryName">Name</label>
             </div>
             <div class="col-md-9">
-                <RadzenTextBox @bind-Value="Model.CategoryName" class="form-control" />
-                <ValidationMessage For="() => Model.CategoryName"></ValidationMessage>
+                <RadzenTextBox id="categoryName" @bind-Value="Model.CategoryName" class="w-100" />
+                <ValidationMessage For="() => Model.CategoryName" />
             </div>
         </div>
     </EditContent>

@@ -1,55 +1,20 @@
-﻿using Middt.Sample.BlazorServer.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Middt.Sample.BlazorServer.Model;
 
-namespace Middt.Sample.BlazorServer.Service
+namespace Middt.Sample.BlazorServer.Service;
+
+public sealed class MenuService
 {
-    public class MenuService
-    {
-        MenuItem[] allMenuItems = new[] {
-        new MenuItem()
-        {
-            Name = "Home",
-            Path = "/",
-            Icon = "&#xe88a"
-        },
-        new MenuItem() {
-            Name="Category",
-            Path ="/Bike/Category",
-        },
-                new MenuItem() {
-            Name="Product",
-            Path ="  /Bike/Product",
-        },
-                        new MenuItem() {
-            Name="Order",
-            Path ="/Bike/Order",
-        }
-    };
+    public IReadOnlyList<MenuItem> MenuItems { get; } =
+    [
+        new() { Name = "Home", Path = "/", Icon = "home", Title = "Middt Sample" },
+        new() { Name = "Category", Path = "/Bike/Category", Icon = "category", Title = "Categories" },
+        new() { Name = "Product", Path = "/Bike/Product", Icon = "pedal_bike", Title = "Products" },
+        new() { Name = "Order", Path = "/Bike/Order", Icon = "receipt_long", Title = "Orders" },
+    ];
 
-        public IEnumerable<MenuItem> MenuItems
-        {
-            get
-            {
-                return allMenuItems;
-            }
-        }
+    public MenuItem? FindCurrent(Uri uri) =>
+        MenuItems.SelectMany(item => item.Children ?? [item])
+            .FirstOrDefault(item => string.Equals(item.Path, uri.AbsolutePath, StringComparison.OrdinalIgnoreCase));
 
-        public MenuItem FindCurrent(Uri uri)
-        {
-            return MenuItems.SelectMany(MenuItem => MenuItem.Children ?? new[] { MenuItem })
-                           .FirstOrDefault(MenuItem => MenuItem.Path == uri.AbsolutePath || $"/{MenuItem.Path}" == uri.AbsolutePath);
-        }
-
-        public string TitleFor(MenuItem MenuItem)
-        {
-            if (MenuItem != null)
-            {
-                return MenuItem.Title ?? "";
-            }
-
-            return "";
-        }
-    }
+    public static string TitleFor(MenuItem? item) => item?.Title ?? "Middt Sample";
 }

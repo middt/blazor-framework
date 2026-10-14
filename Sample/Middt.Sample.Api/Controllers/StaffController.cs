@@ -1,58 +1,25 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Middt.Framework.Api;
 using Middt.Framework.Api.Cache;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Plugin.Redis;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-//using Syncfusion.DocIO;
-//using Syncfusion.DocIO.DLS;
 
-namespace Middt.Sample.Api.Controllers
+namespace Middt.Sample.Api.Controllers;
+
+/// <summary>Staff CRUD (authenticated); the staff list is cached (HybridCache: memory + Redis when configured).</summary>
+[Route("api/v{version:apiVersion}/[controller]")]
+[ApiVersion("1.0")]
+public class StaffController(StaffRepository repository, IBaseCache cache) : BaseCrudControllerWithAuth<Staff, StaffRepository>(repository)
 {
-    [ApiController]
-    [Route("api/v{version:apiVersion}/[controller]")]
-    [ApiVersion("1.0")]
-    public class StaffController : BaseCrudControllerWithAuth<Staff, StaffRepository>
-    {
-        IBaseCache baseCache;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-        MiddtRedisCache middtRedisCache;
-        public StaffController(IBaseCache _baseCache, MiddtRedisCache _middtRedisCache)
-        {
-            baseCache = _baseCache;
-            middtRedisCache = _middtRedisCache;
-        }
-
-        [Authorize]
-        [HttpGet("[action]")]
-        public override Task<BaseResponseDataModel<List<Staff>>> GetAll()
-        {
-            return middtRedisCache.ReadWrite("StaffCache",() =>
-            {
-                return base.GetAll().Result;
-            }, 60,60*60);
-        }
-
-        //[Authorize]
-        //[HttpGet("[action]")]
-        //public override BaseResponseDataModel<List<Staff>> GetAll()
-        //{
-        //    string cacheKey = nameof(StaffController) + nameof(GetAll);
-
-        //    BaseResponseDataModel<List<Staff>> result = baseCache.GetSetValue<BaseResponseDataModel<List<Staff>>>(cacheKey, 1, 1,
-        //        () =>
-        //        {
-        //            return base.GetAll();
-        //        }
-        //        );
-
-        //    return result;
-        //}
-    }
+    [HttpGet("[action]")]
+    public override async Task<ActionResult<BaseResponseDataModel<List<Staff>>>> GetAll(CancellationToken cancellationToken) =>
+        await cache.GetOrCreateAsync(
+            $"{nameof(StaffController)}:{nameof(GetAll)}",
+            async ct => (await base.GetAll(ct)).Value!,
+            CacheDuration,
+            cancellationToken);
 }

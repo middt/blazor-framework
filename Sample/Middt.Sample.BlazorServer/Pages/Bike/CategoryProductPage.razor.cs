@@ -1,25 +1,19 @@
-﻿using Middt.Framework.Blazor.Web.Base.Page;
-using Middt.Sample.Api.Model.Database;
-using Middt.Sample.Common.Service;
-using System.Threading.Tasks;
+using Middt.Framework.Blazor.Web.Base.Page;
 
-namespace Middt.Sample.BlazorServer.Pages.Bike
+namespace Middt.Sample.BlazorServer.Pages.Bike;
+
+public partial class CategoryProductPage
 {
+    private BaseRadzenListPage<ProductService, Product> productListPage = default!;
 
-
-    public partial class CategoryProductPage : BaseDetailPageCode<CategoryService, ICategoryService, Category>
+    public override async Task OnAfterSearch()
     {
-        public BaseRadzenListPage<ProductService, IProductService, Product> baseRadzenListPage { get; set; }
+        await base.OnAfterSearch();
 
-        public override async Task OnAfterSearch()
+        if (baseDetailPage.Model is { } category)
         {
-            await base.OnAfterSearch();
-
-            if (Model != null)
-            {
-                baseRadzenListPage.SearchRequestModel.RequestModel.CategoryId = Model.CategoryId;
-                await baseRadzenListPage.Search();
-            }
+            productListPage.SearchRequestModel.RequestModel.CategoryId = category.CategoryId;
+            await productListPage.Search();
         }
     }
 }

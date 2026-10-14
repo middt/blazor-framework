@@ -1,38 +1,25 @@
-﻿using Microsoft.AspNetCore.Components;
-using Middt.Framework.Blazor.Web.Base.Component.Modal;
+using Microsoft.AspNetCore.Components;
 using Middt.Framework.Blazor.Web.Base.Page;
-using Middt.Sample.Api.Model.Database;
-using Middt.Sample.Common.Service;
-using System;
-using System.Threading.Tasks;
 
-namespace Middt.Sample.BlazorServer.Pages.Bike.PopUp
+namespace Middt.Sample.BlazorServer.Pages.Bike.PopUp;
+
+public partial class PopCustomerSelect
 {
-    public partial class PopCustomerSelect : BaseModalCode
+    private BaseModal baseModal = default!;
+    private BaseRadzenListPage<CustomerService, Customer> customerListPage = default!;
+
+    [Parameter]
+    public EventCallback<Customer> OnSelect { get; set; }
+
+    public override Task Open() => baseModal.Open();
+
+    public override Task Close() => baseModal.Close();
+
+    private async Task Select(Customer model)
     {
-        public BaseRadzenListPage<CustomerService, ICustomerService, Customer> baseListPage { get; set; }
-
-        public BaseModal baseModal { get; set; }
-
-        [Parameter]
-        public EventCallback<Customer>? OnSelect { get; set; }
-        public async Task Select(Customer model)
-        {
-            if (OnSelect != null)
-                await OnSelect?.InvokeAsync(model);
-            await Close();
-        }
-        public override async Task Open()
-        {            
-            await baseModal.Open();
-        }
-
-        public override async Task Close()
-        {
-            await baseModal.Close();
-
-            if (OnClose != null)
-                await OnClose?.InvokeAsync(string.Empty);
-        }
+        await OnSelect.InvokeAsync(model);
+        await Close();
     }
+
+    private Task HandleClosed(string name) => OnClose.InvokeAsync(name);
 }

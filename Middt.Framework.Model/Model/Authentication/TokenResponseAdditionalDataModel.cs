@@ -1,9 +1,7 @@
-﻿namespace Middt.Framework.Model.Authentication
-{
-    public class TokenResponseAdditionalDataModel
-    {
-        public string Key { get; set; }
+namespace Middt.Framework.Model.Authentication;
 
-        public object Value { get; set; }
-    }
+public class TokenResponseAdditionalDataModel
+{
+    public string? Key { get; set; }
+    public object? Value { get; set; }
 }

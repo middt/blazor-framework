@@ -1,100 +1,44 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using Middt.Framework.Common.SignalR.Model;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+using System.Globalization;
 using System.Security.Claims;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using Middt.Framework.Common.SignalR.Model;
 
-namespace Middt.Framework.Common.SignalR
+namespace Middt.Framework.Common.SignalR;
+
+/// <summary>
+/// Strongly typed hub that relays <see cref="BaseSignalRRequestModel{TModel}"/> messages to all clients,
+/// specific users (by <see cref="ClaimTypes.NameIdentifier"/>) or groups.
+/// Scale out with a backplane (e.g. <c>AddSignalR().AddStackExchangeRedis()</c>).
+/// </summary>
+public class BaseSignalRHub<TModel> : Hub<IBaseSignalRClient<TModel>>, IBaseSignalRHub<TModel>
 {
-    public class BaseSignalRHub<TModel> : Hub<IBaseSignalRClient<TModel>>, IBaseSignalRHub<TModel>
+    protected ClaimsPrincipal? CurrentUser => Context.User;
+
+    public string UserName => CurrentUser?.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty;
+
+    public int UserId =>
+        CurrentUser?.FindFirst(ClaimTypes.Sid) is { } claim && int.TryParse(claim.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
+            ? id
+            : -1;
+
+    public IReadOnlyList<string> UserRoles =>
+        CurrentUser?.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList() ?? [];
+
+    public bool IsUserInRole(string role) => CurrentUser?.IsInRole(role) ?? false;
+
+    public virtual Task Send(BaseSignalRRequestModel<TModel> sendModel)
     {
-        #region token
-        public string UserName
-        {
-            get
-            {
-                var claim = ((ClaimsIdentity)Context.User.Identity).FindFirst("UserName");
+        ArgumentNullException.ThrowIfNull(sendModel);
 
-                if (claim != null)
-                    return claim.Value;
-                else
-                    return string.Empty;
-            }
-        }
-        public int UserId
+        return sendModel.MessageType switch
         {
-            get
-            {
-                var claim = ((ClaimsIdentity)Context.User.Identity).FindFirst(ClaimTypes.Sid);
-
-                if (claim != null)
-                    return Convert.ToInt32(claim.Value);
-                else
-                    return -1;
-            }
-        }
-        public List<string> UserRoles
-        {
-            get
-            {
-                List<Claim> claimList = ((ClaimsIdentity)Context.User.Identity).FindAll(ClaimTypes.Role).ToList();
-
-                if (claimList != null && claimList.Count > 0)
-                    return claimList.Select(x => x.Value).ToList();
-                else
-                    return new List<string>();
-            }
-        }
-        public bool IsUserInRole(string RoleId)
-        {
-            if (UserRoles != null && UserRoles.Count > 0)
-            {
-                if (UserRoles.Contains(RoleId))
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-
-            }
-            else
-            {
-                return false;
-            }
-        }
-        #endregion
-
-        public static readonly ConcurrentDictionary<string, string>
-      ConnectedUsers = new ConcurrentDictionary<string, string>();
-
-        public override Task OnConnectedAsync()
-        {
-            ConnectedUsers.GetOrAdd(UserName, Context.ConnectionId);
-            return base.OnConnectedAsync();
-        }
-        public override Task OnDisconnectedAsync(Exception exception)
-        {
-            string id;
-            ConnectedUsers.TryRemove(UserName, out id);
-            return base.OnDisconnectedAsync(exception);
-        }
-
-        public Task Send(BaseSignalRRequestModel<TModel> sendModel)
-        {
-            switch (sendModel.MessageType)
-            {
-                case MessageType.User:
-                    return Clients.Users(sendModel.MessageTo).Receive(sendModel.Data);
-                case MessageType.Group:
-                    return Clients.Groups(sendModel.MessageTo).Receive(sendModel.Data);
-                default:
-                    return Clients.All.Receive(sendModel.Data);
-            }
-        }
+            MessageType.User => Clients.Users(sendModel.MessageTo).Receive(sendModel.Data!),
+            MessageType.Group => Clients.Groups(sendModel.MessageTo).Receive(sendModel.Data!),
+            _ => Clients.All.Receive(sendModel.Data!),
+        };
     }
+
+    public virtual Task JoinGroup(string groupName) => Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+    public virtual Task LeaveGroup(string groupName) => Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 }

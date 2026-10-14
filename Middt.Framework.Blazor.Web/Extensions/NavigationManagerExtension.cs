@@ -1,19 +1,22 @@
-﻿using Microsoft.AspNetCore.Components;
-using System;
-using System.Collections.Specialized;
-using System.Web;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.WebUtilities;
+
+namespace Middt.Framework.Blazor.Web.Extensions;
 
 public static class NavigationManagerExtension
 {
-    public static NameValueCollection QueryString(this NavigationManager navigationManager)
-    {
-        return HttpUtility.ParseQueryString(new Uri(navigationManager.Uri).Query);
-    }
+    public static IDictionary<string, Microsoft.Extensions.Primitives.StringValues> QueryString(this NavigationManager navigationManager) =>
+        QueryHelpers.ParseQuery(navigationManager.ToAbsoluteUri(navigationManager.Uri).Query);
 
-    // get single querystring value with specified key
-    public static string QueryString(this NavigationManager navigationManager, string key)
+    public static string? QueryString(this NavigationManager navigationManager, string key) =>
+        navigationManager.QueryString().TryGetValue(key, out var value) ? value.ToString() : null;
+
+    /// <summary>
+    /// Navigates (full page load) to the server rendered login page, preserving the current location as <c>returnUrl</c>.
+    /// </summary>
+    public static void NavigateToLogin(this NavigationManager navigationManager, string loginPageUrl)
     {
-        return navigationManager.QueryString()[key];
+        var returnUrl = "/" + navigationManager.ToBaseRelativePath(navigationManager.Uri);
+        navigationManager.NavigateTo($"{loginPageUrl}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
     }
 }
-

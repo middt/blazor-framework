@@ -1,31 +1,22 @@
-﻿using Microsoft.AspNetCore.Components;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 
-namespace Middt.Framework.Blazor.Web.Base
+namespace Middt.Framework.Blazor.Web.Base;
+
+/// <summary>Sets <see cref="BaseComponent.IsAuthenticated"/> from the token, optionally requiring one of <see cref="Roles"/>.</summary>
+public class BaseAuthorizeComponent : BaseComponent
 {
-    public class BaseAuthorizeComponent : BaseComponent
+    [Parameter]
+    public IReadOnlyCollection<string>? Roles { get; set; }
+
+    protected override async Task CustomOnAfterRenderAsync(bool firstRender)
     {
-        [Parameter]
-        public List<string> Roles { get; set; }
+        await base.CustomOnAfterRenderAsync(firstRender);
 
-
-        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
+        var authenticated = BaseTokenHelper.IsAuthenticated && (Roles is not { Count: > 0 } || BaseTokenHelper.IsHasRoles(Roles));
+        if (authenticated != IsAuthenticated)
         {
-            await base.CustomOnAfterRenderAsync(firstRender);
-
-            //if (firstRender)
-            //{
-            if (baseTokenHelper.claimsIdentity.IsAuthenticated)
-            {
-                IsAuthenticated = baseTokenHelper.claimsIdentity.IsAuthenticated;
-                if (Roles != null && Roles.Count > 0)
-                {
-                    IsAuthenticated = baseTokenHelper.IsHasRoles(Roles);
-                }
-            }
-            //}
+            IsAuthenticated = authenticated;
+            StateHasChanged();
         }
-
     }
 }

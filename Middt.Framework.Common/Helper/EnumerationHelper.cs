@@ -1,35 +1,23 @@
-﻿using Middt.Framework.Model;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
+using System.Globalization;
+using System.Reflection;
+using Middt.Framework.Model;
 
-namespace Middt.Framework.Common.Helper
+namespace Middt.Framework.Common.Helper;
+
+public static class EnumerationHelper
 {
-    public static class EnumerationHelper
-    {
-        public static string GetDescription<TEnum>(this TEnum value)
-        {
-            var fi = value.GetType().GetField(value.ToString());
+    public static string GetDescription<TEnum>(this TEnum value)
+        where TEnum : struct, Enum =>
+        GetDescription((Enum)value);
 
-            if (fi != null)
-            {
-                var attributes = (DescriptionAttribute[])fi.GetCustomAttributes(typeof(DescriptionAttribute), false);
+    public static string GetDescription(this Enum value) =>
+        value.GetType().GetField(value.ToString())?.GetCustomAttribute<DescriptionAttribute>()?.Description
+        ?? value.ToString();
 
-                if (attributes.Length > 0)
-                {
-                    return attributes[0].Description;
-                }
-            }
-
-            return value.ToString();
-        }
-        public static List<TextValueItem> GetItems<TEnum>(this TEnum value)
-        {
-            return Enum.GetValues(value.GetType())
-                       .Cast<Enum>()
-                       .Select(e => new TextValueItem { Value = e.GetHashCode(), Text = e.GetDescription() })
-                       .ToList();
-        }
-    }
+    public static List<TextValueItem> GetItems<TEnum>(this TEnum _)
+        where TEnum : struct, Enum =>
+        Enum.GetValues<TEnum>()
+            .Select(e => new TextValueItem { Value = Convert.ToInt32(e, CultureInfo.InvariantCulture), Text = e.GetDescription() })
+            .ToList();
 }

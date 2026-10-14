@@ -1,28 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	  <TargetFramework>net6.0</TargetFramework>
-	  <Product>Middt Framework Plugin Consul</Product>
-	  <Owners>Mehmet TOSUN</Owners>
-	  <PackageProjectUrl>https://github.com/middt/blazor-framework</PackageProjectUrl>
-	  <IsPackable>true</IsPackable>
-	  <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
-
-	  <VersionSuffix>6.$([System.DateTime]::Now.ToString(yyyy)).$([System.DateTime]::Now.ToString(MM))$([System.DateTime]::Now.ToString(dd)).$([System.DateTime]::Now.ToString(HHmm))</VersionSuffix>
-	  <AssemblyVersion Condition=" '$(VersionSuffix)' == '' ">0.0.0.1</AssemblyVersion>
-	  <AssemblyVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</AssemblyVersion>
-	  <Version Condition=" '$(VersionSuffix)' == '' ">0.0.1.0</Version>
-	  <Version Condition=" '$(VersionSuffix)' != '' ">$(VersionSuffix)</Version>
-	  <Authors>$(Owners)</Authors>
-	  <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
+    <Product>Middt Framework Plugin Consul</Product>
+    <Description>Consul service registration (hosted service with HTTP health check) for Middt ASP.NET Core applications.</Description>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="Consul" Version="1.6.10.4" />
-		<PackageReference Include="Microsoft.AspNetCore.Hosting.Abstractions" Version="2.2.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Hosting.Server.Abstractions" Version="2.2.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
-	</ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Consul" />
+  </ItemGroup>
+
 </Project>

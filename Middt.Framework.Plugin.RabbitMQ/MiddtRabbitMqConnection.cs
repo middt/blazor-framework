@@ -1,69 +1,145 @@
-﻿using Middt.Framework.Common.Log;
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Plugin.RabbitMQ
+namespace Middt.Framework.Plugin.RabbitMQ;
+
+/// <summary>
+/// Base class owning a RabbitMQ connection/channel and declaring the exchange topology.
+/// No I/O happens in the constructor; call <see cref="EnsureInitializedAsync"/> before using <see cref="Channel"/>.
+/// </summary>
+public abstract class MiddtRabbitMqConnection : IAsyncDisposable
 {
-    public abstract class MiddtRabbitMqConnection : IDisposable
+    private readonly IConnectionFactory _connectionFactory;
+    private readonly ExchangeTypes _exchangeType;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+    private IConnection? _connection;
+    private IChannel? _channel;
+    private bool _disposed;
+
+    protected MiddtRabbitMqConnection(IConnectionFactory connectionFactory, ExchangeTypes exchangeType, ILogger logger)
     {
-        protected string VirtualHost { get; } = "/";
+        ArgumentNullException.ThrowIfNull(connectionFactory);
+        ArgumentNullException.ThrowIfNull(logger);
 
-        protected abstract string Exchange { get; }
-        protected abstract string Queue { get; }
-        protected abstract string AppId { get; }
-        protected abstract string QueueAndExchangeRoutingKey { get; }
+        _connectionFactory = connectionFactory;
+        _exchangeType = exchangeType;
+        Logger = logger;
+    }
 
-        protected IModel Channel { get; private set; }
-        private IConnection _connection;
-        private readonly ConnectionFactory _connectionFactory;
-        private readonly ExchangeTypes _exchangeType;
-        private readonly bool _isPublisher;
-        protected IBaseLog _baselog;
+    /// <summary>Prefix applied to exchange, queue and routing-key names.</summary>
+    protected virtual string VirtualHost => "/";
 
-        protected MiddtRabbitMqConnection(IBaseLog baselog,ConnectionFactory connectionFactory, ExchangeTypes exchangeType, bool isPublisher)
+    protected abstract string Exchange { get; }
+
+    protected abstract string Queue { get; }
+
+    protected abstract string AppId { get; }
+
+    protected abstract string QueueAndExchangeRoutingKey { get; }
+
+    protected ILogger Logger { get; }
+
+    protected internal string RefinedExchangeName => $"{VirtualHost}.{Exchange}";
+
+    protected internal string RefinedQueueName => $"{VirtualHost}.{Queue}";
+
+    protected internal string RefinedRoutingKey => $"{VirtualHost}.{QueueAndExchangeRoutingKey}";
+
+    /// <summary>The open channel. Only valid after <see cref="EnsureInitializedAsync"/> completed.</summary>
+    protected IChannel Channel =>
+        _channel ?? throw new InvalidOperationException($"{GetType().Name} is not initialized. Call {nameof(EnsureInitializedAsync)} first.");
+
+    /// <summary>Opens the connection and channel (re-opening them if closed) and declares the topology.</summary>
+    protected async Task EnsureInitializedAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_channel is { IsOpen: true })
         {
-            _baselog = baselog;
-            _connectionFactory = connectionFactory;
-            this._exchangeType = exchangeType;
-            this._isPublisher = isPublisher;
-            ConnectToRabbitMq();
+            return;
         }
 
-        protected internal string RefinedExchangeName => $"{VirtualHost}.{Exchange}";
-        protected internal string RefinedQueueName => $"{VirtualHost}.{Queue}";
-        protected internal string RefinedRoutingKey => $"{VirtualHost}.{QueueAndExchangeRoutingKey}";
-        private void ConnectToRabbitMq()
+        await _initLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            if (_connection == null || _connection.IsOpen == false)
+            if (_channel is { IsOpen: true })
             {
-                _connection = _connectionFactory.CreateConnection();
+                return;
             }
 
-            if (Channel == null || Channel.IsOpen == false)
+            if (_connection is not { IsOpen: true })
             {
-                Channel = _connection.CreateModel();
-                Channel.ExchangeDeclare(exchange: RefinedExchangeName, type: _exchangeType.ToString(), durable: true, autoDelete: false);
-                if (!_isPublisher)
+                if (_connection is not null)
                 {
-                    Channel.QueueDeclare(queue: RefinedQueueName, durable: true, exclusive: false, autoDelete: false);
-                    Channel.QueueBind(queue: RefinedQueueName, exchange: RefinedExchangeName, routingKey: RefinedRoutingKey);
+                    await _connection.DisposeAsync().ConfigureAwait(false);
                 }
+
+                _connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
             }
+
+            if (_channel is not null)
+            {
+                await _channel.DisposeAsync().ConfigureAwait(false);
+            }
+
+            _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            await DeclareTopologyAsync(_channel, cancellationToken).ConfigureAwait(false);
         }
-
-        public void Dispose()
+        finally
         {
-            Channel?.Close();
-            Channel?.Dispose();
-            Channel = null;
-
-            _connection?.Close();
-            _connection?.Dispose();
-            _connection = null;
+            _initLock.Release();
         }
     }
+
+    /// <summary>Declares the exchange. Consumers override this to also declare and bind their queue.</summary>
+    protected virtual Task DeclareTopologyAsync(IChannel channel, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(channel);
+
+        return channel.ExchangeDeclareAsync(
+            exchange: RefinedExchangeName,
+            type: ToRabbitExchangeType(_exchangeType),
+            durable: true,
+            autoDelete: false,
+            cancellationToken: cancellationToken);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsyncCore().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        if (_channel is not null)
+        {
+            await _channel.DisposeAsync().ConfigureAwait(false);
+            _channel = null;
+        }
+
+        if (_connection is not null)
+        {
+            await _connection.DisposeAsync().ConfigureAwait(false);
+            _connection = null;
+        }
+
+        _initLock.Dispose();
+    }
+
+    private static string ToRabbitExchangeType(ExchangeTypes exchangeType) => exchangeType switch
+    {
+        ExchangeTypes.Direct => ExchangeType.Direct,
+        ExchangeTypes.Fanout => ExchangeType.Fanout,
+        ExchangeTypes.Topic => ExchangeType.Topic,
+        ExchangeTypes.Headers => ExchangeType.Headers,
+        _ => throw new ArgumentOutOfRangeException(nameof(exchangeType), exchangeType, null),
+    };
 }

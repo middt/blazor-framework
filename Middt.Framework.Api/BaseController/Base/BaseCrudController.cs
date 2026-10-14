@@ -1,126 +1,72 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Middt.Framework.Common.Database;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Model.Model.Enumerations;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
-namespace Middt.Framework.Api
+namespace Middt.Framework.Api;
+
+/// <summary>
+/// Adds <c>POST insert</c>, <c>POST update</c> and <c>POST delete</c> to <see cref="BaseListController{TModel,TRepository}"/>.
+/// Writes are mass-assignment safe: updates load the stored record and copy only editable scalar properties
+/// (<see cref="IBaseRepository{TModel}.ApplyUpdate"/>), inserts drop navigation graphs and client chosen identity values.
+/// </summary>
+public abstract class BaseCrudController<TModel, TRepository>(TRepository repository)
+    : BaseListController<TModel, TRepository>(repository)
+    where TModel : class, new()
+    where TRepository : IBaseRepository<TModel>
 {
-    public abstract class BaseCrudController<TModel, TRepository> : BaseListController<TModel, TRepository>
-        where TModel : class, new()
-        where TRepository : IBaseRepository<TModel>, new()
+    [HttpPost("[action]")]
+    [ValidateModel]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public virtual async Task<ActionResult<BaseResponseDataModel<TModel>>> Insert([FromBody] TModel model, CancellationToken cancellationToken)
     {
-
-        protected TRepository repository;
-        protected BaseCrudController()
+        Repository.PrepareForInsert(model);
+        if (!await AuthorizeAsync(model, CrudOperation.Insert, cancellationToken))
         {
-            repository = new TRepository();
+            return Problem(statusCode: StatusCodes.Status403Forbidden, title: "Bu işlem için yetkiniz yok.");
         }
 
-        public virtual async Task<BaseResponseDataModel<TModel>> Insert([FromBody] TModel model)
+        await Repository.InsertAsync(model, cancellationToken);
+        await Repository.SaveChangesAsync(cancellationToken);
+        return BaseResponseDataModel<TModel>.Success(model, 1);
+    }
+
+    [HttpPost("[action]")]
+    [ValidateModel]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public virtual async Task<ActionResult<BaseResponseDataModel<TModel>>> Update([FromBody] TModel model, CancellationToken cancellationToken)
+    {
+        var existing = await Repository.FindByKeyAsync(model, cancellationToken);
+        if (existing is null || !await AuthorizeAsync(existing, CrudOperation.Update, cancellationToken))
         {
-            BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
-            try
-            {
-                if (!ModelState.IsValid)
-                {
-                    List<ModelStateEntry> modelStateEntryList = ModelState.Values.ToList();
-                    if (modelStateEntryList != null && modelStateEntryList.Count > 0)
-                    {
-                        List<ModelError> modelErrorList = null;
-                        foreach (ModelStateEntry modelStateEntry in modelStateEntryList)
-                        {
-                            modelErrorList = modelStateEntry.Errors.ToList();
-
-                            foreach (ModelError modelError in modelErrorList)
-                            {
-                                response.MessageList.Add(modelError.ErrorMessage);
-                            }
-                        }
-                    }
-                    response.Result = ResultEnum.Error;
-                    return response;
-                }
-
-
-
-                await repository.Insert(model);
-                await repository.Save();
-
-                response.Result = ResultEnum.Success;
-                response.MessageList.Add("Ok");
-                response.Data = model;
-
-            }
-            catch (Exception ex)
-            {
-                response.Result = ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
-            }
-            return response;
+            return RecordNotFound();
         }
-        public virtual async Task<BaseResponseDataModel<TModel>> Update(TModel model)
+
+        Repository.ApplyUpdate(existing, model);
+        await Repository.SaveChangesAsync(cancellationToken);
+        return BaseResponseDataModel<TModel>.Success(existing, 1);
+    }
+
+    [HttpPost("[action]")]
+    [ValidateModel(enableValidation = false)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public virtual async Task<ActionResult<BaseResponseDataModel<TModel>>> Delete([FromBody] TModel model, CancellationToken cancellationToken)
+    {
+        // Only the key of the payload is used; the stored record is what gets authorized and deleted.
+        var existing = await Repository.FindByKeyAsync(model, cancellationToken);
+        if (existing is null || !await AuthorizeAsync(existing, CrudOperation.Delete, cancellationToken))
         {
-            BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
-            try
-            {
-                if (!ModelState.IsValid)
-                {
-                    List<ModelStateEntry> modelStateEntryList = ModelState.Values.ToList();
-                    if (modelStateEntryList != null && modelStateEntryList.Count > 0)
-                    {
-                        List<ModelError> modelErrorList = null;
-                        foreach (ModelStateEntry modelStateEntry in modelStateEntryList)
-                        {
-                            modelErrorList = modelStateEntry.Errors.ToList();
-
-                            foreach (ModelError modelError in modelErrorList)
-                            {
-                                response.MessageList.Add(modelError.ErrorMessage);
-                            }
-                        }
-                    }
-                    response.Result = ResultEnum.Error;
-                    return response;
-                }
-
-                await repository.Update(model);
-                await repository.Save();
-
-                response.Result = ResultEnum.Success;
-                response.MessageList.Add("Ok");
-                response.Data = model;
-
-            }
-            catch (Exception ex)
-            {
-                response.Result = ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
-            }
-            return response;
+            return RecordNotFound();
         }
-        public virtual async Task<BaseResponseDataModel<TModel>> Delete(TModel model)
-        {
-            BaseResponseDataModel<TModel> response = new BaseResponseDataModel<TModel>();
-            try
-            {
-                await repository.Delete(model);
-                await repository.Save();
 
-                response.Result = ResultEnum.Success;
-                response.MessageList.Add("Ok");
-                response.Data = model;
-
-            }
-            catch (Exception ex)
-            {
-                response.Result = ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
-            }
-            return response;
-        }
+        Repository.Delete(existing);
+        await Repository.SaveChangesAsync(cancellationToken);
+        return BaseResponseDataModel<TModel>.Success(existing, 1);
     }
 }

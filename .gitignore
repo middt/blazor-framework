@@ -1,15 +1,17 @@
-﻿################################################################################
-# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
-################################################################################
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
 
-/.vs/Middt.Framework/v16
-/.vs/Middt.Framework/v17
-/.vs/Framework/v17
-/NugetSuges
-
-
+# Build output
 bin/
 obj/
-Debug/
-Release/
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg
+
+/NugetSuges
 /node_modules/

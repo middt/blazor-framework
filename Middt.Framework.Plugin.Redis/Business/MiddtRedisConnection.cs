@@ -1,56 +1,63 @@
-﻿using Middt.Framework.Common.Configuration;
-using Middt.Framework.Model.Model.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RedLockNet.SERedis;
 using RedLockNet.SERedis.Configuration;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Plugin.Redis
+namespace Middt.Framework.Plugin.Redis;
+
+/// <summary>
+/// Singleton owner of the shared <see cref="IConnectionMultiplexer"/> and <see cref="RedLockFactory"/>.
+/// The connection is established lazily on first use.
+/// </summary>
+public sealed class MiddtRedisConnection : IDisposable, IAsyncDisposable
 {
-    public class MiddtRedisConnection
+    private readonly Lazy<IConnectionMultiplexer> _multiplexer;
+    private readonly Lazy<RedLockFactory> _redLockFactory;
+
+    public MiddtRedisConnection(IOptions<RedisSettings> options, ILoggerFactory? loggerFactory = null)
     {
-        public ConnectionMultiplexer connectionMultiplexer { get; set; }
+        ArgumentNullException.ThrowIfNull(options);
+        var settings = options.Value;
 
-        public  RedLockFactory redLockFactory { get; set; }
+        _multiplexer = new Lazy<IConnectionMultiplexer>(
+            () => ConnectionMultiplexer.Connect(settings.ConnectionString),
+            LazyThreadSafetyMode.ExecutionAndPublication);
 
-        RedisSettings redisSettings;
-        public MiddtRedisConnection(RedisSettings _redisSettings)
+        _redLockFactory = new Lazy<RedLockFactory>(
+            () => RedLockFactory.Create([new RedLockMultiplexer(_multiplexer.Value)], loggerFactory),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+
+    public IConnectionMultiplexer Multiplexer => _multiplexer.Value;
+
+    public RedLockFactory RedLockFactory => _redLockFactory.Value;
+
+    public IDatabase GetDatabase(int database = -1) => Multiplexer.GetDatabase(database);
+
+    public void Dispose()
+    {
+        if (_redLockFactory.IsValueCreated)
         {
-            redisSettings = _redisSettings;
-            ConfigurationOptions configurationOptions = GetConfig();
-            CreateConnection(configurationOptions);
-            CreateLock();
+            _redLockFactory.Value.Dispose();
         }
 
-        private void CreateLock()
+        if (_multiplexer.IsValueCreated)
         {
-            redLockFactory = RedLockFactory.Create(new List<RedLockMultiplexer>
-            {
-                connectionMultiplexer
-            } );
+            _multiplexer.Value.Dispose();
         }
-        private void CreateConnection(ConfigurationOptions configurationOptions)
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_redLockFactory.IsValueCreated)
         {
-            connectionMultiplexer = ConnectionMultiplexer.Connect(configurationOptions);
+            _redLockFactory.Value.Dispose();
         }
 
-        private ConfigurationOptions GetConfig()
+        if (_multiplexer.IsValueCreated)
         {
-            ConfigurationOptions configurationOptions = new ConfigurationOptions();
-            configurationOptions.SyncTimeout = 500000;
-            configurationOptions.AbortOnConnectFail = false;
-
-            List<RedisModel> redisModelList = redisSettings.RedisModelList;
-
-            foreach (RedisModel redisModel in redisModelList)
-            {
-                configurationOptions.EndPoints.Add(redisModel.Host, redisModel.Port);
-            }
-            return configurationOptions;
+            await _multiplexer.Value.DisposeAsync().ConfigureAwait(false);
         }
     }
 }

@@ -1,53 +1,34 @@
-﻿@inherits BaseListCrudPageComponentClass<TService, TInterface, TModel>
-
-@using Middt.Framework.Blazor.Web.Base
-@using Middt.Framework.Blazor.Web.Base.Page
-@using Middt.Framework.Blazor.Web.Base.Component.Modal
-
-
-@using Middt.Framework.Common.Model.Data
-@using Middt.Framework.Common.Service
-@using Middt.Framework.Model.Model.Enumerations
-
-@using Middt.Framework.Blazor.Web.Base.Component.Pagination;
-@using Radzen.Blazor;
-@using Radzen;
-
-
-@typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
-@typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
+@typeparam TService where TService : ICrudApiClient<TModel>
 @typeparam TModel where TModel : BaseRequestModel, new()
+@inherits BaseListCrudPageComponentClass<TService, TModel>
 
-@if (SearchContent != null && !HideSearch)
+@if (SearchContent is not null && !HideSearch)
 {
-    <EditForm Model="@SearchRequestModel">
-        <div class="row" style="margin-top:10px;">
-            @SearchContent
-        </div>
-        @if (!HideSearchButton)
-        {
-
-
+    <RadzenCard class="rz-mb-4">
+        <EditForm Model="@SearchRequestModel" OnSubmit="SearchButton">
             <div class="row" style="margin-top:10px;">
-                <div class="col-lg-5">
-                    <RadzenButton Icon="search" Text="Ara" Click="() => SearchButton()" />
-                    <RadzenButton Icon="search_off" Text="İptal" Style="font-size:11pt;background-color:dimgray;" Click="() => Cancel()" />
-                </div>
+                @SearchContent
             </div>
-        }
-    </EditForm>
+            @if (!HideSearchButton)
+            {
+                <div class="row" style="margin-top:10px;">
+                    <div class="col-lg-5">
+                        <RadzenButton ButtonType="ButtonType.Submit" Icon="search" Text="Ara" />
+                        <RadzenButton Icon="search_off" Text="İptal" ButtonStyle="ButtonStyle.Light" Click="Cancel" />
+                    </div>
+                </div>
+            }
+        </EditForm>
+    </RadzenCard>
 }
-<br />
 
 @ListContent
 
-<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight" ShowClose="false">
+<BaseCrudModal Title="@ModalTitle" @ref="CrudModal" IsFullScreen="@IsModalFullScreen" Width="@ModalWidth" Height="@ModalHeight"
+               ShowClose="false" OnSave="SaveButtonClick" OnClose="_ => CloseButtonClick()">
     <ChildContent>
         @EditContent
     </ChildContent>
 </BaseCrudModal>
-<BasePaginationComponent @ref="Pagination" PageSize="@PageSize">
-</BasePaginationComponent>
-
-<BaseLoadingModal @ref="LoadingModal">
-</BaseLoadingModal>
+<BasePaginationComponent @ref="Pagination" PageSize="@PageSize" OnPageChange="GotoPage" />
+<BaseLoadingModal @ref="LoadingModal" />

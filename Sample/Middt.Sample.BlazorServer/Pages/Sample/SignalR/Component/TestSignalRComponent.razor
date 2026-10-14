@@ -1,10 +1,15 @@
-﻿@inherits BaseComponent
-@using Middt.Framework.Blazor.Web.Base
+@inherits BaseComponent
 @using Middt.Framework.Blazor.Web.Base.SignalR
 @using Middt.Sample.BlazorServer.SignalR
 
-<BaseSignalRComponent @ref="testSignalRComponent" TSignalRClient="TestSignalRClient" TModel="string">
+<BaseSignalRComponent TSignalRClient="TestSignalRClient" TModel="string" OnMessage="OnMessage">
     <Content>
-       Hello -  @Model
+        <RadzenText>Son mesaj: @lastMessage</RadzenText>
     </Content>
 </BaseSignalRComponent>
+
+@code {
+    private string? lastMessage;
+
+    private void OnMessage(string message) => lastMessage = message;
+}

@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/plugins/">
+    <Project Path="Middt.Framework.Plugin.Consul/Middt.Framework.Plugin.Consul.csproj" />
+    <Project Path="Middt.Framework.Plugin.MassTransit/Middt.Framework.Plugin.MassTransit.csproj" />
+    <Project Path="Middt.Framework.Plugin.RabbitMQ/Middt.Framework.Plugin.RabbitMQ.csproj" />
+    <Project Path="Middt.Framework.Plugin.Redis/Middt.Framework.Plugin.Redis.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="Sample/Middt.Sample.Api/Middt.Sample.Api.csproj" />
+    <Project Path="Sample/Middt.Sample.AppHost/Middt.Sample.AppHost.csproj" />
+    <Project Path="Sample/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj" />
+    <Project Path="Sample/Middt.Sample.Common/Middt.Sample.Common.csproj" />
+    <Project Path="Sample/Middt.Sample.ServiceDefaults/Middt.Sample.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="Middt.Framework.Api/Middt.Framework.Api.csproj" />
+    <Project Path="Middt.Framework.Blazor.Web/Middt.Framework.Blazor.Web.csproj" />
+    <Project Path="Middt.Framework.Common/Middt.Framework.Common.csproj" />
+    <Project Path="Middt.Framework.Data/Middt.Framework.Data.csproj" />
+    <Project Path="Middt.Framework.Model/Middt.Framework.Model.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Middt.Framework.Tests/Middt.Framework.Tests.csproj" />
+  </Folder>
+</Solution>

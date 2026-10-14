@@ -1,88 +1,71 @@
-﻿using Middt.Framework.Common.Configuration;
-using Middt.Framework.Common.Log;
+using Microsoft.Extensions.Logging;
 using RedLockNet;
-using RedLockNet.SERedis;
-using RedLockNet.SERedis.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Plugin.Redis
+namespace Middt.Framework.Plugin.Redis;
+
+/// <summary>Distributed locking helpers on top of RedLock.net.</summary>
+public partial class MiddtRedislock(MiddtRedisConnection connection, ILogger<MiddtRedislock> logger)
 {
-    public class MiddtRedislock
+    public Task<IRedLock> CreateLockAsync(string resource, TimeSpan expiry) =>
+        connection.RedLockFactory.CreateLockAsync(resource, expiry);
+
+    public Task<IRedLock> CreateLockAsync(
+        string resource,
+        TimeSpan expiry,
+        TimeSpan wait,
+        TimeSpan retry,
+        CancellationToken cancellationToken = default) =>
+        connection.RedLockFactory.CreateLockAsync(resource, expiry, wait, retry, cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding the distributed lock on <paramref name="resource"/>.
+    /// Returns <c>default</c> when the lock could not be acquired. Exceptions thrown by the action propagate.
+    /// </summary>
+    public virtual async Task<T?> ExecuteWithLockAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        string resource,
+        TimeSpan expiry,
+        TimeSpan wait,
+        TimeSpan retry,
+        CancellationToken cancellationToken = default)
     {
-        private MiddtRedisConnection baseRedisConnection;
-        private IBaseLog baseLog;
-        public MiddtRedislock(MiddtRedisConnection _baseRedisConnection, IBaseLog _baseLog)
+        ArgumentNullException.ThrowIfNull(action);
+
+        await using var redLock = await CreateLockAsync(resource, expiry, wait, retry, cancellationToken).ConfigureAwait(false);
+        if (!redLock.IsAcquired)
         {
-            baseLog = _baseLog;
-            baseRedisConnection = _baseRedisConnection;
-        }
-        public Task<IRedLock> CreateLock(string resource, TimeSpan expiryTime)
-        {
-            return baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime);
-        }
-        public Task<IRedLock> CreateLock(string resource, TimeSpan expiryTime, TimeSpan waitTime, TimeSpan retryTime, CancellationToken? cancellationToken = null)
-        {
-            return baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime, cancellationToken);
+            LogLockNotAcquired(resource, redLock.Status);
+            return default;
         }
 
-
-
-        public virtual T ExecuteMethod<T>(Func<T> action, string resource, TimeSpan expiryTime, TimeSpan waitTime, TimeSpan retryTime, CancellationToken? cancellationToken = null)
-        {
-            T result = default(T);
-            try
-            {
-                using (var redLock = baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
-                {
-                    if (redLock.Result.IsAcquired)
-                    {
-                        try
-                        {
-                            result = Task.Run<T>(action).Result;
-                        }
-                        catch (Exception ex)
-                        {
-                            baseLog.Error("RedLockHelper - ExecuteMethod  - 1.1  " + ex.ToString());
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                baseLog.Error("RedLockHelper - ExecuteMethod - 1.2 " + ex.ToString());
-            }
-
-            return result;
-        }
-
-        public virtual async void ExecuteMethod(Action action, string resource, TimeSpan expiryTime, TimeSpan waitTime, TimeSpan retryTime, CancellationToken? cancellationToken = null)
-        {
-            try
-            {
-                using (var redLock = baseRedisConnection.redLockFactory.CreateLockAsync(resource, expiryTime, waitTime, retryTime)) // there are also non async Create() methods
-                {
-                    if (redLock.Result.IsAcquired)
-                    {
-                        try
-                        {
-                            await Task.Run(action);
-                        }
-                        catch (Exception ex)
-                        {
-                            baseLog.Error("RedLockHelper - ExecuteMethod  - 2.1  " + ex.ToString());
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                baseLog.Error("RedLockHelper - ExecuteMethod  - 2.2  " + ex.ToString());
-            }
-        }
+        return await action(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding the distributed lock on <paramref name="resource"/>.
+    /// Returns <c>false</c> when the lock could not be acquired.
+    /// </summary>
+    public virtual async Task<bool> ExecuteWithLockAsync(
+        Func<CancellationToken, Task> action,
+        string resource,
+        TimeSpan expiry,
+        TimeSpan wait,
+        TimeSpan retry,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        await using var redLock = await CreateLockAsync(resource, expiry, wait, retry, cancellationToken).ConfigureAwait(false);
+        if (!redLock.IsAcquired)
+        {
+            LogLockNotAcquired(resource, redLock.Status);
+            return false;
+        }
+
+        await action(cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not acquire distributed lock {Resource} (status: {Status})")]
+    private partial void LogLockNotAcquired(string resource, RedLockStatus status);
 }

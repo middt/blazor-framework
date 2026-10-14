@@ -1,80 +1,54 @@
-﻿using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Model.Model.Enumerations;
-using Syncfusion.XlsIO;
-using System;
 using System.Data;
-using System.IO;
+using Middt.Framework.Common.Model.Data;
+using Syncfusion.XlsIO;
 
-namespace Middt.Framework.Common.Export
+namespace Middt.Framework.Common.Export;
+
+/// <summary>Fills an Excel template (Syncfusion XlsIO template markers) with <see cref="BaseExportModel"/> values.</summary>
+public abstract class BaseExcelExport
 {
-    public abstract class BaseExcelExport //: IBaseExport
+    public abstract string Folder { get; }
+
+    public abstract string TemplateFileName { get; }
+
+    public virtual BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel) => ConvertToExcel(baseExportModel);
+
+    protected BaseResponseDataModel<byte[]> ConvertToExcel(BaseExportModel baseExportModel)
     {
-        public abstract string Folder { get; }
-        public abstract string TemplateFileName { get; }
+        using var excelEngine = new ExcelEngine();
+        var application = excelEngine.Excel;
+        application.DefaultVersion = ExcelVersion.Xlsx;
 
+        using var fileStream = File.OpenRead(ExportTemplate.Resolve(Folder, TemplateFileName));
+        var workbook = application.Workbooks.Open(fileStream);
 
-        public virtual BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel)
+        CustomConvert(baseExportModel, workbook, workbook.CreateTemplateMarkersProcessor());
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return BaseResponseDataModel<byte[]>.Success(stream.ToArray());
+    }
+
+    public virtual void CustomConvert(BaseExportModel baseExportModel, IWorkbook workbook, ITemplateMarkersProcessor marker)
+    {
+        foreach (var parameter in baseExportModel?.ParamList ?? [])
         {
-            return ConvertToExcel(baseExportModel);
-        }
-        protected BaseResponseDataModel<byte[]> ConvertToExcel(BaseExportModel baseExportModel)
-        {
-            BaseResponseDataModel<byte[]> response = new BaseResponseDataModel<byte[]>();
-
-            try
+            if (parameter.Value is DataSet dataSet)
             {
-                response.Result = ResultEnum.Success;
-
-                using (ExcelEngine excelEngine = new ExcelEngine())
+                var merged = new DataTable();
+                foreach (DataTable table in dataSet.Tables)
                 {
-                    IApplication application = excelEngine.Excel;
-                    application.DefaultVersion = ExcelVersion.Excel2016;
-                    string path = Path.Combine(Environment.CurrentDirectory, Folder, TemplateFileName);
-                    FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
-                    IWorkbook workbook = application.Workbooks.Open(fileStream);
-
-                    ITemplateMarkersProcessor marker = workbook.CreateTemplateMarkersProcessor();
-                    CustomConvert(baseExportModel, workbook, marker);
-
-                    using (MemoryStream stream = new MemoryStream())
-                    {
-                        workbook.SaveAs(stream);
-                        response.Data = stream.ToArray();
-                    }
+                    merged.Merge(table);
                 }
+
+                marker.AddVariable(parameter.Key, merged);
             }
-            catch (Exception ex)
+            else
             {
-                response.Result = Framework.Model.Model.Enumerations.ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
+                marker.AddVariable(parameter.Key, parameter.Value);
             }
-            return response;
         }
 
-        public virtual void CustomConvert(BaseExportModel baseExportModel, IWorkbook workbook, ITemplateMarkersProcessor marker)
-        {
-            if (baseExportModel != null && baseExportModel.ParamList != null && baseExportModel.ParamList.Count > 0)
-            {
-                foreach (ExportParameterModel keyValue in baseExportModel.ParamList)
-                {
-                    if (keyValue.Value is DataSet)
-                    {
-                        DataTable dt = new DataTable();
-                        foreach (DataTable dataTable in (keyValue.Value as DataSet).Tables)
-                        {
-                            dt.Merge(dataTable);
-                        }
-
-                        marker.AddVariable(keyValue.Key, dt);
-                    }
-                    else
-                    {
-                        marker.AddVariable(keyValue.Key, keyValue.Value);
-                    }
-                }
-            }
-            marker.ApplyMarkers();
-
-        }
+        marker.ApplyMarkers();
     }
 }

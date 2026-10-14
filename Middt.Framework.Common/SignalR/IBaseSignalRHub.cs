@@ -1,14 +1,8 @@
-﻿using Middt.Framework.Common.SignalR.Model;
-using System.Threading.Tasks;
+using Middt.Framework.Common.SignalR.Model;
 
-namespace Middt.Framework.Common.SignalR
+namespace Middt.Framework.Common.SignalR;
+
+public interface IBaseSignalRHub<TModel>
 {
-    public interface IBaseSignalRHub<TModel>
-    {
-
-        Task Send(BaseSignalRRequestModel<TModel> sendModel);
-
-        //void Send(TModel sendModel,string connectionID);
-
-    }
+    Task Send(BaseSignalRRequestModel<TModel> sendModel);
 }

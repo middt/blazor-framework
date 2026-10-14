@@ -1,8 +1,7 @@
-﻿namespace Middt.Framework.Api.Configuration.Model
+namespace Middt.Framework.Api.Configuration.Model;
+
+public class UygulamaSettings
 {
-    public class UygulamaSettings
-    {
-        public string UygulamaAdi { get; set; }
-        public int UygulamaId { get; set; }
-    }
+    public string? UygulamaAdi { get; set; }
+    public int UygulamaId { get; set; }
 }

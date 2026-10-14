@@ -1,8 +1,7 @@
-﻿using Middt.Framework.Common.SignalR;
+using Microsoft.AspNetCore.Authorization;
+using Middt.Framework.Common.SignalR;
 
-namespace Middt.Sample.Api
-{
-    public class TestHub : BaseSignalRHub<string>
-    {
-    }
-}
+namespace Middt.Sample.Api;
+
+[Authorize]
+public class TestHub : BaseSignalRHub<string>;

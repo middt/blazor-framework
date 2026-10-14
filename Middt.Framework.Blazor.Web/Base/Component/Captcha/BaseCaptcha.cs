@@ -1,166 +1,97 @@
-﻿using Microsoft.AspNetCore.Components;
+using System.Globalization;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Captcha
+namespace Middt.Framework.Blazor.Web.Base.Component.Captcha;
+
+/// <summary>
+/// Simple server rendered captcha. The image is an inline SVG (no System.Drawing, works on Linux containers)
+/// and the word is generated with a cryptographic RNG. Validate with <see cref="IsValid"/>.
+/// </summary>
+public class BaseCaptcha : ComponentBase
 {
-    public class BaseCaptcha : ComponentBase
+    // Ambiguous characters (0/O, 1/l/I) are excluded on purpose.
+    private const string Alphabet = "ABCDEFGHJKLMNPRSTUVYZabcdefghjkmnprstuvyz23456789";
+
+    private string captchaWord = string.Empty;
+    private string svg = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> CaptchaWordChanged { get; set; }
+
+    [Parameter]
+    public int Width { get; set; } = 170;
+
+    [Parameter]
+    public int Height { get; set; } = 40;
+
+    [Parameter]
+    public int CharNumber { get; set; } = 4;
+
+    [Parameter]
+    public bool CaseSensitive { get; set; } = true;
+
+    public bool IsValid(string? text) =>
+        !string.IsNullOrEmpty(text) &&
+        string.Equals(text, captchaWord, CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+
+    public async Task RefreshAsync()
     {
-        [Parameter]
-        public EventCallback<string>? CaptchaWordChanged { get; set; }
+        CreateCaptcha();
+        StateHasChanged();
+        await CaptchaWordChanged.InvokeAsync(captchaWord);
+    }
 
-        [Parameter]
-        public int Width { get; set; } = 170;
+    protected override void OnInitialized() => CreateCaptcha();
 
-        [Parameter]
-        public int Height { get; set; } = 40;
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "middt-captcha");
+        builder.AddMarkupContent(2, svg);
+        builder.OpenElement(3, "button");
+        builder.AddAttribute(4, "type", "button");
+        builder.AddAttribute(5, "class", "btn btn-refresh");
+        builder.AddAttribute(6, "aria-label", "Yeni kod");
+        builder.AddAttribute(7, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, RefreshAsync));
+        builder.AddContent(8, "↻");
+        builder.CloseElement();
+        builder.CloseElement();
+    }
 
-        [Parameter]
-        public int CharNumber { get; set; } = 4;
+    private void CreateCaptcha()
+    {
+        captchaWord = RandomNumberGenerator.GetString(Alphabet, CharNumber);
+        svg = RenderSvg(captchaWord);
+    }
 
-        protected string CaptchaWord;
+    private string RenderSvg(string word)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var sb = new StringBuilder();
+        sb.Append(inv, $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{Width}\" height=\"{Height}\" role=\"img\" aria-label=\"captcha\">");
+        sb.Append("<rect width=\"100%\" height=\"100%\" fill=\"#fffdfb\"/>");
 
-        public string GetCaptchaWord(int length)
+        for (var i = 0; i < 4; i++)
         {
-            var random = new Random(DateTime.Now.Millisecond);
-
-            const string chars = "ABCDEFGHIJKLMNOPRSTUQVTYZabcdefghijklmnoprstuqvyz0123456789";
-            string cw = new string(Enumerable.Repeat(chars, length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
-
-            return cw;
-        }
-        private async Task OnRefreshInternal()
-        {
-            CreateCaptcha();
-            if (CaptchaWordChanged != null)
-                await CaptchaWordChanged?.InvokeAsync(CaptchaWord);
-        }
-        protected void CreateCaptcha()
-        {
-            CaptchaWord = GetCaptchaWord(CharNumber);
-            Initialization();
-        }
-        private Random RandomValue { get; set; }
-        private List<Letter> Letters;
-        private Color _BackgroundColor;
-
-        public BaseCaptcha()
-        {
-            CreateCaptcha();
-        }
-        private void Initialization()
-        {
-            if (String.IsNullOrEmpty(CaptchaWord)) return;
-
-            RandomValue = new Random();
-
-            _BackgroundColor = Color.FromArgb(255, 253, 251);
-            //Color.Gray;
-            //Color.FromArgb(RandomValue.Next(100, 256), RandomValue.Next(100, 256), RandomValue.Next(100, 256)); ;
-
-            var fontFamilies = new string[] { "Courier"/*, "Arial", "Verdana", "Times New Roman" */};
-
-            Letters = new List<Letter>();
-
-            if (!String.IsNullOrEmpty(CaptchaWord))
-            {
-                foreach (char c in CaptchaWord)
-                {
-                    var letter = new Letter
-                    {
-                        Value = c.ToString(),
-                        //Angle = RandomValue.Next(-20, 20),
-                        ForeColor = Color.Black,
-                        //Color.FromArgb(RandomValue.Next(256), RandomValue.Next(256), RandomValue.Next(256)),
-                        Family = fontFamilies[RandomValue.Next(0, fontFamilies.Length)],
-                    };
-                    letter.Font = new Font(letter.Family, RandomValue.Next(Height / 2, (Height / 2) + (Height / 4)), FontStyle.Bold);
-
-                    Letters.Add(letter);
-                }
-            }
-
-        }
-        public bool IsValid(string CheckText)
-        {
-            if (!string.IsNullOrEmpty(CheckText) && CheckText.Equals(CaptchaWord))
-            {
-                return true;
-            }
-            return false;
-        }
-        protected override void BuildRenderTree(RenderTreeBuilder builder)
-        {
-            if (RandomValue == null) return;
-            if (String.IsNullOrEmpty(CaptchaWord)) return;
-
-            Bitmap bmp = new Bitmap(Width, Height);
-            Graphics g = Graphics.FromImage(bmp);
-
-            g.Clear(_BackgroundColor);
-
-            var foreColor = Color.Gray;
-            //var pen = new Pen(foreColor, 2.0f);
-
-            float x = 2;
-
-            foreach (Letter l in Letters)
-            {
-                SizeF textSize = g.MeasureString(l.Value, l.Font);
-
-                var y = ((Height - textSize.Height) / 2);
-
-                g.TranslateTransform(x, y);
-                g.RotateTransform(l.Angle);
-                g.DrawString(l.Value, l.Font, new SolidBrush(l.ForeColor), 0, 0);
-                g.ResetTransform();
-
-                x += textSize.Width;
-            }
-
-            foreColor = Color.FromArgb(RandomValue.Next(256), RandomValue.Next(256), RandomValue.Next(256));
-
-            //pen = new Pen(foreColor, 0.8f);
-            //g.DrawEllipse(pen, RandomValue.Next(-Width, Width), RandomValue.Next(-Height, Height), Width, Height);
-            //g.DrawLine(pen, 0, RandomValue.Next(0, Height), Width, RandomValue.Next(0, Height));
-            //g.DrawLine(pen, 0, RandomValue.Next(0, Height), Width, RandomValue.Next(0, Height));
-
-
-            MemoryStream ms = new MemoryStream();
-            bmp.Save(ms, ImageFormat.Gif);
-            string imageBase64Data = Convert.ToBase64String(ms.ToArray());
-            var img = string.Format("data:image/gif;base64,{0}", imageBase64Data);
-            bmp.Dispose();
-
-
-            var seq = 0;
-            builder.OpenElement(++seq, "div");
-            {
-                builder.OpenElement(++seq, "img");
-                builder.AddAttribute(++seq, "src", img);
-                builder.CloseElement();
-
-                builder.OpenElement(++seq, "button");
-                {
-                    builder.AddAttribute(++seq, "class", "btn btn-refresh");
-                    //builder.AddAttribute(++seq, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, OnRefresh));
-                    builder.AddAttribute(++seq, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, () => OnRefreshInternal()));
-                }
-                builder.CloseElement();
-            }
-            builder.CloseElement();
-
-
-            base.BuildRenderTree(builder);
+            sb.Append(inv, $"<line x1=\"{RandomNumberGenerator.GetInt32(Width)}\" y1=\"{RandomNumberGenerator.GetInt32(Height)}\" x2=\"{RandomNumberGenerator.GetInt32(Width)}\" y2=\"{RandomNumberGenerator.GetInt32(Height)}\" stroke=\"#{RandomNumberGenerator.GetInt32(0x1000000):x6}\" stroke-width=\"1\"/>");
         }
 
+        var step = (double)(Width - 10) / Math.Max(word.Length, 1);
+        var fontSize = Height * 0.6;
+        for (var i = 0; i < word.Length; i++)
+        {
+            var x = 5 + (i * step) + (step / 4);
+            var y = (Height / 2.0) + (fontSize / 3);
+            var angle = RandomNumberGenerator.GetInt32(-20, 21);
+            sb.Append(inv, $"<text x=\"{x:0.#}\" y=\"{y:0.#}\" font-family=\"Courier, monospace\" font-weight=\"bold\" font-size=\"{fontSize:0.#}\" transform=\"rotate({angle} {x:0.#} {y:0.#})\">{WebUtility.HtmlEncode(word[i].ToString())}</text>");
+        }
+
+        sb.Append("</svg>");
+        return sb.ToString();
     }
 }
