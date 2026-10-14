@@ -1,0 +1,139 @@
+@page "/account/journey/{Id:guid}"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@inject IAuthJourneyService Journeys
+@inject JourneyViewRegistry Views
+@inject NavigationManager Navigation
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<PageTitle>@Title</PageTitle>
+
+<section class="idp-card">
+    @if (state is null)
+    {
+        <h1 class="idp-title">Oturumun süresi doldu</h1>
+        <p>Bu işlem bulunamadı ya da süresi doldu. Lütfen baştan başlayın.</p>
+        <a class="idp-button idp-button-primary" href="@MiddtIdentityDefaults.LoginPath">Oturum aç</a>
+    }
+    else if (state.IsFinished && !state.IsSucceeded)
+    {
+        <h1 class="idp-title">İşlem tamamlanamadı</h1>
+        <ErrorSummary Errors="errors" />
+        <p>@(state.StateTitle ?? "İşlem sonlandırıldı.") Lütfen baştan başlayın.</p>
+        <a class="idp-button idp-button-primary" href="@JourneyLinks.StartPath(state.Journey, state.ReturnUrl)">Baştan başla</a>
+    }
+    else if (state.IsSucceeded)
+    {
+        <h1 class="idp-title">Tamamlandı</h1>
+        <p>İşlem tamamlandı.</p>
+        <a class="idp-button idp-button-primary" href="@MiddtIdentityDefaults.JourneyCompletePath(Id)">Devam et</a>
+    }
+    else
+    {
+        <div class="idp-journey" data-journey="@state.Journey" data-state="@state.State" data-view="@state.View">
+            <CascadingValue Value="formContext" IsFixed="true">
+                <DynamicComponent Type="@Views.Resolve(state.View)" Parameters="@ViewParameters" />
+            </CascadingValue>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private AuthJourneyState? state;
+    private string? binding;
+    private IReadOnlyList<string> errors = [];
+    private IReadOnlyDictionary<string, string> values = new Dictionary<string, string>();
+    private JourneyFormContext formContext = default!;
+
+    private string Title => $"{state?.StateTitle ?? "Oturum"} – {Options.Value.ProductName}";
+
+    private Dictionary<string, object?> ViewParameters => new()
+    {
+        [nameof(JourneyViewBase.State)] = state,
+        [nameof(JourneyViewBase.Values)] = values,
+        [nameof(JourneyViewBase.Errors)] = errors,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        formContext = new JourneyFormContext(EventCallback.Factory.Create(this, SubmitAsync));
+        HttpContext.Response.Headers.CacheControl = "no-store";
+
+        binding = AuthJourneyCookie.Read(HttpContext, Id);
+        if (binding is null)
+        {
+            return;
+        }
+
+        state = await Journeys.GetAsync(Id, binding, HttpContext.RequestAborted);
+        if (state is null)
+        {
+            return;
+        }
+
+        errors = state.Errors;
+        if (HttpMethods.IsPost(HttpContext.Request.Method))
+        {
+            return;
+        }
+
+        if (state.IsSucceeded)
+        {
+            Navigation.NavigateTo(MiddtIdentityDefaults.JourneyCompletePath(Id), forceLoad: true);
+        }
+        else if (JourneyLinks.FinishedRedirect(state) is { } redirect)
+        {
+            Navigation.NavigateTo(redirect, forceLoad: true);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (binding is null || state is null)
+        {
+            return;
+        }
+
+        var form = await HttpContext.Request.ReadFormAsync(HttpContext.RequestAborted);
+        var key = JourneyInputMapper.ActionOf(form);
+        var action = state.Actions.FirstOrDefault(a => string.Equals(a.Key, key, StringComparison.Ordinal));
+        if (action is null)
+        {
+            errors = ["Bu adımda bu işlem yapılamaz. Sayfayı yenileyip tekrar deneyin."];
+            return;
+        }
+
+        if (form.TryGetValue(JourneyInputMapper.ConfirmPasswordField, out var confirm) &&
+            !string.Equals(confirm.ToString(), form["password"].ToString(), StringComparison.Ordinal))
+        {
+            values = JourneyInputMapper.SafeValues(form);
+            errors = ["Şifreler eşleşmiyor."];
+            return;
+        }
+
+        var result = await Journeys.SubmitAsync(Id, binding, action.Key, JourneyInputMapper.Map(action.InputSchema, form), HttpContext.RequestAborted);
+        if (result is null)
+        {
+            state = null;
+            return;
+        }
+
+        if (result.Errors.Count > 0 && !result.IsFinished)
+        {
+            // Errors are rendered in this response (no redirect) so they are not lost; non-sensitive values are kept.
+            state = result;
+            errors = result.Errors;
+            values = JourneyInputMapper.SafeValues(form);
+            return;
+        }
+
+        // Post/Redirect/Get: the next step (or the completion endpoint) is loaded with GET.
+        Navigation.NavigateTo(result.IsSucceeded ? MiddtIdentityDefaults.JourneyCompletePath(Id) : MiddtIdentityDefaults.JourneyPath(Id), forceLoad: true);
+    }
+}

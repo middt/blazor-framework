@@ -110,6 +110,22 @@ public sealed class SpaBffTests(SpaBffHostFixture fixture) : IClassFixture<SpaBf
     }
 
     [Fact]
+    public async Task Signed_in_user_without_the_role_gets_the_access_denied_page_not_the_login_page()
+    {
+        // With an identity provider the login page signs in silently: redirecting there would loop.
+        var browser = await SignedInBrowserAsync();
+
+        using var response = await browser.GetAsync(SpaBffTestHost.ForbiddenPagePath);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.Should().StartWith("http://localhost/Account/AccessDenied");
+
+        using var page = await browser.GetAsync("/Account/AccessDenied");
+        page.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await page.Content.ReadAsStringAsync(Ct)).Should().Contain("Erişim engellendi");
+    }
+
+    [Fact]
     public async Task Api_call_without_csrf_header_is_rejected_with_403()
     {
         var browser = await SignedInBrowserAsync();

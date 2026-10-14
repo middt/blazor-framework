@@ -1,0 +1,37 @@
+@* Root component of the identity provider UI. Account pages ([ExcludeFromInteractiveRouting]) render statically – they
+   set cookies; every other page (administration) runs interactively on the server. *@
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <base href="/" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23345'/%3E%3Ctext x='8' y='12' font-size='10' text-anchor='middle' fill='white' font-family='sans-serif'%3EM%3C/text%3E%3C/svg%3E" />
+    @if (Interactive)
+    {
+        <RadzenTheme Theme="@Options.Value.AdminTheme" />
+    }
+    <link rel="stylesheet" href="@Assets[MiddtIdentityUi.StylesheetPath]" />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+<body>
+    <MiddtIdentityRoutes @rendermode="PageRenderMode" />
+    @if (Interactive)
+    {
+        <script src="@Assets["_content/Radzen.Blazor/Radzen.Blazor.js"]"></script>
+    }
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private bool Interactive => HttpContext.AcceptsInteractiveRouting();
+
+    private IComponentRenderMode? PageRenderMode => Interactive ? InteractiveServer : null;
+}

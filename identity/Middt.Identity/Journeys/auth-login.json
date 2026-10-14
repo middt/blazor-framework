@@ -1,0 +1,136 @@
+{
+  // Sign-in: credentials → (TOTP when enabled) → (consent for explicit-consent clients) → authenticated.
+  // consentOnly (started by /connect/authorize for an already signed-in user) skips the credentials.
+  // Wrong passwords/codes keep the step (data.error) and count for the account lockout; after
+  // MiddtIdentityOptions.MaxJourneyAttempts the journey ends in "failed".
+  "key": "auth-login",
+  "version": 1,
+  "title": "Giriş",
+  "roles": [ "idp-journey" ],
+  "timeout": { "after": "PT15M", "target": "expired" },
+  "start": {
+    "key": "start",
+    "target": "begin",
+    "input": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "returnUrl": { "type": "string", "maxLength": 4000 },
+          "clientId": { "type": "string", "maxLength": 200 },
+          "scopes": { "type": "array", "items": { "type": "string" }, "maxItems": 50 },
+          "userId": { "type": "string" },
+          "consentOnly": { "type": "boolean" },
+          "forceConsent": { "type": "boolean" },
+          "_bindingHash": { "type": "string" }
+        }
+      }
+    }
+  },
+  "states": [
+    {
+      "key": "begin",
+      "title": "Başlangıç",
+      "transitions": [
+        { "key": "to-consent-check", "target": "check-consent", "trigger": "Automatic", "rule": "data.consentOnly == true" },
+        { "key": "to-credentials", "target": "credentials", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "credentials",
+      "title": "Giriş yap",
+      "step": 1,
+      "view": { "component": "credentials" },
+      "transitions": [
+        {
+          "key": "submit-credentials",
+          "title": "Giriş yap",
+          "target": "check-credentials",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "userName", "password" ],
+              "properties": {
+                "userName": { "type": "string", "title": "Kullanıcı adı", "minLength": 1, "maxLength": 256 },
+                "password": { "type": "string", "title": "Şifre", "minLength": 1, "maxLength": 512 }
+              }
+            },
+            "into": "form",
+            "sensitive": [ "password" ]
+          },
+          "onExecute": [ { "task": "idp-verify-credentials" } ]
+        },
+        { "key": "register", "title": "Kayıt ol", "target": "to-register", "input": { "set": { "redirect": "\"/account/register\"" } } },
+        { "key": "forgot-password", "title": "Şifremi unuttum", "target": "to-forgot-password", "input": { "set": { "redirect": "\"/account/forgot-password\"" } } }
+      ]
+    },
+    {
+      "key": "check-credentials",
+      "title": "Kontrol",
+      "transitions": [
+        { "key": "too-many-attempts", "target": "failed", "trigger": "Automatic", "rule": "data.attemptsExceeded == true" },
+        { "key": "to-mfa", "target": "mfa", "trigger": "Automatic", "rule": "data.authenticated == true && data.mfaRequired == true" },
+        { "key": "credentials-ok", "target": "check-consent", "trigger": "Automatic", "rule": "data.authenticated == true" },
+        { "key": "credentials-retry", "target": "credentials", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "mfa",
+      "title": "Doğrulama kodu",
+      "step": 2,
+      "view": { "component": "totp" },
+      "transitions": [
+        {
+          "key": "submit-totp",
+          "title": "Doğrula",
+          "target": "check-mfa",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "code" ],
+              "properties": { "code": { "type": "string", "title": "Doğrulama kodu", "minLength": 6, "maxLength": 8 } }
+            },
+            "into": "form",
+            "sensitive": [ "code" ]
+          },
+          "onExecute": [ { "task": "idp-verify-totp" } ]
+        }
+      ]
+    },
+    {
+      "key": "check-mfa",
+      "title": "Kontrol",
+      "transitions": [
+        { "key": "mfa-too-many-attempts", "target": "failed", "trigger": "Automatic", "rule": "data.attemptsExceeded == true" },
+        { "key": "mfa-ok", "target": "check-consent", "trigger": "Automatic", "rule": "data.mfaPassed == true" },
+        { "key": "mfa-retry", "target": "mfa", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "check-consent",
+      "title": "İzin kontrolü",
+      "onEntry": [ { "task": "idp-check-consent" } ],
+      "transitions": [
+        { "key": "to-consent", "target": "consent", "trigger": "Automatic", "rule": "data.consentRequired == true" },
+        { "key": "no-consent-needed", "target": "authenticated", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "consent",
+      "title": "İzin",
+      "step": 3,
+      "view": { "component": "consent" },
+      "transitions": [
+        { "key": "approve", "title": "İzin ver", "target": "authenticated", "onExecute": [ { "task": "idp-grant-consent" } ] },
+        { "key": "deny", "title": "Reddet", "target": "denied", "input": { "set": { "consentDenied": "true" } } }
+      ]
+    },
+    { "key": "authenticated", "title": "Giriş yapıldı", "type": "Finish", "subType": "Success" },
+    { "key": "denied", "title": "İzin reddedildi", "type": "Finish", "subType": "Success" },
+    { "key": "failed", "title": "Giriş başarısız", "type": "Finish", "subType": "Error" },
+    { "key": "expired", "title": "Süre doldu", "type": "Finish", "subType": "Timeout" },
+    { "key": "to-register", "title": "Kayıt", "type": "Finish", "subType": "Cancelled" },
+    { "key": "to-forgot-password", "title": "Şifremi unuttum", "type": "Finish", "subType": "Cancelled" }
+  ]
+}

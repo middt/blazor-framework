@@ -1,0 +1,222 @@
+@* Create (UserId = null) or edit a user: user name, e-mail, display name, roles; initial password on create. *@
+
+@if (!loaded)
+{
+    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" aria-label="Yükleniyor" />
+}
+else
+{
+    <form class="idp-dialog-form" @onsubmit="SaveAsync">
+        <RadzenStack Gap="0.75rem">
+            <RadzenFormField Text="Kullanıcı adı" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="model.UserName" Name="UserName" autocomplete="off" aria-required="true" />
+            </RadzenFormField>
+            <RadzenFormField Text="E-posta" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="model.Email" Name="Email" type="email" autocomplete="off" />
+            </RadzenFormField>
+            <RadzenFormField Text="Ad soyad" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="model.DisplayName" Name="DisplayName" autocomplete="off" />
+            </RadzenFormField>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenSwitch @bind-Value="model.EmailConfirmed" Name="EmailConfirmed" InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "E-posta doğrulandı" })" />
+                <RadzenLabel Text="E-posta doğrulandı" Component="EmailConfirmed" />
+            </RadzenStack>
+            @if (UserId is null)
+            {
+                <RadzenFormField Text="Şifre" Variant="Variant.Outlined">
+                    <RadzenPassword @bind-Value="model.Password" Name="Password" autocomplete="new-password" aria-required="true" />
+                </RadzenFormField>
+            }
+
+            <fieldset class="idp-fieldset">
+                <legend>Roller</legend>
+                @if (allRoles.Count == 0)
+                {
+                    <p class="idp-muted">Tanımlı rol yok.</p>
+                }
+                else
+                {
+                    <RadzenCheckBoxList TValue="string" @bind-Value="selectedRoles" Orientation="Orientation.Horizontal" Gap="1rem">
+                        <Items>
+                            @foreach (var role in allRoles)
+                            {
+                                <RadzenCheckBoxListItem TValue="string" Text="@role" Value="@role" />
+                            }
+                        </Items>
+                    </RadzenCheckBoxList>
+                }
+                @if (canCreateRoles)
+                {
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.End" Style="margin-top: 0.75rem">
+                        <RadzenFormField Text="Yeni rol" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="newRole" Name="NewRole" autocomplete="off" />
+                        </RadzenFormField>
+                        <RadzenButton Icon="add" Text="Ekle" ButtonStyle="ButtonStyle.Base" Click="AddRole" />
+                    </RadzenStack>
+                }
+            </fieldset>
+
+            <ErrorSummary Errors="errors" Id="idp-user-errors" />
+
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="@(() => Dialogs.Close(false))" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Kaydet" ButtonStyle="ButtonStyle.Primary" IsBusy="saving" BusyText="Kaydediliyor…" />
+            </RadzenStack>
+        </RadzenStack>
+    </form>
+}
+
+@code {
+    /// <summary>Id of the user to edit; <c>null</c> creates a user.</summary>
+    [Parameter]
+    public string? UserId { get; set; }
+
+    private sealed class Model
+    {
+        public string? UserName { get; set; }
+        public string? Email { get; set; }
+        public string? DisplayName { get; set; }
+        public bool EmailConfirmed { get; set; }
+        public string? Password { get; set; }
+    }
+
+    private readonly Model model = new();
+    private List<string> allRoles = [];
+    private IEnumerable<string> selectedRoles = [];
+    private IReadOnlyList<string> originalRoles = [];
+    private IReadOnlyList<string> errors = [];
+    private string? newRole;
+    private bool canCreateRoles;
+    private bool loaded;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await WithScopeAsync(async sp =>
+        {
+            var roles = sp.GetService<RoleManager<IdentityRole>>();
+            canCreateRoles = roles is not null;
+            allRoles = roles is null ? [] : await roles.Roles.Select(r => r.Name!).Where(n => n != null).OrderBy(n => n).ToListAsync();
+
+            if (UserId is not null)
+            {
+                var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+                if (await users.FindByIdAsync(UserId) is { } user)
+                {
+                    model.UserName = user.UserName;
+                    model.Email = user.Email;
+                    model.DisplayName = user.DisplayName;
+                    model.EmailConfirmed = user.EmailConfirmed;
+                    originalRoles = [.. await users.GetRolesAsync(user)];
+                    selectedRoles = [.. originalRoles];
+                    allRoles = [.. allRoles.Union(originalRoles, StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+                }
+            }
+
+            return true;
+        });
+        loaded = true;
+    }
+
+    private void AddRole()
+    {
+        var role = newRole?.Trim();
+        if (string.IsNullOrEmpty(role))
+        {
+            return;
+        }
+
+        if (!allRoles.Contains(role, StringComparer.Ordinal))
+        {
+            allRoles = [.. allRoles.Append(role).Order(StringComparer.Ordinal)];
+        }
+
+        selectedRoles = [.. selectedRoles.Append(role).Distinct(StringComparer.Ordinal)];
+        newRole = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        errors = [];
+        if (string.IsNullOrWhiteSpace(model.UserName) || (UserId is null && string.IsNullOrEmpty(model.Password)))
+        {
+            errors = [UserId is null ? "Kullanıcı adı ve şifre zorunludur." : "Kullanıcı adı zorunludur."];
+            return;
+        }
+
+        saving = true;
+        var ok = await RunAsync(async sp =>
+        {
+            var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            var roleManager = sp.GetService<RoleManager<IdentityRole>>();
+            var wanted = selectedRoles.ToList();
+
+            // Roles typed in the dialog are created first (AddToRoles requires existing roles).
+            if (roleManager is not null)
+            {
+                foreach (var role in wanted)
+                {
+                    if (!await roleManager.RoleExistsAsync(role))
+                    {
+                        var created = await roleManager.CreateAsync(new IdentityRole(role));
+                        if (!created.Succeeded)
+                        {
+                            return Errors(created);
+                        }
+                    }
+                }
+            }
+
+            MiddtIdentityUser user;
+            if (UserId is null)
+            {
+                user = new MiddtIdentityUser
+                {
+                    UserName = model.UserName.Trim(),
+                    Email = string.IsNullOrWhiteSpace(model.Email) ? null : model.Email.Trim(),
+                    DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim(),
+                    EmailConfirmed = model.EmailConfirmed,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                };
+                var result = await users.CreateAsync(user, model.Password!);
+                if (!result.Succeeded)
+                {
+                    return Errors(result);
+                }
+            }
+            else
+            {
+                if (await users.FindByIdAsync(UserId) is not { } existing)
+                {
+                    return ["Kullanıcı bulunamadı."];
+                }
+
+                user = existing;
+                user.UserName = model.UserName.Trim();
+                user.Email = string.IsNullOrWhiteSpace(model.Email) ? null : model.Email.Trim();
+                user.DisplayName = string.IsNullOrWhiteSpace(model.DisplayName) ? null : model.DisplayName.Trim();
+                user.EmailConfirmed = model.EmailConfirmed;
+                var result = await users.UpdateAsync(user);
+                if (!result.Succeeded)
+                {
+                    return Errors(result);
+                }
+            }
+
+            var add = wanted.Except(originalRoles, StringComparer.Ordinal).ToList();
+            var remove = originalRoles.Except(wanted, StringComparer.Ordinal).ToList();
+            if (add.Count > 0 && Errors(await users.AddToRolesAsync(user, add)) is { Count: > 0 } addErrors)
+            {
+                return addErrors;
+            }
+
+            return remove.Count > 0 ? Errors(await users.RemoveFromRolesAsync(user, remove)) : Ok;
+        }, "Kullanıcı kaydedildi.");
+        saving = false;
+
+        if (ok)
+        {
+            Dialogs.Close(true);
+        }
+    }
+}

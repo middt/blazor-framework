@@ -15,3 +15,12 @@ This is a **security boundary** – treat every change as security relevant and 
 - SPA hosting: static files (hashed → immutable, others → no-cache), `.html` only for signed-in users, precompressed
   `.br/.gz`, compression (HTML excluded – BREACH), strict CSP (`SecurityHeadersOptions.SpaContentSecurityPolicy`).
 - API-style paths (`ApiPathPrefixes`) answer 401/403, never redirects.
+- OIDC mode (`MiddtBffOptions.Oidc`, configuration `Bff:Oidc`, code in `Oidc/`): only when `Authority` is set. The cookie
+  stays the default/challenge scheme (API paths keep 401/403); `/Account/Login` GET challenges `BffOidc.SchemeName`
+  (code + PKCE, `response_mode=query`, PAR off unless `UsePushedAuthorization`), POST answers 404. `OnTicketReceived`
+  (`BffOidc.CreateSessionAsync`) builds the session like `CookieSignInService` (fresh id, tokens + id token in the store,
+  `ClaimTypes.*` cookie claims, previous session ended). `OidcTokenService` replaces `ITokenService` (refresh/revoke at
+  the provider via the handler's discovery). Logout answers an HTML page with a meta refresh to the end-session endpoint
+  (a 302 after the form post would violate CSP `form-action 'self'`). All server-to-server calls use the
+  `BffOidc.BackchannelClientName` HttpClient (`BackchannelRewriteHandler`); tests replace its primary handler
+  (`tests/…/Bff/BffOidcTests.cs`, `FakeOidcProvider`). Never put tokens into authentication properties (`SaveTokens=false`).

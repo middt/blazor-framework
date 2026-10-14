@@ -1,1 +1,11 @@
-<h3>Giriş sayfasına yönlendiriliyorsunuz, lütfen bekleyin.</h3>
+@if (denied)
+{
+    <div class="middt-access-denied" role="alert">
+        <h3>Erişim engellendi</h3>
+        <p>Bu sayfayı görüntüleme yetkiniz yok.</p>
+    </div>
+}
+else
+{
+    <h3>Giriş sayfasına yönlendiriliyorsunuz, lütfen bekleyin.</h3>
+}

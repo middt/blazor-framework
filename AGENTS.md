@@ -13,6 +13,9 @@ A .NET 10 framework for line-of-business apps with **two interchangeable fronten
   (JSON layouts stored in the DB, editable at runtime).
 - **Frontends**: **Blazor Server** (Radzen) and **Angular 22** (Material). Both sit behind a **BFF** (cookie session,
   server side tokens, `/api` + `/hubs` proxy). The browser never holds an API token.
+- **Identity** (`identity/`, a service, not part of the SDK): OAuth 2.0 / OIDC server (OpenIddict) whose
+  sign-in/registration/reset/MFA flows are workflow journeys, with a Blazor UI + admin console. The demos' BFFs sign in
+  there; the API validates its tokens.
 - **Contracts shared by .NET and TypeScript**: layout model + widget specs, the **portable expression language**
   (`{{ }}` templates, `visibleWhen`) with a shared conformance suite in `spec/`.
 
@@ -29,8 +32,10 @@ sdk/                              the framework (NuGet + npm packages)
     bff/                          Middt.Framework.Bff                           cookie session, login pages, YARP proxy
     blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
     angular/                      @middt/angular (library workspace)            Angular frontend
+identity/Middt.Identity           OAuth2/OIDC server – ONE runnable service (not SDK), configured by appsettings (docs/identity.md)
 demo/                             bike store sample (same shape: shared / server / client)
   server/Middt.Sample.Api         API + Layouts/*.json + Workflows/*.json seeds
+  server/identity.json            demo settings of Middt Identity (:8083) – both demos sign in there
   client/blazor/…BlazorServer     Blazor demo (:8080)
   client/angular/                 Middt.Sample.Angular (BFF host, :8081) + app/ (Angular demo app)
   Middt.Sample.AppHost            Aspire orchestration
@@ -58,7 +63,7 @@ MIDDT_UPDATE_SPEC=1 dotnet test --project tests/Middt.Framework.Tests  # regener
 (cd demo/client/angular/app && npm ci && npx ng build sample --configuration production)
 
 # Full stack (needs .env – copy .env.example and fill it)
-docker compose up -d --build        # Blazor :8080 · Angular :8081 · API :8180/scalar (Development) · login test@test.com / test
+docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083 · API :8180/scalar (Development) · login test@test.com / test
 ```
 
 ## Definition of done (every change)
@@ -100,3 +105,7 @@ docker compose up -d --build        # Blazor :8080 · Angular :8081 · API :8180
 - SQL Server sorts `uniqueidentifier` by bytes 10–15: use the engine's sequential id generator, not random/v7 GUIDs.
 - Seeds (`demo/server/…/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
 - E2E (Playwright) suites are not in the repo yet; see `docs/ai/testing.md`.
+- Identity admin pages run on SQL Server without MARS: materialize an `IAsyncEnumerable` from OpenIddict/EF before
+  querying per row (SQLite in the tests does not catch "open DataReader").
+- Radzen grids with `LoadData` lose the initial load across prerendering: call `grid.Reload()` in
+  `OnAfterRenderAsync(firstRender)`.

@@ -1,0 +1,22 @@
+@page "/Account/AccessDenied"
+@model AccessDeniedModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Erişim engellendi</title>
+    <link rel="stylesheet" href="~/_content/Middt.Framework.Bff/account.css" />
+</head>
+<body class="middt-account">
+    <main class="middt-account-card">
+        <h1>Erişim engellendi</h1>
+        <p role="alert">Bu sayfayı görüntüleme yetkiniz yok.</p>
+        <p><a href="~/">Ana sayfa</a> · <a href="@Model.LogoutUrl">Farklı hesapla oturum aç</a></p>
+    </main>
+</body>
+</html>

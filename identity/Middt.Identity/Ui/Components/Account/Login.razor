@@ -1,0 +1,11 @@
+@page "/account/login"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@inherits JourneyStartPage
+
+<PageTitle>Oturum aç</PageTitle>
+<p class="idp-muted" role="status">Oturum açma sayfasına yönlendiriliyorsunuz…</p>
+
+@code {
+    protected override string Journey => AuthJourneys.Login;
+}

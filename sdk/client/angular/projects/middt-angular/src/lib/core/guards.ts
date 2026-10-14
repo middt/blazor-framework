@@ -14,7 +14,7 @@ export const middtAuthGuard: CanActivateFn = async (_route, state) => {
   return true;
 };
 
-/** Requires one of <paramref name="roles"/> (after authentication). */
+/** Requires one of <paramref name="roles"/> (after authentication); signed-in users without them see the access denied page. */
 export function middtRoleGuard(...roles: string[]): CanActivateFn {
   return async (route, state) => {
     const auth = inject(AuthService);
@@ -24,6 +24,11 @@ export function middtRoleGuard(...roles: string[]): CanActivateFn {
       return false;
     }
 
-    return roles.some(role => user.roles.includes(role));
+    if (roles.some(role => user.roles.includes(role))) {
+      return true;
+    }
+
+    auth.accessDenied();
+    return false;
   };
 }

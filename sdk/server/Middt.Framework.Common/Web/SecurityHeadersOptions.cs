@@ -18,15 +18,15 @@ public sealed class SecurityHeadersOptions
     /// <summary>Policy suited to JSON APIs: nothing may be loaded or framed.</summary>
     public static string ApiContentSecurityPolicy => "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
-    /// <summary>
-    /// Policy suited to Blazor Server + Radzen/Syncfusion: same-origin scripts only (no inline/eval),
-    /// inline style attributes (required by the component libraries) and same-origin WebSockets.
-    /// </summary>
     /// <summary>Policy for single page applications (Angular, React) served by a BFF: no inline scripts, same-origin API/WebSocket.</summary>
     public static string SpaContentSecurityPolicy =>
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
         "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 
+    /// <summary>
+    /// Policy suited to Blazor Server + Radzen/Syncfusion: same-origin scripts only (no inline/eval),
+    /// inline style attributes (required by the component libraries) and same-origin WebSockets.
+    /// </summary>
     public static string BlazorServerContentSecurityPolicy =>
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
         "font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";

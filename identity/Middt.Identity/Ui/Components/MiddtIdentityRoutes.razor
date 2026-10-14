@@ -1,0 +1,22 @@
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<Router AppAssembly="typeof(MiddtIdentityApp).Assembly" AdditionalAssemblies="Options.Value.AdditionalAssemblies">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(AccountLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <AccessDeniedMessage />
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
+            </NotAuthorized>
+            <Authorizing>
+                <p class="idp-muted" role="status">Yetki kontrol ediliyor…</p>
+            </Authorizing>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

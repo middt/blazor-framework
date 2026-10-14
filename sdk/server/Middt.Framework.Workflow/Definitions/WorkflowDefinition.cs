@@ -200,6 +200,31 @@ public sealed class InputDefinition
 
     /// <summary>Extra values computed with expressions after the merge, e.g. <c>{ "approvedBy": "user.name" }</c>.</summary>
     public Dictionary<string, string> Set { get; set; } = [];
+
+    /// <summary>
+    /// Top-level input properties that must never be persisted (passwords, one-time codes): tasks and expressions of the
+    /// transition see them (<c>input.password</c>), but they are not merged into instance data and are removed from
+    /// history, pending (retry) input and job payloads. Such transitions cannot run asynchronously, and a faulted run
+    /// must be re-submitted by the user instead of retried.
+    /// </summary>
+    public List<string> Sensitive { get; set; } = [];
+
+    /// <summary>The input without <see cref="Sensitive"/> properties (the object itself when nothing is sensitive).</summary>
+    public JsonObject? Persistable(JsonObject? input)
+    {
+        if (input is null || Sensitive.Count == 0 || !Sensitive.Any(input.ContainsKey))
+        {
+            return input;
+        }
+
+        var copy = (JsonObject)input.DeepClone();
+        foreach (var name in Sensitive)
+        {
+            copy.Remove(name);
+        }
+
+        return copy;
+    }
 }
 
 public sealed class TaskDefinition

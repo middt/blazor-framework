@@ -1,0 +1,70 @@
+@page "/dev/mailbox"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@using Microsoft.Extensions.Hosting
+@using Microsoft.Net.Http.Headers
+@inject IHostEnvironment Environment
+@inject IServiceProvider Services
+
+<PageTitle>Geliştirme posta kutusu</PageTitle>
+
+<section class="idp-card idp-card-wide" aria-labelledby="idp-mailbox-title">
+    @if (!Environment.IsDevelopment())
+    {
+        <h1 id="idp-mailbox-title" class="idp-title">Sayfa bulunamadı</h1>
+    }
+    else
+    {
+        <div class="idp-label-row">
+            <h1 id="idp-mailbox-title" class="idp-title">Geliştirme posta kutusu</h1>
+            <a class="idp-button idp-button-secondary" href="@MiddtIdentityUi.MailboxPath">Yenile</a>
+        </div>
+        <p class="idp-muted">Yalnızca geliştirme ortamında: akışların gönderdiği e-postalar burada görünür, gerçekten gönderilmez.</p>
+        @if (mailbox is null)
+        {
+            <div class="idp-alert" role="status">
+                E-postalar gerçek bir gönderici ile gönderiliyor; geliştirme posta kutusu kullanılmıyor.
+            </div>
+        }
+        else if (mailbox.Messages.Count == 0)
+        {
+            <p>Henüz ileti yok.</p>
+        }
+        else
+        {
+            <ul class="idp-mail-list">
+                @foreach (var message in mailbox.Messages)
+                {
+                    <li class="idp-mail">
+                        <div class="idp-mail-head">
+                            <strong>@message.Subject</strong>
+                            <time datetime="@message.SentAt.ToString("O", CultureInfo.InvariantCulture)">@message.SentAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture)</time>
+                        </div>
+                        <div class="idp-muted">Alıcı: @message.To</div>
+                        <pre class="idp-mail-body">@message.Text</pre>
+                    </li>
+                }
+            </ul>
+        }
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private DevelopmentMailbox? mailbox;
+
+    protected override void OnInitialized()
+    {
+        HttpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
+        if (!Environment.IsDevelopment())
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        // Only when the development mailbox is the active sender (a real sender replaces it in production setups).
+        mailbox = Services.GetService(typeof(IIdentityMessageSender)) as DevelopmentMailbox;
+    }
+}

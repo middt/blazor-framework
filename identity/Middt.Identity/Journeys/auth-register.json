@@ -1,0 +1,121 @@
+{
+  // Self registration: details → (e-mail code when RequireConfirmedEmail) → registered (signed in on completion).
+  // registrationAllowed/requireConfirmedEmail come from MiddtIdentityOptions (set by the journey service at start).
+  "key": "auth-register",
+  "version": 1,
+  "title": "Kayıt",
+  "roles": [ "idp-journey" ],
+  "timeout": { "after": "PT15M", "target": "expired" },
+  "start": {
+    "key": "start",
+    "target": "begin",
+    "input": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "returnUrl": { "type": "string", "maxLength": 4000 },
+          "clientId": { "type": "string", "maxLength": 200 },
+          "scopes": { "type": "array", "items": { "type": "string" }, "maxItems": 50 },
+          "registrationAllowed": { "type": "boolean" },
+          "requireConfirmedEmail": { "type": "boolean" },
+          "_bindingHash": { "type": "string" }
+        }
+      }
+    }
+  },
+  "states": [
+    {
+      "key": "begin",
+      "title": "Başlangıç",
+      "transitions": [
+        { "key": "registration-closed", "target": "disabled", "trigger": "Automatic", "rule": "data.registrationAllowed != true" },
+        { "key": "to-details", "target": "details", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "details",
+      "title": "Kayıt ol",
+      "step": 1,
+      "view": { "component": "register" },
+      "transitions": [
+        {
+          "key": "submit-details",
+          "title": "Kayıt ol",
+          "target": "check-details",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "userName", "email", "password" ],
+              "properties": {
+                "userName": { "type": "string", "title": "Kullanıcı adı", "minLength": 3, "maxLength": 256 },
+                "email": { "type": "string", "title": "E-posta", "format": "email", "maxLength": 256 },
+                "displayName": { "type": "string", "title": "Ad soyad", "maxLength": 256 },
+                "password": { "type": "string", "title": "Şifre", "minLength": 1, "maxLength": 512 }
+              }
+            },
+            "into": "form",
+            "sensitive": [ "password" ]
+          },
+          "onExecute": [ { "task": "idp-create-user" } ]
+        }
+      ]
+    },
+    {
+      "key": "check-details",
+      "title": "Kontrol",
+      "transitions": [
+        {
+          "key": "to-verify-email", "target": "verify-email", "trigger": "Automatic",
+          "rule": "data.created == true && data.requireConfirmedEmail == true",
+          "onExecute": [ { "task": "idp-send-email-code", "config": { "purpose": "confirm-email" } } ]
+        },
+        { "key": "created", "target": "registered", "trigger": "Automatic", "rule": "data.created == true" },
+        { "key": "details-retry", "target": "details", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "verify-email",
+      "title": "E-posta doğrulama",
+      "step": 2,
+      "view": { "component": "email-code" },
+      "transitions": [
+        {
+          "key": "submit-code",
+          "title": "Doğrula",
+          "target": "check-code",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "code" ],
+              "properties": { "code": { "type": "string", "title": "Doğrulama kodu", "minLength": 6, "maxLength": 6 } }
+            },
+            "into": "form",
+            "sensitive": [ "code" ]
+          },
+          "onExecute": [ { "task": "idp-verify-email-code", "config": { "confirmEmail": true } } ]
+        },
+        {
+          "key": "resend-code",
+          "title": "Kodu tekrar gönder",
+          "target": "$self",
+          "onExecute": [ { "task": "idp-send-email-code", "config": { "purpose": "confirm-email", "resend": true } } ]
+        }
+      ]
+    },
+    {
+      "key": "check-code",
+      "title": "Kontrol",
+      "transitions": [
+        { "key": "code-too-many-attempts", "target": "failed", "trigger": "Automatic", "rule": "data.attemptsExceeded == true" },
+        { "key": "code-ok", "target": "registered", "trigger": "Automatic", "rule": "data.codeValid == true" },
+        { "key": "code-retry", "target": "verify-email", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "registered", "title": "Kayıt tamamlandı", "type": "Finish", "subType": "Success" },
+    { "key": "disabled", "title": "Kayıt kapalı", "type": "Finish", "subType": "Error" },
+    { "key": "failed", "title": "Doğrulama başarısız", "type": "Finish", "subType": "Error" },
+    { "key": "expired", "title": "Süre doldu", "type": "Finish", "subType": "Timeout" }
+  ]
+}

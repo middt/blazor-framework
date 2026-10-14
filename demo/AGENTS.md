@@ -6,8 +6,10 @@ Same shape as `sdk/`: `shared/` (Sample.Common, Sample.Views Razor views, Servic
 
 - Seeds: `server/Middt.Sample.Api/Layouts/*.json` (layouts, `$schema` → `spec/ui-layout.schema.json`) and
   `Workflows/*.json` (JSONC). Both are validated at startup. Bump a layout's `version` to overwrite the stored copy.
-- Demo user `test@test.com` / `test` has roles `manager` and `ui-admin` (`TokenController`). Writes on CRUD
-  controllers need `manager` (`SampleCrudController`); order-approval uses `instanceAccess` owner mode.
+- Sign-in: both BFFs use Middt Identity (`identity/Middt.Identity`, :8083) configured by `server/identity.json` (seed).
+  Demo user `test@test.com` / `test` has roles `manager`, `ui-admin`, `idp-admin`; `user@test.com` / `test` has none.
+  Writes on CRUD controllers need `manager` (`SampleCrudController`); order-approval uses `instanceAccess` owner mode
+  (owner = the IdP `sub`).
 - Both frontends must show the same features: a change to a screen/workflow view usually needs Blazor
   (`Sample.Views` Razor views) **and** Angular (`app/src/app/views`) work.
 - Running: `docker compose up -d --build` with `.env` (see `.env.example`). Rebuild only what changed:

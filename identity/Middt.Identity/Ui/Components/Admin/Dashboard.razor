@@ -1,0 +1,76 @@
+@page "/admin"
+@using Middt.Framework.Model.Workflow
+@using Middt.Framework.Workflow.Expressions
+@using Middt.Framework.Workflow.Runtime
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<PageTitle>Yönetim – @Options.Value.ProductName</PageTitle>
+
+<h1 class="idp-admin-title">Özet</h1>
+
+<div class="idp-stat-grid">
+    @foreach (var stat in stats)
+    {
+        <a class="idp-stat" href="@stat.Href">
+            <span class="idp-stat-value">@(stat.Value?.ToString("N0", CultureInfo.GetCultureInfo("tr-TR")) ?? "–")</span>
+            <span class="idp-stat-label">@stat.Label</span>
+        </a>
+    }
+</div>
+
+@code {
+    private sealed record Stat(string Label, string Href, long? Value);
+
+    private List<Stat> stats = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var admin = MiddtIdentityUi.AdminPath;
+        stats =
+        [
+            new("Kullanıcı", admin + "/users", await CountAsync(sp => sp.GetRequiredService<UserManager<MiddtIdentityUser>>().Users.LongCountAsync())),
+            new("Kilitli kullanıcı", admin + "/users", await CountAsync(sp =>
+            {
+                var now = DateTimeOffset.UtcNow;
+                return sp.GetRequiredService<UserManager<MiddtIdentityUser>>().Users.LongCountAsync(u => u.LockoutEnd != null && u.LockoutEnd > now);
+            })),
+            new("Uygulama", admin + "/clients", await CountAsync(sp => sp.GetRequiredService<IOpenIddictApplicationManager>().CountAsync().AsTask())),
+            new("Kapsam", admin + "/scopes", await CountAsync(sp => sp.GetRequiredService<IOpenIddictScopeManager>().CountAsync().AsTask())),
+            new("Yetkilendirme", admin + "/sessions", await CountAsync(sp => sp.GetRequiredService<IOpenIddictAuthorizationManager>().CountAsync().AsTask())),
+            new("Süren akış", admin + "/journeys", await CountAsync(ActiveJourneysAsync)),
+        ];
+    }
+
+    private async Task<long> ActiveJourneysAsync(IServiceProvider services)
+    {
+        var engine = services.GetRequiredService<WorkflowEngine>();
+        long total = 0;
+        foreach (var workflow in Options.Value.AdminJourneyWorkflows)
+        {
+            try
+            {
+                var (_, count) = await engine.ListAsync(workflow, WorkflowUser.System, null, WorkflowInstanceStatus.Active, null, 1, 1);
+                total += count;
+            }
+            catch (WorkflowNotFoundException)
+            {
+                // Journey not registered in this host.
+            }
+        }
+
+        return total;
+    }
+
+    // A missing store (e.g. workflow not registered) shows "–" instead of breaking the dashboard.
+    private async Task<long?> CountAsync(Func<IServiceProvider, Task<long>> count)
+    {
+        try
+        {
+            return await WithScopeAsync(async sp => (long?)await count(sp));
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or WorkflowException)
+        {
+            return null;
+        }
+    }
+}

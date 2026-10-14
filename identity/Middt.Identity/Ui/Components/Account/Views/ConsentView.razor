@@ -1,0 +1,60 @@
+@* View "consent" (auth-login): the user approves or denies the scopes requested by an application. *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">İzin isteği</h1>
+<p class="idp-subtitle">
+    <strong>@(Data("clientName") ?? Data("clientId") ?? "Bir uygulama")</strong> hesabınıza erişmek istiyor.
+</p>
+
+<ErrorSummary Errors="Errors" />
+
+@if (Scopes is { Count: > 0 } scopes)
+{
+    <p id="idp-consent-scopes-title">Uygulamanın erişmek istedikleri:</p>
+    <ul class="idp-scope-list" aria-labelledby="idp-consent-scopes-title">
+        @foreach (var (name, title) in scopes)
+        {
+            <li>
+                <span class="idp-scope-name">@title</span>
+                <code class="idp-muted">@name</code>
+            </li>
+        }
+    </ul>
+}
+
+<JourneyForm Action="approve" Name="journey-consent">
+    <div class="idp-actions">
+        <button type="submit" name="@JourneyInputMapper.ActionField" value="approve" class="idp-button idp-button-primary" autofocus>@Title("approve", "İzin ver")</button>
+        @if (Has("deny"))
+        {
+            <button type="submit" name="@JourneyInputMapper.ActionField" value="deny" class="idp-button idp-button-secondary">@Title("deny", "Reddet")</button>
+        }
+    </div>
+</JourneyForm>
+
+<p class="idp-alt idp-muted">İzni daha sonra hesap ayarlarınızdan veya uygulama yöneticisi aracılığıyla geri alabilirsiniz.</p>
+
+@code {
+    // data.scopeDetails ([{ name, displayName }], set by the consent check) or data.scopes; built-in scopes get Turkish texts.
+    private IReadOnlyList<(string Name, string Title)> Scopes =>
+        State.Data["scopeDetails"] is JsonArray details
+            ? [.. details.OfType<JsonObject>()
+                .Select(d => (Name: d["name"]?.GetValue<string>() ?? string.Empty, DisplayName: d["displayName"]?.GetValue<string>()))
+                .Where(d => d.Name.Length > 0)
+                .Select(d => (d.Name, ScopeTitle(d.Name, d.DisplayName)))]
+            : [.. DataList("scopes").Select(s => (s, ScopeTitle(s, null)))];
+
+    private static string ScopeTitle(string scope, string? displayName) => BuiltInTitle(scope) ?? (string.IsNullOrEmpty(displayName) ? scope : displayName);
+
+    private static string? BuiltInTitle(string scope) => scope switch
+    {
+        "openid" => "Kimliğiniz",
+        "profile" => "Profil bilgileriniz (ad)",
+        "email" => "E-posta adresiniz",
+        "roles" => "Rolleriniz",
+        "offline_access" => "Siz uygulamada değilken erişim (oturumu yenileme)",
+        "phone" => "Telefon numaranız",
+        "address" => "Adresiniz",
+        _ => null,
+    };
+}

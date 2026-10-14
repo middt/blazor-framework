@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Expressions;
@@ -74,9 +75,11 @@ public sealed class WorkflowRegistry
             }
         }
 
+        // Tasks are resolved for their Validate method: use a scope, application tasks usually depend on scoped services.
+        using var scope = services.CreateScope();
         foreach (var definition in result.Values.SelectMany(v => v.Values))
         {
-            errors.AddRange(WorkflowDefinitionValidator.Validate(definition, expressions, tasks, services, key => result.ContainsKey(key), options.ViewTypes)
+            errors.AddRange(WorkflowDefinitionValidator.Validate(definition, expressions, tasks, scope.ServiceProvider, key => result.ContainsKey(key), options.ViewTypes)
                 .Select(e => $"{definition.Key} v{definition.Version}: {e}"));
         }
 
@@ -345,6 +348,15 @@ internal static class WorkflowDefinitionValidator
             foreach (var error in Safely(() => JsonSchemaValidator.CheckSchema(schema)))
             {
                 yield return $"{where}: input.schema {error}";
+            }
+        }
+
+        foreach (var name in t.Input?.Sensitive ?? [])
+        {
+            // Only declared top-level properties can be stripped reliably (without a schema the body is ignored anyway).
+            if (t.Input?.Schema?["properties"] is not JsonObject properties || !properties.ContainsKey(name))
+            {
+                yield return $"{where}: input.sensitive '{name}' is not a property of input.schema.";
             }
         }
 

@@ -1,0 +1,7 @@
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.DependencyInjection
+@using OpenIddict.Abstractions
+@layout AdminLayout
+@inherits AdminComponentBase
+@attribute [Authorize(Policy = MiddtIdentityUi.AdminPolicy)]

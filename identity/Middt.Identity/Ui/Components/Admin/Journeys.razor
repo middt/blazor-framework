@@ -1,0 +1,108 @@
+@page "/admin/journeys"
+@using Middt.Framework.Model.Workflow
+@using Middt.Framework.Workflow.Expressions
+@using Middt.Framework.Workflow.Runtime
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<PageTitle>Akışlar</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Kimlik akışları</h1>
+    <RadzenDropDown TValue="string" Data="Options.Value.AdminJourneyWorkflows" @bind-Value="workflow" Change="@(_ => ReloadAsync())"
+                    InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Akış" })" Style="min-width: 14rem" />
+    <RadzenDropDown TValue="WorkflowInstanceStatus?" Data="statuses" TextProperty="Text" ValueProperty="Value" @bind-Value="status" Change="@(_ => ReloadAsync())"
+                    Placeholder="Tüm durumlar" AllowClear="true" InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Durum" })" Style="min-width: 10rem" />
+</div>
+
+@if (missing)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Bu akış bu sunucuda kayıtlı değil.</RadzenAlert>
+}
+
+<RadzenDataGrid @ref="grid" TItem="WorkflowInstanceModel" Data="rows" Count="count" LoadData="LoadAsync" IsLoading="loading"
+                AllowPaging="true" PageSize="25" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                PagingSummaryFormat="Sayfa {0} / {1} ({2} kayıt)" EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+    <Columns>
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="CreatedAt" Title="Başlangıç" FormatString="{0:dd.MM.yyyy HH:mm:ss}" Sortable="false" />
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Title="Adım" Sortable="false">
+            <Template Context="instance">@(instance.StateTitle ?? instance.State) <code class="idp-muted">@instance.State</code></Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Title="Durum" Sortable="false">
+            <Template Context="instance"><JourneyStatusBadge Instance="instance" /></Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="StartedBy" Title="Başlatan" Sortable="false" />
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="UpdatedAt" Title="Son işlem" FormatString="{0:dd.MM.yyyy HH:mm:ss}" Sortable="false" />
+        <RadzenDataGridColumn TItem="WorkflowInstanceModel" Title="" Sortable="false" Width="7rem" TextAlign="TextAlign.Right">
+            <Template Context="instance">
+                <a href="@($"{MiddtIdentityUi.AdminPath}/journeys/{instance.Id:D}")">Ayrıntı</a>
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private sealed record StatusOption(string Text, WorkflowInstanceStatus? Value);
+
+    private static readonly StatusOption[] statuses =
+    [
+        new("Süren", WorkflowInstanceStatus.Active),
+        new("Tamamlanan", WorkflowInstanceStatus.Completed),
+        new("Hatalı", WorkflowInstanceStatus.Faulted),
+        new("İptal", WorkflowInstanceStatus.Cancelled),
+    ];
+
+    private RadzenDataGrid<WorkflowInstanceModel>? grid;
+    private List<WorkflowInstanceModel> rows = [];
+    private int count;
+    private bool loading;
+    private bool missing;
+    private string? workflow;
+    private WorkflowInstanceStatus? status;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The grid's initial LoadData runs while prerendering and is lost with the prerendered component: load here.
+        if (firstRender && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    protected override void OnInitialized() => workflow = Options.Value.AdminJourneyWorkflows.FirstOrDefault();
+
+    private async Task LoadAsync(LoadDataArgs args)
+    {
+        if (workflow is null)
+        {
+            return;
+        }
+
+        loading = true;
+        missing = false;
+        try
+        {
+            var pageSize = args.Top ?? 25;
+            var page = (args.Skip ?? 0) / Math.Max(pageSize, 1) + 1;
+            (rows, count) = await WithScopeAsync(sp =>
+                sp.GetRequiredService<WorkflowEngine>().ListAsync(workflow, WorkflowUser.System, null, status, null, page, pageSize));
+        }
+        catch (WorkflowNotFoundException)
+        {
+            missing = true;
+            rows = [];
+            count = 0;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (grid is not null)
+        {
+            await grid.FirstPage(true);
+        }
+    }
+}

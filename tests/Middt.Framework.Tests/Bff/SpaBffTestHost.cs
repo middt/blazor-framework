@@ -31,6 +31,9 @@ namespace Middt.Framework.Tests.Bff;
 public sealed class SpaBffTestHost : IAsyncDisposable
 {
     public const string ApiUrl = "http://api.test/";
+
+    /// <summary>Page that requires a role the test user does not have.</summary>
+    public const string ForbiddenPagePath = "/test/forbidden-page";
     public const string IndexHtml = "<!doctype html><title>spa</title><app-root>spa-shell</app-root>";
 
     private readonly string contentDirectory;
@@ -130,6 +133,7 @@ public sealed class SpaBffTestHost : IAsyncDisposable
             context.User.FindFirst(MiddtClaimTypes.SessionId)?.Value,
             [.. context.User.Claims.Select(c => c.Type)])))
             .RequireAuthorization();
+        app.MapGet(ForbiddenPagePath, () => Results.Ok()).RequireAuthorization(policy => policy.RequireRole("nobody-has-this-role"));
 
         await app.StartAsync();
         host = new SpaBffTestHost(app, time, tokens, api, contentDirectory);

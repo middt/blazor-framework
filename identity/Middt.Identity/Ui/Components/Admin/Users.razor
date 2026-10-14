@@ -1,0 +1,243 @@
+@page "/admin/users"
+
+<PageTitle>Kullanıcılar</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Kullanıcılar</h1>
+    <form class="idp-admin-search" role="search" @onsubmit="SearchAsync">
+        <RadzenTextBox @bind-Value="search" Placeholder="Kullanıcı adı, e-posta veya ad" aria-label="Kullanıcı ara" Style="min-width: 16rem" />
+        <RadzenButton ButtonType="ButtonType.Submit" Icon="search" Text="Ara" ButtonStyle="ButtonStyle.Base" />
+    </form>
+    <RadzenButton Icon="person_add" Text="Yeni kullanıcı" ButtonStyle="ButtonStyle.Primary" Click="CreateAsync" />
+</div>
+
+<RadzenDataGrid @ref="grid" TItem="UserRow" Data="rows" Count="count" LoadData="LoadAsync" IsLoading="loading"
+                AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                PagingSummaryFormat="Sayfa {0} / {1} ({2} kayıt)" EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+    <Columns>
+        <RadzenDataGridColumn TItem="UserRow" Property="UserName" Title="Kullanıcı adı" />
+        <RadzenDataGridColumn TItem="UserRow" Property="DisplayName" Title="Ad" />
+        <RadzenDataGridColumn TItem="UserRow" Property="Email" Title="E-posta">
+            <Template Context="user">
+                @user.Email
+                @if (user.EmailConfirmed)
+                {
+                    <RadzenIcon Icon="verified" title="Doğrulandı" Style="font-size: 1rem; vertical-align: middle" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="UserRow" Title="Durum" Sortable="false">
+            <Template Context="user">
+                @if (user.LockedOut)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="Kilitli" />
+                }
+                @if (user.TwoFactor)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="2FA" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="UserRow" Property="LastLoginAt" Title="Son giriş" FormatString="{0:dd.MM.yyyy HH:mm}" />
+        <RadzenDataGridColumn TItem="UserRow" Title="İşlemler" Sortable="false" Width="15rem" TextAlign="TextAlign.Right">
+            <Template Context="user">
+                <RadzenButton Icon="edit" Variant="Variant.Text" Size="ButtonSize.Small" title="Düzenle" aria-label="@($"{user.UserName} düzenle")" Click="@(() => EditAsync(user))" />
+                <RadzenButton Icon="@(user.LockedOut ? "lock_open" : "lock")" Variant="Variant.Text" Size="ButtonSize.Small"
+                              title="@(user.LockedOut ? "Kilidi aç" : "Kilitle")" aria-label="@($"{user.UserName} {(user.LockedOut ? "kilidi aç" : "kilitle")}")" Click="@(() => ToggleLockAsync(user))" />
+                <RadzenButton Icon="key" Variant="Variant.Text" Size="ButtonSize.Small" title="Şifre belirle" aria-label="@($"{user.UserName} şifre belirle")" Click="@(() => SetPasswordAsync(user))" />
+                <RadzenButton Icon="phonelink_erase" Variant="Variant.Text" Size="ButtonSize.Small" title="Doğrulayıcıyı sıfırla" aria-label="@($"{user.UserName} doğrulayıcıyı sıfırla")" Click="@(() => ResetAuthenticatorAsync(user))" />
+                <RadzenButton Icon="delete" Variant="Variant.Text" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" title="Sil" aria-label="@($"{user.UserName} sil")" Click="@(() => DeleteAsync(user))" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private sealed record UserRow(string Id, string? UserName, string? DisplayName, string? Email, bool EmailConfirmed, bool LockedOut, bool TwoFactor, DateTimeOffset? LastLoginAt);
+
+    private RadzenDataGrid<UserRow>? grid;
+    private List<UserRow> rows = [];
+    private int count;
+    private bool loading;
+    private string? search;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The grid's initial LoadData runs while prerendering and is lost with the prerendered component: load here.
+        if (firstRender && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task LoadAsync(LoadDataArgs args)
+    {
+        loading = true;
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var term = search?.Trim();
+            (rows, count) = await WithScopeAsync(async sp =>
+            {
+                var query = sp.GetRequiredService<UserManager<MiddtIdentityUser>>().Users;
+                if (!string.IsNullOrEmpty(term))
+                {
+                    var upper = term.ToUpperInvariant();
+                    query = query.Where(u => u.NormalizedUserName!.Contains(upper) || u.NormalizedEmail!.Contains(upper) || u.DisplayName!.Contains(term));
+                }
+
+                var total = await query.CountAsync();
+                var page = await query.OrderBy(u => u.UserName).Skip(args.Skip ?? 0).Take(args.Top ?? 20)
+                    .Select(u => new { u.Id, u.UserName, u.DisplayName, u.Email, u.EmailConfirmed, u.LockoutEnd, u.TwoFactorEnabled, u.LastLoginAt })
+                    .ToListAsync();
+
+                // Lockout is evaluated in memory: not every provider translates DateTimeOffset comparisons (SQLite).
+                return (page.Select(u => new UserRow(u.Id, u.UserName, u.DisplayName, u.Email, u.EmailConfirmed, u.LockoutEnd > now, u.TwoFactorEnabled, u.LastLoginAt)).ToList(), total);
+            });
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (grid is not null)
+        {
+            await grid.FirstPage(true);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (await Dialogs.OpenAsync<UserEditDialog>("Yeni kullanıcı", new Dictionary<string, object?>(), new DialogOptions { Width = "640px" }) is true)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task EditAsync(UserRow user)
+    {
+        if (await Dialogs.OpenAsync<UserEditDialog>($"Kullanıcı: {user.UserName}", new Dictionary<string, object?> { [nameof(UserEditDialog.UserId)] = user.Id }, new DialogOptions { Width = "640px" }) is true)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task SetPasswordAsync(UserRow user)
+    {
+        await Dialogs.OpenAsync<SetPasswordDialog>($"Şifre belirle: {user.UserName}", new Dictionary<string, object?> { [nameof(SetPasswordDialog.UserId)] = user.Id }, new DialogOptions { Width = "480px" });
+    }
+
+    private async Task ToggleLockAsync(UserRow user)
+    {
+        if (!user.LockedOut && await IsSelfAsync(user))
+        {
+            Notifications.Notify(NotificationSeverity.Warning, "Kendi hesabınızı kilitleyemezsiniz.");
+            return;
+        }
+
+        var ok = await RunAsync(async sp =>
+        {
+            var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            if (await users.FindByIdAsync(user.Id) is not { } entity)
+            {
+                return ["Kullanıcı bulunamadı."];
+            }
+
+            if (user.LockedOut)
+            {
+                var unlocked = await users.SetLockoutEndDateAsync(entity, null);
+                return unlocked.Succeeded ? Errors(await users.ResetAccessFailedCountAsync(entity)) : Errors(unlocked);
+            }
+
+            var enabled = await users.SetLockoutEnabledAsync(entity, true);
+            return enabled.Succeeded ? Errors(await users.SetLockoutEndDateAsync(entity, DateTimeOffset.MaxValue)) : Errors(enabled);
+        }, user.LockedOut ? "Kilit açıldı." : "Kullanıcı kilitlendi.");
+
+        if (ok)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ResetAuthenticatorAsync(UserRow user)
+    {
+        if (await Dialogs.Confirm($"{user.UserName} için iki adımlı doğrulama kapatılacak ve doğrulayıcı anahtarı sıfırlanacak.", "Doğrulayıcıyı sıfırla",
+                new ConfirmOptions { OkButtonText = "Sıfırla", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var ok = await RunAsync(async sp =>
+        {
+            var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            if (await users.FindByIdAsync(user.Id) is not { } entity)
+            {
+                return ["Kullanıcı bulunamadı."];
+            }
+
+            var disabled = await users.SetTwoFactorEnabledAsync(entity, false);
+            return disabled.Succeeded ? Errors(await users.ResetAuthenticatorKeyAsync(entity)) : Errors(disabled);
+        }, "Doğrulayıcı sıfırlandı.");
+
+        if (ok)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(UserRow user)
+    {
+        if (await IsSelfAsync(user))
+        {
+            Notifications.Notify(NotificationSeverity.Warning, "Kendi hesabınızı silemezsiniz.");
+            return;
+        }
+
+        if (await Dialogs.Confirm($"{user.UserName} kalıcı olarak silinecek. Bu işlem geri alınamaz.", "Kullanıcıyı sil",
+                new ConfirmOptions { OkButtonText = "Sil", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var ok = await RunAsync(async sp =>
+        {
+            var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            return await users.FindByIdAsync(user.Id) is { } entity ? Errors(await users.DeleteAsync(entity)) : Ok;
+        }, "Kullanıcı silindi.");
+
+        if (ok)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task<bool> IsSelfAsync(UserRow user)
+    {
+        if (AuthenticationState is null)
+        {
+            return false;
+        }
+
+        var principal = (await AuthenticationState).User;
+        return await WithScopeAsync(sp =>
+        {
+            var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            var id = users.GetUserId(principal) ?? principal.FindFirst("sub")?.Value;
+            return Task.FromResult(string.Equals(id, user.Id, StringComparison.Ordinal));
+        });
+    }
+}

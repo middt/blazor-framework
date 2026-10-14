@@ -1,0 +1,129 @@
+@* Create (Id = null) or edit an OpenIddict scope: name, display name, description, resources (audiences). *@
+
+@if (!loaded)
+{
+    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" aria-label="Yükleniyor" />
+}
+else
+{
+    <form class="idp-dialog-form" @onsubmit="SaveAsync">
+        <RadzenStack Gap="0.75rem">
+            <RadzenFormField Text="Ad (ör. api)" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="name" Name="Name" autocomplete="off" aria-required="true" />
+            </RadzenFormField>
+            <RadzenFormField Text="Görünen ad" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="displayName" Name="DisplayName" autocomplete="off" />
+            </RadzenFormField>
+            <RadzenFormField Text="Açıklama" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="description" Name="Description" autocomplete="off" />
+            </RadzenFormField>
+            <RadzenFormField Text="Kaynaklar / audience (her satıra bir tane)" Variant="Variant.Outlined">
+                <RadzenTextArea @bind-Value="resources" Name="Resources" Rows="3" placeholder="middt-api" />
+            </RadzenFormField>
+            <ErrorSummary Errors="errors" Id="idp-scope-errors" />
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="@(() => Dialogs.Close(false))" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Kaydet" ButtonStyle="ButtonStyle.Primary" IsBusy="saving" />
+            </RadzenStack>
+        </RadzenStack>
+    </form>
+}
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private string? name;
+    private string? displayName;
+    private string? description;
+    private string? resources;
+    private bool loaded;
+    private bool saving;
+    private IReadOnlyList<string> errors = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is not null)
+        {
+            await WithScopeAsync(async sp =>
+            {
+                var manager = sp.GetRequiredService<IOpenIddictScopeManager>();
+                if (await manager.FindByIdAsync(Id) is { } scope)
+                {
+                    var descriptor = new OpenIddictScopeDescriptor();
+                    await manager.PopulateAsync(descriptor, scope);
+                    name = descriptor.Name;
+                    displayName = descriptor.DisplayName;
+                    description = descriptor.Description;
+                    resources = string.Join('\n', descriptor.Resources);
+                }
+
+                return true;
+            });
+        }
+
+        loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        errors = [];
+        if (string.IsNullOrWhiteSpace(name) || name.Trim().Contains(' ', StringComparison.Ordinal))
+        {
+            errors = ["Ad zorunludur ve boşluk içeremez."];
+            return;
+        }
+
+        saving = true;
+        var ok = await RunAsync(async sp =>
+        {
+            var manager = sp.GetRequiredService<IOpenIddictScopeManager>();
+            var descriptor = new OpenIddictScopeDescriptor();
+            object? scope = null;
+            if (Id is not null)
+            {
+                scope = await manager.FindByIdAsync(Id);
+                if (scope is null)
+                {
+                    return ["Kapsam bulunamadı."];
+                }
+
+                await manager.PopulateAsync(descriptor, scope);
+            }
+            else if (await manager.FindByNameAsync(name.Trim()) is not null)
+            {
+                return ["Bu adda bir kapsam zaten var."];
+            }
+
+            descriptor.Name = name.Trim();
+            descriptor.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+            descriptor.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+            descriptor.Resources.Clear();
+            descriptor.Resources.UnionWith((resources ?? string.Empty).Split(['\n', '\r', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+            try
+            {
+                if (scope is null)
+                {
+                    await manager.CreateAsync(descriptor);
+                }
+                else
+                {
+                    await manager.UpdateAsync(scope, descriptor);
+                }
+            }
+            catch (OpenIddictExceptions.ValidationException exception)
+            {
+                return [.. exception.Results.Select(r => r.ErrorMessage ?? string.Empty).Where(m => m.Length > 0)];
+            }
+
+            return Ok;
+        }, "Kapsam kaydedildi.");
+        saving = false;
+
+        if (ok)
+        {
+            Dialogs.Close(true);
+        }
+    }
+}

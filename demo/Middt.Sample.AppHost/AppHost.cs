@@ -1,4 +1,5 @@
-// Local orchestration for the sample: SQL Server (+ BikeStores seed), Redis, RabbitMQ, API, Blazor UI and the Angular UI
+// Local orchestration for the sample: SQL Server (+ BikeStores seed), Redis, RabbitMQ, identity provider (:8083), API,
+// Blazor UI and the Angular UI
 // (BFF host; build the SPA first: cd demo/client/angular/app && npm run build:sdk && npm ci && npx ng build sample).
 // Run with: dotnet run --project demo/Middt.Sample.AppHost  (requires Docker or Podman)
 var builder = DistributedApplication.CreateBuilder(args);
@@ -15,13 +16,23 @@ var bikeStores = sql.AddDatabase("BikeStores")
 var redis = builder.AddRedis("redis");
 var messaging = builder.AddRabbitMQ("messaging").WithManagementPlugin();
 
-var jwtSecret = builder.AddParameter("jwt-secret", secret: true);
+// Middt Identity (OAuth 2.0 / OpenID Connect server, identity/Middt.Identity) with the demo's settings
+// (demo/server/identity.json: issuer :8083, clients middt-blazor / middt-angular, demo users). Client registrations use
+// the fixed launch profile ports (Blazor https://localhost:7020, Angular :8081); the BFFs' Development client secrets
+// match the demo file.
+var identityDb = sql.AddDatabase("Identity", "MiddtIdentity");
+var identity = builder.AddProject<Projects.Middt_Identity>("middt-identity")
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("Identity__ConfigFile", Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "server", "identity.json")))
+    .WithReference(identityDb).WaitFor(identityDb)
+    .WithReference(redis).WaitFor(redis)
+    .WithHttpHealthCheck("/health");
 
 var api = builder.AddProject<Projects.Middt_Sample_Api>("middt-sample-api")
     .WithReference(bikeStores).WaitFor(bikeStores)
     .WithReference(redis).WaitFor(redis)
     .WithReference(messaging).WaitFor(messaging)
-    .WithEnvironment("JwtSettings__Secret", jwtSecret)
+    .WaitFor(identity)
     .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.Middt_Sample_BlazorServer>("middt-sample-blazorserver")
@@ -29,6 +40,7 @@ builder.AddProject<Projects.Middt_Sample_BlazorServer>("middt-sample-blazorserve
     .WithEnvironment("ApiSettings__URL", api.GetEndpoint("https"))
     .WithReference(redis)
     .WaitFor(api)
+    .WaitFor(identity)
     .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.Middt_Sample_Angular>("middt-sample-angular")
@@ -36,6 +48,7 @@ builder.AddProject<Projects.Middt_Sample_Angular>("middt-sample-angular")
     .WithEnvironment("ApiSettings__URL", api.GetEndpoint("https"))
     .WithReference(redis)
     .WaitFor(api)
+    .WaitFor(identity)
     .WithHttpHealthCheck("/health");
 
 builder.Build().Run();

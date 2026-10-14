@@ -1,0 +1,43 @@
+@page "/"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@inject IOptions<MiddtIdentityUiOptions> Options
+@inject IOptions<MiddtIdentityOptions> IdentityOptions
+
+<PageTitle>@Options.Value.ProductName</PageTitle>
+
+<section class="idp-card" aria-labelledby="idp-home-title">
+    <h1 id="idp-home-title" class="idp-title">@Options.Value.ProductName</h1>
+    @if (user.Identity?.IsAuthenticated == true)
+    {
+        <p>Hoş geldiniz, <strong>@user.Identity.Name</strong>.</p>
+        <nav class="idp-link-list" aria-label="Hesap">
+            <a href="@MiddtIdentityUi.SecurityPath">Hesap güvenliği</a>
+            @if (user.IsInRole(IdentityOptions.Value.AdminRole))
+            {
+                <a href="@MiddtIdentityUi.AdminPath">Yönetim</a>
+            }
+            <a href="@MiddtIdentityDefaults.LogoutPath">Çıkış yap</a>
+        </nav>
+    }
+    else
+    {
+        <p>Uygulamalarınız için tek oturum açma noktası.</p>
+        <div class="idp-actions">
+            <a class="idp-button idp-button-primary" href="@MiddtIdentityDefaults.LoginPath">Oturum aç</a>
+            @if (IdentityOptions.Value.AllowRegistration)
+            {
+                <a class="idp-button idp-button-secondary" href="@MiddtIdentityDefaults.RegisterPath">Hesap oluştur</a>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private System.Security.Claims.ClaimsPrincipal user = new();
+
+    protected override async Task OnInitializedAsync() => user = await AccountSession.GetPrincipalAsync(HttpContext);
+}

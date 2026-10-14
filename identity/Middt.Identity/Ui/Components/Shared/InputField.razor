@@ -1,0 +1,62 @@
+@* A labelled native input for static forms (posted by name). *@
+<div class="idp-field">
+    @if (LabelAddon is null)
+    {
+        <label for="@Id">@Label</label>
+    }
+    else
+    {
+        <div class="idp-label-row">
+            <label for="@Id">@Label</label>
+            @LabelAddon
+        </div>
+    }
+    <input id="@Id" name="@Name" type="@Type" value="@Value" autocomplete="@Autocomplete" required="@Required" autofocus="@Autofocus"
+           inputmode="@InputMode" maxlength="@MaxLength" spellcheck="false" autocapitalize="@(Autocomplete is "name" ? null : "none")"
+           aria-describedby="@(Hint is null ? null : Id + "-hint")" class="idp-input" @attributes="AdditionalAttributes" />
+    @if (Hint is not null)
+    {
+        <small id="@(Id + "-hint")" class="idp-hint">@Hint</small>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Type { get; set; } = "text";
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public string? Autocomplete { get; set; }
+
+    [Parameter]
+    public bool Required { get; set; }
+
+    [Parameter]
+    public bool Autofocus { get; set; }
+
+    [Parameter]
+    public string? InputMode { get; set; }
+
+    [Parameter]
+    public int? MaxLength { get; set; }
+
+    [Parameter]
+    public string? Hint { get; set; }
+
+    [Parameter]
+    public RenderFragment? LabelAddon { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

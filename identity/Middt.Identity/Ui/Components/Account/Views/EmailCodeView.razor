@@ -1,0 +1,37 @@
+@* View "email-code" (auth-register / auth-reset-password): verification code sent by e-mail. *@
+@inherits JourneyViewBase
+@using Microsoft.Extensions.Hosting
+@inject IHostEnvironment Environment
+
+<h1 class="idp-title">E-posta doğrulama</h1>
+<p class="idp-subtitle">
+    @if ((Data("codeSentTo") ?? Data("email")) is { Length: > 0 } email)
+    {
+        <span><strong>@email</strong> adresine gönderdiğimiz kodu girin.</span>
+    }
+    else
+    {
+        <span>E-posta adresinize gönderdiğimiz kodu girin.</span>
+    }
+</p>
+
+<ErrorSummary Errors="Errors" />
+
+<JourneyForm Action="submit-code">
+    <InputField Id="Input_Code" Name="code" Label="Doğrulama kodu" Autocomplete="one-time-code" InputMode="numeric"
+                Required="true" Autofocus="true" MaxLength="12" />
+    <button type="submit" class="idp-button idp-button-primary idp-button-block">@Title("submit-code", "Doğrula")</button>
+</JourneyForm>
+
+@if (Has("resend-code"))
+{
+    <JourneyForm Action="resend-code" CssClass="idp-form idp-form-inline">
+        <span class="idp-muted">Kod gelmedi mi?</span>
+        <button type="submit" class="idp-button idp-button-link">@Title("resend-code", "Kodu yeniden gönder")</button>
+    </JourneyForm>
+}
+
+@if (Environment.IsDevelopment())
+{
+    <p class="idp-alt idp-muted">Geliştirme ortamı: <a href="@MiddtIdentityUi.MailboxPath" target="_blank" rel="noopener">posta kutusunu açın</a>.</p>
+}

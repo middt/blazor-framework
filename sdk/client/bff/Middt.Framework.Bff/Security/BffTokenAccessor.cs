@@ -112,6 +112,12 @@ public sealed partial class BffTokenAccessor(IServerTokenStore store, ITokenServ
 
         // Keep the absolute session expiry: refreshing tokens must not extend the session.
         var refreshed = new SaveTokenResponseModel(result) { expire_datetime = tokens.expire_datetime };
+        // OIDC: providers may omit the identity token on refresh; keep the previous one for the logout id_token_hint.
+        if (Oidc.OidcTokens.GetIdToken(refreshed) is null && Oidc.OidcTokens.GetIdToken(tokens) is { } idToken)
+        {
+            Oidc.OidcTokens.SetIdToken(refreshed, idToken);
+        }
+
         await store.SetAsync(sessionId, refreshed);
         return refreshed;
     }

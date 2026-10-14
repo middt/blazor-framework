@@ -1,0 +1,28 @@
+@* Error summary of a form (announced by screen readers: role="alert"). *@
+@if (Errors is { Count: > 0 })
+{
+    <div class="idp-alert idp-alert-error" role="alert" id="@Id" tabindex="-1">
+        @if (Errors.Count == 1)
+        {
+            <p>@Errors[0]</p>
+        }
+        else
+        {
+            <p class="idp-alert-title">Lütfen aşağıdakileri düzeltin:</p>
+            <ul>
+                @foreach (var error in Errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<string>? Errors { get; set; }
+
+    [Parameter]
+    public string Id { get; set; } = "idp-errors";
+}

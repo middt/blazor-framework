@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.RateLimiting;
 using Middt.Framework.Bff.DependencyInjection;
+using Middt.Framework.Bff.Oidc;
 using Middt.Framework.Bff.Security;
 using Middt.Framework.Common.Web;
 
@@ -17,7 +19,7 @@ namespace Middt.Framework.Bff.Pages.Account;
 [AllowAnonymous]
 [EnableRateLimiting(MiddtBffExtensions.LoginRateLimitPolicy)]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class LoginModel(CookieSignInService signInService, LoginAttemptLimiter attemptLimiter) : PageModel
+public sealed class LoginModel(CookieSignInService signInService, LoginAttemptLimiter attemptLimiter, MiddtBffOptions bffOptions) : PageModel
 {
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -27,11 +29,27 @@ public sealed class LoginModel(CookieSignInService signInService, LoginAttemptLi
 
     public string? ErrorMessage { get; private set; }
 
-    public IActionResult OnGet() =>
-        User.Identity?.IsAuthenticated == true ? LocalRedirect(LocalUrl.OrDefault(ReturnUrl)) : Page();
+    public IActionResult OnGet()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            return LocalRedirect(LocalUrl.OrDefault(ReturnUrl));
+        }
+
+        // OIDC mode: sign-in happens at the identity provider; it returns to the (local only) return URL.
+        return bffOptions.Oidc.IsEnabled
+            ? Challenge(new AuthenticationProperties { RedirectUri = LocalUrl.OrDefault(ReturnUrl) }, BffOidc.SchemeName)
+            : Page();
+    }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        // No password form in OIDC mode: credentials are only ever entered at the identity provider.
+        if (bffOptions.Oidc.IsEnabled)
+        {
+            return NotFound();
+        }
+
         if (!ModelState.IsValid)
         {
             ErrorMessage = "Kullanıcı adı ve şifre zorunludur.";

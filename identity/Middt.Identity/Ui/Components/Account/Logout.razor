@@ -1,0 +1,47 @@
+@page "/account/logout"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@using Microsoft.AspNetCore.Authentication
+@inject NavigationManager Navigation
+
+<PageTitle>Oturumu kapat</PageTitle>
+
+<section class="idp-card" aria-labelledby="idp-logout-title">
+    @if (user.Identity?.IsAuthenticated == true)
+    {
+        <h1 id="idp-logout-title" class="idp-title">Oturumu kapat</h1>
+        <p><strong>@user.Identity.Name</strong> hesabından çıkış yapmak istediğinize emin misiniz?</p>
+        <form method="post" @formname="logout" @onsubmit="LogoutAsync" class="idp-form">
+            <AntiforgeryToken />
+            <div class="idp-actions">
+                <button type="submit" class="idp-button idp-button-primary" autofocus>Çıkış yap</button>
+                <a class="idp-button idp-button-secondary" href="@(JourneyLinks.SafeReturnUrl(ReturnUrl) ?? "/")">Vazgeç</a>
+            </div>
+        </form>
+    }
+    else
+    {
+        <h1 id="idp-logout-title" class="idp-title">Oturum kapalı</h1>
+        <p>Şu anda açık bir oturumunuz yok.</p>
+        <a class="idp-button idp-button-primary" href="@MiddtIdentityDefaults.LoginPath">Oturum aç</a>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private System.Security.Claims.ClaimsPrincipal user = new();
+
+    protected override async Task OnInitializedAsync() => user = await AccountSession.GetPrincipalAsync(HttpContext);
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private async Task LogoutAsync()
+    {
+        await HttpContext.SignOutAsync(MiddtIdentityDefaults.CookieScheme);
+        AuthJourneyCookie.Delete(HttpContext);
+        Navigation.NavigateTo(JourneyLinks.SafeReturnUrl(ReturnUrl) ?? "/", forceLoad: true);
+    }
+}

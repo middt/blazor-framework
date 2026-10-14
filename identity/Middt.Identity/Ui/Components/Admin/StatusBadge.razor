@@ -1,0 +1,24 @@
+@* Badge of an OpenIddict status (valid, revoked, redeemed, rejected, inactive). *@
+<RadzenBadge BadgeStyle="@Style" Text="@Text" />
+
+@code {
+    [Parameter]
+    public string? Status { get; set; }
+
+    private BadgeStyle Style => Status switch
+    {
+        OpenIddictConstants.Statuses.Valid => BadgeStyle.Success,
+        OpenIddictConstants.Statuses.Revoked or OpenIddictConstants.Statuses.Rejected => BadgeStyle.Danger,
+        _ => BadgeStyle.Light,
+    };
+
+    private string Text => Status switch
+    {
+        OpenIddictConstants.Statuses.Valid => "Geçerli",
+        OpenIddictConstants.Statuses.Revoked => "İptal",
+        OpenIddictConstants.Statuses.Redeemed => "Kullanıldı",
+        OpenIddictConstants.Statuses.Rejected => "Reddedildi",
+        OpenIddictConstants.Statuses.Inactive => "Pasif",
+        _ => Status ?? "–",
+    };
+}

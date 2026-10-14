@@ -16,6 +16,8 @@ export interface MiddtConfig {
   loginUrl: string;
   /** Server rendered logout page of the BFF (POST with antiforgery). */
   logoutUrl: string;
+  /** Server rendered page for signed-in users without a required role (SecuritySettings.AccessDeniedPageURL). */
+  accessDeniedUrl: string;
   /** Locale for number/date formats of layouts. */
   locale: string;
   /** Role allowed to edit layouts at runtime (MiddtUiOptions.AdminRole). */
@@ -28,6 +30,7 @@ export const DEFAULT_MIDDT_CONFIG: MiddtConfig = {
   bffBaseUrl: '/bff',
   loginUrl: '/Account/Login',
   logoutUrl: '/Account/Logout',
+  accessDeniedUrl: '/Account/AccessDenied',
   locale: 'tr-TR',
   uiAdminRole: 'ui-admin',
 };

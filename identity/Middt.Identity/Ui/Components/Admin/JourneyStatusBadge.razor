@@ -1,0 +1,27 @@
+@using Middt.Framework.Model.Workflow
+@* Status of a journey instance: running, succeeded/failed (final sub type), faulted, cancelled. *@
+<RadzenBadge BadgeStyle="@Style" Text="@Text" />
+
+@code {
+    [Parameter, EditorRequired]
+    public WorkflowInstanceModel Instance { get; set; } = default!;
+
+    private bool Failed => Instance.StateSubType.Equals("Failure", StringComparison.OrdinalIgnoreCase);
+
+    private BadgeStyle Style => Instance.Status switch
+    {
+        WorkflowInstanceStatus.Completed => Failed ? BadgeStyle.Warning : BadgeStyle.Success,
+        WorkflowInstanceStatus.Faulted => BadgeStyle.Danger,
+        WorkflowInstanceStatus.Cancelled => BadgeStyle.Light,
+        _ => BadgeStyle.Info,
+    };
+
+    private string Text => Instance.Status switch
+    {
+        WorkflowInstanceStatus.Completed => Failed ? "Başarısız" : "Başarılı",
+        WorkflowInstanceStatus.Faulted => "Hata",
+        WorkflowInstanceStatus.Cancelled => "İptal / süre doldu",
+        WorkflowInstanceStatus.Busy => "İşleniyor",
+        _ => "Sürüyor",
+    };
+}

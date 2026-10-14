@@ -1,0 +1,117 @@
+@page "/admin/journeys/{Id:guid}"
+@using System.Text.Json
+@using Middt.Framework.Model.Workflow
+@using Middt.Framework.Workflow.Expressions
+@using Middt.Framework.Workflow.Runtime
+
+<PageTitle>Akış ayrıntısı</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Akış ayrıntısı</h1>
+    <a href="@(MiddtIdentityUi.AdminPath + "/journeys")">← Akışlar</a>
+</div>
+
+@if (notFound)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" Shade="Shade.Lighter" AllowClose="false">Akış bulunamadı.</RadzenAlert>
+}
+else if (instance is not null)
+{
+    <dl class="idp-summary idp-summary-grid">
+        <dt>Akış</dt>
+        <dd>@instance.Workflow <span class="idp-muted">v@(instance.WorkflowVersion)</span></dd>
+        <dt>Id</dt>
+        <dd><code>@instance.Id</code></dd>
+        <dt>Adım</dt>
+        <dd>@(instance.StateTitle ?? instance.State) <code class="idp-muted">@instance.State</code></dd>
+        <dt>Durum</dt>
+        <dd><JourneyStatusBadge Instance="instance" /></dd>
+        <dt>Başlatan</dt>
+        <dd>@(instance.StartedBy ?? "–")</dd>
+        <dt>Başlangıç</dt>
+        <dd>@Format(instance.CreatedAt)</dd>
+        <dt>Son işlem</dt>
+        <dd>@Format(instance.UpdatedAt)</dd>
+        <dt>Bitiş</dt>
+        <dd>@(instance.CompletedAt is { } completed ? Format(completed) : "–")</dd>
+        @foreach (var (key, value) in safeData)
+        {
+            <dt>@key</dt>
+            <dd>@value</dd>
+        }
+    </dl>
+    <p class="idp-muted">Akış verisinden yalnızca hassas olmayan alanlar gösterilir (şifre, kod ve bağlama özetleri gösterilmez).</p>
+
+    <h2 class="idp-admin-subtitle">Geçmiş</h2>
+    <RadzenDataGrid TItem="WorkflowHistoryModel" Data="history" EmptyText="Geçmiş yok." Density="Density.Compact" AllowSorting="false">
+        <Columns>
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="StartedAt" Title="Zaman" FormatString="{0:dd.MM.yyyy HH:mm:ss}" />
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="TransitionKey" Title="İşlem" />
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="FromState" Title="Önceki adım" />
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="ToState" Title="Yeni adım" />
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="Trigger" Title="Tetikleyen" />
+            <RadzenDataGridColumn TItem="WorkflowHistoryModel" Property="ExecutedBy" Title="Kullanıcı" />
+        </Columns>
+    </RadzenDataGrid>
+
+    @if (incidents.Count > 0)
+    {
+        <h2 class="idp-admin-subtitle">Hatalar</h2>
+        <RadzenDataGrid TItem="WorkflowIncidentModel" Data="incidents" Density="Density.Compact" AllowSorting="false">
+            <Columns>
+                <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="CreatedAt" Title="Zaman" FormatString="{0:dd.MM.yyyy HH:mm:ss}" />
+                <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="TaskKey" Title="Görev" />
+                <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="Error" Title="Hata" />
+                <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="Attempts" Title="Deneme" />
+            </Columns>
+        </RadzenDataGrid>
+    }
+}
+
+@code {
+    /// <summary>Data fields that are safe to show; everything else (hashes, codes, binding) stays hidden.</summary>
+    internal static readonly string[] SafeDataKeys = ["userName", "userId", "email", "clientId", "clientName", "scopes", "error", "attempts"];
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private WorkflowInstanceModel? instance;
+    private List<WorkflowHistoryModel> history = [];
+    private List<WorkflowIncidentModel> incidents = [];
+    private List<KeyValuePair<string, string>> safeData = [];
+    private bool notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            await WithScopeAsync(async sp =>
+            {
+                var engine = sp.GetRequiredService<WorkflowEngine>();
+                instance = await engine.GetAsync(Id, WorkflowUser.System);
+                history = await engine.HistoryAsync(Id, WorkflowUser.System);
+                incidents = await engine.IncidentsAsync(Id, WorkflowUser.System);
+                return true;
+            });
+            safeData = [.. SafeData(instance!.Data)];
+        }
+        catch (WorkflowNotFoundException)
+        {
+            notFound = true;
+        }
+    }
+
+    internal static IEnumerable<KeyValuePair<string, string>> SafeData(JsonObject data)
+    {
+        foreach (var key in SafeDataKeys)
+        {
+            if (data[key] is { } node)
+            {
+                yield return new(key, node is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : node.ToJsonString());
+            }
+        }
+    }
+
+    private static string Format(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+}

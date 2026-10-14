@@ -1,0 +1,35 @@
+@* Layout of the administration pages (interactive server, Radzen). *@
+@inherits LayoutComponentBase
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<div class="idp-admin">
+    <a class="idp-skip" href="#idp-admin-main">İçeriğe geç</a>
+    <header class="idp-admin-header">
+        <a class="idp-brand" href="@MiddtIdentityUi.AdminPath">
+            <span class="idp-brand-mark" aria-hidden="true">M</span>
+            <span>@Options.Value.ProductName <small class="idp-muted">Yönetim</small></span>
+        </a>
+        <div class="idp-admin-user">
+            <AuthorizeView>
+                <span class="idp-muted">@context.User.Identity?.Name</span>
+            </AuthorizeView>
+            <a href="@MiddtIdentityUi.SecurityPath" data-enhance-nav="false">Hesabım</a>
+            <a href="@MiddtIdentityDefaults.LogoutPath" data-enhance-nav="false">Çıkış</a>
+        </div>
+    </header>
+    <nav class="idp-admin-nav" aria-label="Yönetim menüsü">
+        <NavLink href="@MiddtIdentityUi.AdminPath" Match="NavLinkMatch.All">Özet</NavLink>
+        <NavLink href="@(MiddtIdentityUi.AdminPath + "/users")">Kullanıcılar</NavLink>
+        <NavLink href="@(MiddtIdentityUi.AdminPath + "/clients")">Uygulamalar</NavLink>
+        <NavLink href="@(MiddtIdentityUi.AdminPath + "/scopes")">Kapsamlar</NavLink>
+        <NavLink href="@(MiddtIdentityUi.AdminPath + "/sessions")">Oturumlar</NavLink>
+        <NavLink href="@(MiddtIdentityUi.AdminPath + "/journeys")">Akışlar</NavLink>
+    </nav>
+    <main id="idp-admin-main" class="idp-admin-main">
+        @Body
+    </main>
+</div>
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenTooltip />

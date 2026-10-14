@@ -1,0 +1,36 @@
+@* A static-SSR form posting one journey action (hidden "__action"; a submit button with name="__action" overrides it).
+   Not enhanced: the response may redirect to other origins (OIDC clients). *@
+<form method="post" @formname="@FormName" @onsubmit="SubmitAsync" class="@CssClass" aria-describedby="@DescribedBy">
+    <AntiforgeryToken />
+    @if (!string.IsNullOrEmpty(Action))
+    {
+        <input type="hidden" name="@JourneyInputMapper.ActionField" value="@Action" />
+    }
+    @ChildContent
+</form>
+
+@code {
+    /// <summary>Default action key of the form.</summary>
+    [Parameter]
+    public string? Action { get; set; }
+
+    /// <summary>Form name (unique on the page); defaults to <c>journey-{Action}</c>.</summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    [Parameter]
+    public string CssClass { get; set; } = "idp-form";
+
+    [Parameter]
+    public string? DescribedBy { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [CascadingParameter]
+    private JourneyFormContext? Context { get; set; }
+
+    private string FormName => Name ?? "journey-" + (Action ?? "form");
+
+    private Task SubmitAsync() => Context?.SubmitAsync() ?? Task.CompletedTask;
+}

@@ -1,0 +1,221 @@
+@* Create (Id = null) or edit an OpenIddict application. Closes with the new secret (string) when one was generated –
+   it is shown once – otherwise with true. *@
+
+@if (!loaded)
+{
+    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" aria-label="Yükleniyor" />
+}
+else
+{
+    <form class="idp-dialog-form" @onsubmit="SaveAsync">
+        <RadzenStack Gap="0.75rem">
+            <div class="idp-grid-2">
+                <RadzenFormField Text="İstemci kimliği (client_id)" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="settings.ClientId" Name="ClientId" autocomplete="off" aria-required="true" />
+                </RadzenFormField>
+                <RadzenFormField Text="Görünen ad" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="settings.DisplayName" Name="DisplayName" autocomplete="off" />
+                </RadzenFormField>
+            </div>
+
+            <div class="idp-grid-2">
+                <fieldset class="idp-fieldset">
+                    <legend>İstemci türü</legend>
+                    <RadzenRadioButtonList TValue="string" @bind-Value="settings.ClientType" Orientation="Orientation.Vertical">
+                        <Items>
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ClientTypes.Confidential" Text="Confidential (sunucu tarafı, secret ile)" />
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ClientTypes.Public" Text="Public (SPA / mobil, secret yok)" />
+                        </Items>
+                    </RadzenRadioButtonList>
+                </fieldset>
+                <fieldset class="idp-fieldset">
+                    <legend>İzin (consent) türü</legend>
+                    <RadzenRadioButtonList TValue="string" @bind-Value="settings.ConsentType" Orientation="Orientation.Vertical">
+                        <Items>
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ConsentTypes.Explicit" Text="Explicit (kullanıcı onaylar)" />
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ConsentTypes.Implicit" Text="Implicit (onay sorulmaz)" />
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ConsentTypes.External" Text="External (yönetici onayı gerekir)" />
+                            <RadzenRadioButtonListItem TValue="string" Value="@OpenIddictConstants.ConsentTypes.Systematic" Text="Systematic (her seferinde sorulur)" />
+                        </Items>
+                    </RadzenRadioButtonList>
+                </fieldset>
+            </div>
+
+            <RadzenFormField Text="Yönlendirme adresleri (her satıra bir adres)" Variant="Variant.Outlined">
+                <RadzenTextArea @bind-Value="settings.RedirectUris" Name="RedirectUris" Rows="3" placeholder="https://uygulama.example.com/signin-oidc" />
+            </RadzenFormField>
+            <RadzenFormField Text="Çıkış sonrası adresler (her satıra bir adres)" Variant="Variant.Outlined">
+                <RadzenTextArea @bind-Value="settings.PostLogoutRedirectUris" Name="PostLogoutRedirectUris" Rows="2" placeholder="https://uygulama.example.com/signout-callback-oidc" />
+            </RadzenFormField>
+
+            <fieldset class="idp-fieldset">
+                <legend>Uç noktalar</legend>
+                <RadzenCheckBoxList TValue="string" @bind-Value="settings.Endpoints" Orientation="Orientation.Horizontal" Gap="1rem" Style="flex-wrap: wrap">
+                    <Items>
+                        @foreach (var (value, text) in ClientSettings.EndpointOptions)
+                        {
+                            <RadzenCheckBoxListItem TValue="string" Value="@value" Text="@text" />
+                        }
+                    </Items>
+                </RadzenCheckBoxList>
+            </fieldset>
+
+            <fieldset class="idp-fieldset">
+                <legend>Grant türleri</legend>
+                <RadzenCheckBoxList TValue="string" @bind-Value="settings.GrantTypes" Orientation="Orientation.Horizontal" Gap="1rem" Style="flex-wrap: wrap">
+                    <Items>
+                        @foreach (var (value, text) in ClientSettings.GrantTypeOptions)
+                        {
+                            <RadzenCheckBoxListItem TValue="string" Value="@value" Text="@text" />
+                        }
+                    </Items>
+                </RadzenCheckBoxList>
+            </fieldset>
+
+            <fieldset class="idp-fieldset">
+                <legend>Kapsamlar <small class="idp-muted">(openid ve offline_access her zaman izinlidir)</small></legend>
+                <RadzenCheckBoxList TValue="string" @bind-Value="settings.Scopes" Orientation="Orientation.Horizontal" Gap="1rem" Style="flex-wrap: wrap">
+                    <Items>
+                        @foreach (var scope in scopeNames)
+                        {
+                            <RadzenCheckBoxListItem TValue="string" Value="@scope" Text="@scope" />
+                        }
+                    </Items>
+                </RadzenCheckBoxList>
+            </fieldset>
+
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenSwitch @bind-Value="settings.RequirePkce" Name="RequirePkce" InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "PKCE zorunlu" })" />
+                <RadzenLabel Text="PKCE zorunlu" Component="RequirePkce" />
+            </RadzenStack>
+
+            @if (Id is not null && settings.ClientType == OpenIddictConstants.ClientTypes.Confidential && hadSecret)
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenSwitch @bind-Value="regenerateSecret" Name="RegenerateSecret" InputAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Yeni secret üret" })" />
+                    <RadzenLabel Text="Yeni secret üret (eskisi geçersiz olur)" Component="RegenerateSecret" />
+                </RadzenStack>
+            }
+
+            <ErrorSummary Errors="errors" Id="idp-client-errors" />
+
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+                <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="@(() => Dialogs.Close(false))" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Kaydet" ButtonStyle="ButtonStyle.Primary" IsBusy="saving" BusyText="Kaydediliyor…" />
+            </RadzenStack>
+        </RadzenStack>
+    </form>
+}
+
+@code {
+    /// <summary>OpenIddict application id; <c>null</c> creates an application.</summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    private ClientSettings settings = new();
+    private List<string> scopeNames = [];
+    private IReadOnlyList<string> errors = [];
+    private bool hadSecret;
+    private bool regenerateSecret;
+    private bool loaded;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await WithScopeAsync(async sp =>
+        {
+            var scopes = sp.GetRequiredService<IOpenIddictScopeManager>();
+            var names = new HashSet<string>(ClientSettings.StandardScopes, StringComparer.Ordinal);
+            await foreach (var scope in scopes.ListAsync(500, 0))
+            {
+                if (await scopes.GetNameAsync(scope) is { Length: > 0 } name)
+                {
+                    names.Add(name);
+                }
+            }
+
+            if (Id is not null)
+            {
+                var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
+                if (await manager.FindByIdAsync(Id) is { } application)
+                {
+                    var descriptor = new OpenIddictApplicationDescriptor();
+                    await manager.PopulateAsync(descriptor, application);
+                    settings = ClientSettings.From(descriptor);
+                    hadSecret = !string.IsNullOrEmpty(descriptor.ClientSecret);
+                    names.UnionWith(settings.Scopes);
+                }
+            }
+
+            scopeNames = [.. names.Order(StringComparer.Ordinal)];
+            return true;
+        });
+        loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        errors = [];
+        saving = true;
+        string? newSecret = null;
+        var ok = await RunAsync(async sp =>
+        {
+            var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
+            var descriptor = new OpenIddictApplicationDescriptor();
+            object? application = null;
+            if (Id is not null)
+            {
+                application = await manager.FindByIdAsync(Id);
+                if (application is null)
+                {
+                    return ["Uygulama bulunamadı."];
+                }
+
+                await manager.PopulateAsync(descriptor, application);
+            }
+
+            if (settings.ApplyTo(descriptor) is { Count: > 0 } invalid)
+            {
+                errors = invalid;
+                return [];
+            }
+
+            if (settings.ClientType == OpenIddictConstants.ClientTypes.Confidential && (regenerateSecret || string.IsNullOrEmpty(descriptor.ClientSecret)))
+            {
+                newSecret = ClientSettings.GenerateSecret();
+                descriptor.ClientSecret = newSecret;
+            }
+
+            if (application is null && await manager.FindByClientIdAsync(descriptor.ClientId!) is not null)
+            {
+                return ["Bu istemci kimliği zaten kullanılıyor."];
+            }
+
+            try
+            {
+                if (application is null)
+                {
+                    await manager.CreateAsync(descriptor);
+                }
+                else
+                {
+                    await manager.UpdateAsync(application, descriptor);
+                }
+            }
+            catch (OpenIddictExceptions.ValidationException exception)
+            {
+                newSecret = null;
+                return [.. exception.Results.Select(r => r.ErrorMessage ?? string.Empty).Where(m => m.Length > 0)];
+            }
+
+            return Ok;
+        }, null);
+        saving = false;
+
+        if (ok && errors.Count == 0)
+        {
+            Notifications.Notify(NotificationSeverity.Success, "Uygulama kaydedildi.");
+            Dialogs.Close(newSecret is null ? true : newSecret);
+        }
+    }
+}

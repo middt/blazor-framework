@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\server\Middt.Sample.Api\Middt.Sample.Api.csproj" />
+    <ProjectReference Include="..\..\identity\Middt.Identity\Middt.Identity.csproj" />
     <ProjectReference Include="..\client\blazor\Middt.Sample.BlazorServer\Middt.Sample.BlazorServer.csproj" />
     <ProjectReference Include="..\client\angular\Middt.Sample.Angular\Middt.Sample.Angular.csproj" />
   </ItemGroup>

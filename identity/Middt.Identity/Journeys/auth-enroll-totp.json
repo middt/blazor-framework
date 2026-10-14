@@ -1,0 +1,62 @@
+{
+  // Authenticator (TOTP) enrollment of a signed-in user (start.UserId): show key/QR → confirm a code → enabled.
+  "key": "auth-enroll-totp",
+  "version": 1,
+  "title": "Doğrulama uygulaması",
+  "roles": [ "idp-journey" ],
+  "timeout": { "after": "PT15M", "target": "expired" },
+  "start": {
+    "key": "start",
+    "target": "setup",
+    "input": {
+      "schema": {
+        "type": "object",
+        "required": [ "userId" ],
+        "properties": {
+          "returnUrl": { "type": "string", "maxLength": 4000 },
+          "userId": { "type": "string" },
+          "_bindingHash": { "type": "string" }
+        }
+      }
+    },
+    "onExecute": [ { "task": "idp-totp-setup" } ]
+  },
+  "states": [
+    {
+      "key": "setup",
+      "title": "Doğrulama uygulamasını kur",
+      "step": 1,
+      "view": { "component": "totp-setup" },
+      "transitions": [
+        {
+          "key": "confirm",
+          "title": "Etkinleştir",
+          "target": "check-code",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "code" ],
+              "properties": { "code": { "type": "string", "title": "Doğrulama kodu", "minLength": 6, "maxLength": 8 } }
+            },
+            "into": "form",
+            "sensitive": [ "code" ]
+          },
+          "onExecute": [ { "task": "idp-enable-totp" } ]
+        }
+      ]
+    },
+    {
+      "key": "check-code",
+      "title": "Kontrol",
+      "transitions": [
+        { "key": "code-too-many-attempts", "target": "failed", "trigger": "Automatic", "rule": "data.attemptsExceeded == true" },
+        { "key": "code-ok", "target": "enabled", "trigger": "Automatic", "rule": "data.totpEnabled == true" },
+        { "key": "code-retry", "target": "setup", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "enabled", "title": "Doğrulama uygulaması etkin", "type": "Finish", "subType": "Success" },
+    { "key": "failed", "title": "Doğrulama başarısız", "type": "Finish", "subType": "Error" },
+    { "key": "expired", "title": "Süre doldu", "type": "Finish", "subType": "Timeout" }
+  ]
+}

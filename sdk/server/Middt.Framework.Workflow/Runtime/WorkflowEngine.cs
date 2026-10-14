@@ -112,7 +112,7 @@ public sealed partial class WorkflowEngine(
         {
             // Same guarantee as RunClaimedAsync: never leave the new instance Busy; it can be retried from the start transition.
             LogUnexpected(logger, ex, instance.Id);
-            var pendingInput = request.Data?.ToJsonString();
+            var pendingInput = definition.Start.Input?.Persistable(request.Data)?.ToJsonString() ?? (definition.Start.Input is null ? request.Data?.ToJsonString() : null);
             await db.Instances.Where(i => i.Id == instance.Id && i.Status == WorkflowInstanceStatus.Busy)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(i => i.Status, WorkflowInstanceStatus.Faulted)
@@ -155,6 +155,11 @@ public sealed partial class WorkflowEngine(
         if (runAsync)
         {
             EnsureActive(snapshot);
+            if (transition.Input?.Sensitive.Count > 0)
+            {
+                throw new WorkflowValidationException(["Transitions with sensitive input cannot run asynchronously."]);
+            }
+
             db.Jobs.Add(NewJob(snapshot, WorkflowJobKind.Transition, transitionKey, snapshot.State, Now, input?.ToJsonString(), user.AuditName));
             await db.SaveChangesAsync(cancellationToken);
             jobSignal.Notify();
@@ -169,7 +174,7 @@ public sealed partial class WorkflowEngine(
                 run.CancelChildren.Add(child);
                 run.Instance.WaitingForInstanceId = null;
             }
-        }, cancellationToken, (transition.Key, input), snapshot);
+        }, cancellationToken, (transition.Key, transition.Input?.Persistable(input) ?? input), snapshot);
 
         return await ToModelAsync(run, cancellationToken);
     }
@@ -638,7 +643,7 @@ public sealed partial class WorkflowEngine(
                 }
             }
 
-            AddHistory(run, transition.Key, from, trigger, input, startedAt);
+            AddHistory(run, transition.Key, from, trigger, transition.Input?.Persistable(input) ?? input, startedAt);
             run.Events.Add(Event(run, instance.Status switch
             {
                 WorkflowInstanceStatus.Completed => WorkflowEventType.Completed,
@@ -758,9 +763,9 @@ public sealed partial class WorkflowEngine(
         }
 
         // The body is only written when a schema validated it; an input block with just "set" ignores the body.
-        if (input is not null && definition.Schema is not null)
+        if (input is not null && definition.Schema is not null && definition.Persistable(input) is { } persistable)
         {
-            JsonPath.Merge(run.Data, input, definition.Into);
+            JsonPath.Merge(run.Data, persistable, definition.Into);
         }
 
         foreach (var (path, expression) in definition.Set)
@@ -1013,7 +1018,7 @@ public sealed partial class WorkflowEngine(
     {
         run.Instance.Status = WorkflowInstanceStatus.Faulted;
         run.Instance.PendingTransition = transition.Key;
-        run.Instance.PendingInput = input?.ToJsonString();
+        run.Instance.PendingInput = (transition.Input?.Persistable(input) ?? input)?.ToJsonString();
         run.Instance.Error = error;
         if (!incidentAdded)
         {

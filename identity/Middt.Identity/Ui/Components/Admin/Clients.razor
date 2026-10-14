@@ -1,0 +1,173 @@
+@page "/admin/clients"
+
+<PageTitle>Uygulamalar</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Uygulamalar</h1>
+    <RadzenButton Icon="add" Text="Yeni uygulama" ButtonStyle="ButtonStyle.Primary" Click="CreateAsync" />
+</div>
+
+<RadzenDataGrid @ref="grid" TItem="ClientRow" Data="rows" Count="count" LoadData="LoadAsync" IsLoading="loading"
+                AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                PagingSummaryFormat="Sayfa {0} / {1} ({2} kayıt)" EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+    <Columns>
+        <RadzenDataGridColumn TItem="ClientRow" Property="ClientId" Title="İstemci kimliği" Sortable="false" />
+        <RadzenDataGridColumn TItem="ClientRow" Property="DisplayName" Title="Ad" Sortable="false" />
+        <RadzenDataGridColumn TItem="ClientRow" Title="Tür" Sortable="false">
+            <Template Context="client">
+                <RadzenBadge BadgeStyle="@(client.ClientType == OpenIddictConstants.ClientTypes.Confidential ? BadgeStyle.Info : BadgeStyle.Light)" Text="@client.ClientType" />
+                @if (client.RequirePkce)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="PKCE" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="ClientRow" Property="ConsentType" Title="İzin" Sortable="false" />
+        <RadzenDataGridColumn TItem="ClientRow" Property="RedirectUris" Title="Yönlendirme" Sortable="false" />
+        <RadzenDataGridColumn TItem="ClientRow" Title="İşlemler" Sortable="false" Width="11rem" TextAlign="TextAlign.Right">
+            <Template Context="client">
+                <RadzenButton Icon="edit" Variant="Variant.Text" Size="ButtonSize.Small" title="Düzenle" aria-label="@($"{client.ClientId} düzenle")" Click="@(() => EditAsync(client))" />
+                @if (client.ClientType == OpenIddictConstants.ClientTypes.Confidential)
+                {
+                    <RadzenButton Icon="vpn_key" Variant="Variant.Text" Size="ButtonSize.Small" title="Yeni secret üret" aria-label="@($"{client.ClientId} için yeni secret üret")" Click="@(() => RotateSecretAsync(client))" />
+                }
+                <RadzenButton Icon="delete" Variant="Variant.Text" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" title="Sil" aria-label="@($"{client.ClientId} sil")" Click="@(() => DeleteAsync(client))" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private sealed record ClientRow(string Id, string? ClientId, string? DisplayName, string? ClientType, string? ConsentType, int RedirectUris, bool RequirePkce);
+
+    private RadzenDataGrid<ClientRow>? grid;
+    private List<ClientRow> rows = [];
+    private int count;
+    private bool loading;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The grid's initial LoadData runs while prerendering and is lost with the prerendered component: load here.
+        if (firstRender && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task LoadAsync(LoadDataArgs args)
+    {
+        loading = true;
+        try
+        {
+            (rows, count) = await WithScopeAsync(async sp =>
+            {
+                var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
+                var total = (int)await manager.CountAsync();
+                var page = new List<ClientRow>();
+                await foreach (var application in manager.ListAsync(args.Top ?? 20, args.Skip ?? 0))
+                {
+                    page.Add(new ClientRow(
+                        await manager.GetIdAsync(application) ?? string.Empty,
+                        await manager.GetClientIdAsync(application),
+                        await manager.GetDisplayNameAsync(application),
+                        await manager.GetClientTypeAsync(application),
+                        await manager.GetConsentTypeAsync(application),
+                        (await manager.GetRedirectUrisAsync(application)).Length,
+                        await manager.HasRequirementAsync(application, OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange)));
+                }
+
+                return (page, total);
+            });
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (await Dialogs.OpenAsync<ClientEditDialog>("Yeni uygulama", new Dictionary<string, object?>(), new DialogOptions { Width = "760px" }) is string secret)
+        {
+            await ShowSecretAsync(secret);
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task EditAsync(ClientRow client)
+    {
+        if (await Dialogs.OpenAsync<ClientEditDialog>($"Uygulama: {client.ClientId}", new Dictionary<string, object?> { [nameof(ClientEditDialog.Id)] = client.Id }, new DialogOptions { Width = "760px" }) is string secret)
+        {
+            await ShowSecretAsync(secret);
+        }
+
+        await ReloadAsync();
+    }
+
+    private async Task RotateSecretAsync(ClientRow client)
+    {
+        if (await Dialogs.Confirm($"{client.ClientId} için yeni bir secret üretilecek; eski secret hemen geçersiz olur.", "Yeni secret",
+                new ConfirmOptions { OkButtonText = "Üret", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var secret = ClientSettings.GenerateSecret();
+        var ok = await RunAsync(async sp =>
+        {
+            var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
+            if (await manager.FindByIdAsync(client.Id) is not { } application)
+            {
+                return ["Uygulama bulunamadı."];
+            }
+
+            var descriptor = new OpenIddictApplicationDescriptor();
+            await manager.PopulateAsync(descriptor, application);
+            descriptor.ClientSecret = secret;
+            await manager.UpdateAsync(application, descriptor);
+            return Ok;
+        }, null);
+
+        if (ok)
+        {
+            await ShowSecretAsync(secret);
+        }
+    }
+
+    private async Task DeleteAsync(ClientRow client)
+    {
+        if (await Dialogs.Confirm($"{client.ClientId} ve ona ait yetkilendirmeler/tokenlar silinecek.", "Uygulamayı sil",
+                new ConfirmOptions { OkButtonText = "Sil", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var ok = await RunAsync(async sp =>
+        {
+            var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
+            if (await manager.FindByIdAsync(client.Id) is { } application)
+            {
+                await manager.DeleteAsync(application);
+            }
+
+            return Ok;
+        }, "Uygulama silindi.");
+
+        if (ok)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private Task ShowSecretAsync(string secret) =>
+        Dialogs.OpenAsync<SecretDialog>("İstemci secret", new Dictionary<string, object?> { [nameof(SecretDialog.Secret)] = secret }, new DialogOptions { Width = "560px" });
+}

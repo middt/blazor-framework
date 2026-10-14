@@ -60,6 +60,7 @@ public sealed partial class CookieSignInService(
 
     public async Task SignOutAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(httpContext);
         if (httpContext.User.FindFirst(MiddtClaimTypes.SessionId)?.Value is { } sessionId)
         {
             await EndSessionAsync(sessionId, cancellationToken);
@@ -68,9 +69,22 @@ public sealed partial class CookieSignInService(
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     }
 
-    /// <summary>Revokes the session's refresh token at the API and removes the session from the store.</summary>
-    private async Task EndSessionAsync(string sessionId, CancellationToken cancellationToken)
+    /// <summary>The identity token of the current session (OIDC mode), used as <c>id_token_hint</c> at logout.</summary>
+    public async Task<string?> GetIdTokenAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        return httpContext.User.FindFirst(MiddtClaimTypes.SessionId)?.Value is { } sessionId
+            ? Oidc.OidcTokens.GetIdToken(await tokenStore.GetAsync(sessionId, touch: false, cancellationToken))
+            : null;
+    }
+
+    /// <summary>
+    /// Revokes the session's refresh token (at the API, or at the identity provider in OIDC mode) and removes the session
+    /// from the store.
+    /// </summary>
+    public async Task EndSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sessionId);
         if (await tokenStore.GetAsync(sessionId, touch: false, cancellationToken) is { access_token: { } access, refresh_token: { } refresh })
         {
             await tokenService.RevokeAsync(access, refresh, cancellationToken);

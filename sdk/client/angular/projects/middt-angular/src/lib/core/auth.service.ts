@@ -50,6 +50,14 @@ export class AuthService {
     location.assign(loginUrl(this.#config, returnUrl));
   }
 
+  /**
+   * Full page navigation to the BFF access denied page (signed in, role missing). Never the login page: with an identity
+   * provider it signs in silently and would return to the forbidden page in a loop.
+   */
+  accessDenied(): void {
+    location.assign(this.#config.accessDeniedUrl);
+  }
+
   /** Full page navigation to the BFF logout page: ends the server session and revokes the refresh token. */
   logout(): void {
     location.assign(this.#config.logoutUrl);

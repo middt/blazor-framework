@@ -28,6 +28,11 @@ Targets **.NET 10 (LTS)**.
 | Plugins | `Middt.Framework.Plugin.Redis` | Redis connection, RedLock distributed lock, lock-protected read-through cache. |
 | Plugins | `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
 
+**Middt Identity** (`identity/Middt.Identity`, not a package): the OAuth 2.0 / OpenID Connect server of Middt
+applications – one service, configured by appsettings / environment (database, issuer, certificate, clients, users).
+Sign-in, registration, password reset and authenticator enrollment run as workflow journeys; account pages and the
+`/admin` console are Blazor. See [docs/identity.md](docs/identity.md).
+
 ### Repository layout
 
 The repository has two halves with the same shape: **`sdk/`** (the framework) and **`demo/`** (the bike store sample).
@@ -45,9 +50,10 @@ sdk/                              the framework (NuGet / npm packages)
     bff/                          Bff                                           backend-for-frontend host blocks (Blazor + Angular)
     blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
     angular/                      @middt/angular                                Angular frontend (library workspace)
+identity/Middt.Identity          the OAuth 2.0 / OpenID Connect server: one ready to run service (not an SDK package)
 demo/                             the bike store sample
   shared/                         Sample.Common · Sample.Views · ServiceDefaults
-  server/                         Sample.Api (+ Layouts/, Workflows/ seeds)
+  server/                         Sample.Api (+ Layouts/, Workflows/ seeds) · identity.json (demo settings of Middt Identity)
   client/
     blazor/                       Sample.BlazorServer
     angular/                      Sample.Angular (BFF host) · app/ (Angular demo app using @middt/angular as a package)
@@ -377,7 +383,7 @@ Publishing after `SaveChanges` is not atomic with the database write; use Rebus'
 | Workflow instances | everyone allowed by `roles` sees all instances | `"instanceAccess": { "mode": "owner", "supervisorRoles": ["manager"] }` (the demo uses it) |
 | Workflow `http` task | no redirects; any host of the definition | `AllowedHttpHosts` |
 | BFF proxy | `/api/**/token/**` is not proxied (tokens never reach JS) | `MiddtBffOptions.ProxyDeniedPaths` |
-| BFF login | per IP and per user name (failed logins) | `LoginAttemptsPerMinute`, `LoginAttemptsPerUsernamePerMinute` |
+| BFF login | per IP and per user name (failed logins); OIDC mode: password form disabled, code + PKCE at the provider | `LoginAttemptsPerMinute`, `LoginAttemptsPerUsernamePerMinute`, `Bff:Oidc` |
 | Logout | auto-submits only from the same origin (no logout CSRF) | – |
 | SPA shell | `*.html` only for signed-in users; no `Server` header | – |
 | Compression | Brotli/Gzip for API, BFF and Blazor responses (login pages excluded: BREACH) | `EnableResponseCompression` / `ResponseCompression` / `UseResponseCompression` |
@@ -396,7 +402,23 @@ server rendered Razor Pages (`/Account/Login`, `/Account/Logout`) with antiforge
 generic error messages and open-redirect protection (`LocalUrl`). Sessions have an idle and an absolute timeout,
 are revalidated every minute by the circuit, and a replayed cookie is rejected once its server session is gone.
 For more than one instance (or containers) register a shared `IDistributedCache` and persist the Data Protection keys
-(e.g. Redis, see the sample).
+(e.g. Redis, see the sample). A signed-in user without a required role gets `/Account/AccessDenied`
+(`SecuritySettings:AccessDeniedPageURL`; Blazor's `RedirectToLogin` shows "Erişim engellendi", Angular's
+`middtRoleGuard` navigates there) – never the login page, which would loop with an identity provider (silent sign-in).
+
+**Sign-in at an identity provider (OIDC mode).** Set `Bff:Oidc:Authority`, `ClientId` and `ClientSecret`
+(`MiddtBffOptions.Oidc`; env vars `Bff__Oidc__Authority`, `Bff__Oidc__ClientId`, `Bff__Oidc__ClientSecret`, optional
+`Bff__Oidc__BackchannelAuthority`, `Bff__Oidc__Scopes`, `Bff__Oidc__RequireHttpsMetadata`, `Bff__Oidc__CallbackPath`,
+`Bff__Oidc__SignedOutCallbackPath`) and `/Account/Login` redirects to the provider instead of showing the password form
+(the form post answers 404): authorization code flow with PKCE, `response_mode=query` (works with `SameSite=Lax` over
+plain http), confidential client. The callback (`/signin-oidc`) creates the same server side session as the password
+login – fresh session id, access/refresh/identity token in `IServerTokenStore`, a cookie with only `ClaimTypes.Name`,
+`Role`, `NameIdentifier`, `Email` and the session id – and ends a previous session of the browser. Token refresh
+(`BffTokenAccessor`, Blazor's session state) and revocation go to the provider's token/revocation endpoints
+(`OidcTokenService`). `POST /Account/Logout` revokes the refresh token, ends the local session and navigates to the
+provider's end-session endpoint (`id_token_hint`, back via `/signout-callback-oidc` to `/`). Server-to-server calls can go
+to an internal URL (`BackchannelAuthority`, `BackchannelRewriteHandler`) while issuer and browser redirects keep the
+public one. Without `Bff:Oidc:Authority` everything works as before (password form → API token controller).
 
 **SPA (Angular) calls.** The Angular app never sees a token: it calls `/api/**` and `/hubs/**` on its own origin and the
 BFF forwards them to the API (YARP) with the session's access token, refreshing it shortly before it expires (single
@@ -411,6 +433,15 @@ lifetime; replaying a used refresh token revokes the whole family (OAuth 2.0 Sec
 via `POST token/revoke`. Implement `CheckUsernamePasswordAsync` with a salted password hash (e.g. ASP.NET Core Identity's
 `PasswordHasher`) and `LoadUserAsync` so disabled users lose access on the next refresh. Keep `JwtSettings:Secret`
 (≥ 32 chars) in a secret store / environment variable.
+
+**Tokens of an identity provider (API authority mode).** With `Authentication:Authority` (or
+`MiddtApiOptions.Authority`; env var `Authentication__Authority`) the API validates RS256 access tokens of that OpenID
+Connect provider instead of its own HS256 tokens: signing keys from discovery, issuer = the authority, audience
+`Authentication:Audience` (default `middt-api`), `Authentication:RequireHttpsMetadata` (default: outside Development),
+discovery/JWKS through `Authentication:BackchannelAuthority` when set. OIDC claims are mapped to the claim types the
+framework reads (`name` → `ClaimTypes.Name`, every `role` → `ClaimTypes.Role`, `sub` → `ClaimTypes.NameIdentifier` and
+`ClaimTypes.Sid`, `email` → `ClaimTypes.Email`); SignalR's `access_token` query parameter keeps working under
+`HubPathPrefix`. `JwtSettings` are optional in this mode (only needed if the app still hosts a `BaseTokenController`).
 
 **Authorization & mass assignment.** `BaseCrudControllerWithAuth` requires an authenticated user. Updates load the stored
 record and copy only editable scalar columns (`ApplyUpdate`): keys, navigations, store generated columns and
@@ -436,7 +467,7 @@ token reuse; personal data is kept out of logs; vulnerable transitive packages a
 
 ## Running the sample
 
-The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the API, the Blazor UI and the Angular UI. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
+The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the OAuth 2.0 / OpenID Connect identity provider, the API, the Blazor UI and the Angular UI. Both UIs sign in at the identity provider (authorization code + PKCE through their BFF) and the API accepts its access tokens. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
 
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
@@ -451,13 +482,15 @@ The Aspire dashboard shows all resources, logs, traces and metrics. Set the SQL 
 **With Docker Compose:**
 
 ```bash
-cp .env.example .env    # then set JWT_SECRET, MSSQL_SA_PASSWORD, RABBITMQ_DEFAULT_USER / _PASS
+cp .env.example .env    # then set IDP_BLAZOR_CLIENT_SECRET, IDP_ANGULAR_CLIENT_SECRET, MSSQL_SA_PASSWORD, RABBITMQ_DEFAULT_USER / _PASS
 docker compose up --build
 ```
 
-Blazor UI: <http://localhost:8080> · Angular UI: <http://localhost:8081> (same screens, layouts and workflows) · login
-page `/Account/Login`, demo user `test@test.com` / `test` (roles `manager` and `ui-admin`) · layout editor: `/ui-admin` ·
-API reference: <http://localhost:8180/scalar>.
+Blazor UI: <http://localhost:8080> · Angular UI: <http://localhost:8081> (same screens, layouts and workflows) ·
+identity provider: <http://localhost:8083> (login, registration, password reset, authenticator, `/admin` console,
+`/dev/mailbox` for verification codes) · demo users `test@test.com` / `test` (roles `manager`, `ui-admin`, `idp-admin`)
+and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference: <http://localhost:8180/scalar>.
+Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
 
 ## Development
 

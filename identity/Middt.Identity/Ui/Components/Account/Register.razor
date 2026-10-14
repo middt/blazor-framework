@@ -1,0 +1,25 @@
+@page "/account/register"
+@attribute [ExcludeFromInteractiveRouting]
+@layout AccountLayout
+@inherits JourneyStartPage
+@inject IOptions<MiddtIdentityOptions> IdentityOptions
+
+<PageTitle>Hesap oluştur</PageTitle>
+@if (Disabled)
+{
+    <section class="idp-card" aria-labelledby="idp-register-title">
+        <h1 id="idp-register-title" class="idp-title">Kayıt kapalı</h1>
+        <p>Bu sistemde yeni hesap oluşturulamıyor. Lütfen yöneticinize başvurun.</p>
+        <a class="idp-button idp-button-secondary" href="@MiddtIdentityDefaults.LoginPath">Oturum aç</a>
+    </section>
+}
+else
+{
+    <p class="idp-muted" role="status">Kayıt sayfasına yönlendiriliyorsunuz…</p>
+}
+
+@code {
+    protected override string Journey => AuthJourneys.Register;
+
+    protected override bool Disabled => !IdentityOptions.Value.AllowRegistration;
+}

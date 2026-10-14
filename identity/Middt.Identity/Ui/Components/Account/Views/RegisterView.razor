@@ -1,0 +1,23 @@
+@* View "register" (auth-register, step details). *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">Hesap oluştur</h1>
+<p class="idp-subtitle">Bilgilerinizi girin; e-posta adresinize bir doğrulama kodu göndereceğiz.</p>
+
+<ErrorSummary Errors="Errors" />
+
+<JourneyForm Action="submit-details">
+    <InputField Id="Input_Username" Name="userName" Label="Kullanıcı adı" Autocomplete="username"
+                Value="@Value("userName")" Required="true" Autofocus="true" MaxLength="256" />
+    <InputField Id="Input_Email" Name="email" Label="E-posta" Type="email" Autocomplete="email"
+                Value="@Value("email")" Required="true" MaxLength="256" />
+    <InputField Id="Input_DisplayName" Name="displayName" Label="Ad soyad" Autocomplete="name"
+                Value="@Value("displayName")" MaxLength="256" />
+    <InputField Id="Input_Password" Name="password" Label="Şifre" Type="password" Autocomplete="new-password" Required="true"
+                Hint="En az 6 karakter; büyük/küçük harf, rakam ve sembol içermesi önerilir." />
+    <InputField Id="Input_ConfirmPassword" Name="@JourneyInputMapper.ConfirmPasswordField" Label="Şifre (tekrar)" Type="password"
+                Autocomplete="new-password" Required="true" />
+    <button type="submit" class="idp-button idp-button-primary idp-button-block">@Title("submit-details", "Hesap oluştur")</button>
+</JourneyForm>
+
+<p class="idp-alt">Zaten hesabınız var mı? <a href="@LoginUrl">Oturum açın</a></p>

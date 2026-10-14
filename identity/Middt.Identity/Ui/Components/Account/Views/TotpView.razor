@@ -1,0 +1,21 @@
+@* View "totp" (auth-login, step mfa): code of the authenticator app. *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">İki adımlı doğrulama</h1>
+<p class="idp-subtitle">
+    @if (Data("userName") is { Length: > 0 } user)
+    {
+        <span><strong>@user</strong> hesabı için </span>
+    }
+    doğrulayıcı uygulamanızdaki 6 haneli kodu girin.
+</p>
+
+<ErrorSummary Errors="Errors" />
+
+<JourneyForm Action="submit-totp">
+    <InputField Id="Input_Code" Name="code" Label="Doğrulama kodu" Autocomplete="one-time-code" InputMode="numeric"
+                Required="true" Autofocus="true" MaxLength="10" pattern="[0-9 ]*" />
+    <button type="submit" class="idp-button idp-button-primary idp-button-block">@Title("submit-totp", "Doğrula")</button>
+</JourneyForm>
+
+<p class="idp-alt"><a href="@LoginUrl">Farklı bir hesapla oturum açın</a></p>

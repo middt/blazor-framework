@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Bff.Hosting;
+using Middt.Framework.Bff.Oidc;
 using Middt.Framework.Bff.Proxy;
 using Middt.Framework.Bff.Security;
 using Middt.Framework.Client.DependencyInjection;
@@ -61,6 +62,13 @@ public sealed class MiddtBffOptions
 
     /// <summary>Request paths answered with 401/403 instead of a redirect to the login page (API style endpoints).</summary>
     public IList<string> ApiPathPrefixes { get; } = ["/api", "/hubs", "/bff", "/_blazor"];
+
+    /// <summary>
+    /// OpenID Connect sign-in at an identity provider (bound from configuration <c>Bff:Oidc</c> before the configure
+    /// callback runs). Off unless <see cref="MiddtBffOidcOptions.Authority"/> is set; then <c>/Account/Login</c> redirects to
+    /// the provider and the password form is disabled.
+    /// </summary>
+    public MiddtBffOidcOptions Oidc { get; } = new();
 }
 
 /// <summary>
@@ -87,6 +95,7 @@ public static class MiddtBffExtensions
     private static MiddtBffOptions AddMiddtBffCore(WebApplicationBuilder builder, Action<MiddtBffOptions>? configure)
     {
         var options = new MiddtBffOptions();
+        builder.Configuration.GetSection(MiddtBffOidcOptions.SectionName).Bind(options.Oidc);
         configure?.Invoke(options);
 
         var services = builder.Services;
@@ -122,8 +131,10 @@ public static class MiddtBffExtensions
             services.AddHostedService<ForwardedHeadersStartupWarning>();
         }
 
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(cookie =>
+        // The cookie stays the default (challenge) scheme in both modes: page navigations are redirected to
+        // /Account/Login (which challenges the identity provider in OIDC mode), API style paths get 401/403.
+        var authentication = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
+        authentication.AddCookie(cookie =>
             {
                 cookie.Cookie.Name = options.CookieName;
                 cookie.Cookie.HttpOnly = true;
@@ -131,11 +142,11 @@ public static class MiddtBffExtensions
                 cookie.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 cookie.LoginPath = securitySettings.LoginPageURL;
                 cookie.LogoutPath = securitySettings.LogoutPageURL;
-                cookie.AccessDeniedPath = securitySettings.LoginPageURL;
+                cookie.AccessDeniedPath = securitySettings.AccessDeniedPageURL;
                 cookie.ExpireTimeSpan = TimeSpan.FromMinutes(generalSettings.SessionAbsoluteTimeoutInMinute);
                 cookie.SlidingExpiration = false;
                 cookie.Events.OnValidatePrincipal = ValidateServerSessionAsync;
-                // API style requests get status codes; page navigations are redirected to the login page.
+                // API style requests get status codes; page navigations are redirected to the login / access denied page.
                 cookie.Events.OnRedirectToLogin = context => StatusOrRedirect(context, StatusCodes.Status401Unauthorized, options);
                 cookie.Events.OnRedirectToAccessDenied = context => StatusOrRedirect(context, StatusCodes.Status403Forbidden, options);
             });
@@ -154,6 +165,12 @@ public static class MiddtBffExtensions
         });
 
         services.AddMiddtApiClients(configuration);
+        if (options.Oidc.IsEnabled)
+        {
+            // After AddMiddtApiClients: replaces its ITokenService with the identity provider's token endpoints.
+            BffOidc.Add(authentication, options.Oidc, options.CookieName, builder.Environment);
+        }
+
         services.AddHealthChecks();
         return options;
     }

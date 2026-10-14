@@ -1,0 +1,20 @@
+@* Layout of the account pages (static server rendering). Enhanced navigation is off: journeys end with redirects to
+   other origins (OIDC clients), which must be full page loads. *@
+@inherits LayoutComponentBase
+@inject IOptions<MiddtIdentityUiOptions> Options
+
+<div class="idp-shell" data-enhance-nav="false">
+    <a class="idp-skip" href="#idp-main">İçeriğe geç</a>
+    <header class="idp-header">
+        <a class="idp-brand" href="/">
+            <span class="idp-brand-mark" aria-hidden="true">M</span>
+            <span>@Options.Value.ProductName</span>
+        </a>
+    </header>
+    <main id="idp-main" class="idp-main">
+        @Body
+    </main>
+    <footer class="idp-footer">
+        <span>&copy; @DateTime.UtcNow.Year @Options.Value.ProductName</span>
+    </footer>
+</div>

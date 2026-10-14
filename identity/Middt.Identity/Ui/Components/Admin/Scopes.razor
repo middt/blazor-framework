@@ -1,0 +1,103 @@
+@page "/admin/scopes"
+
+<PageTitle>Kapsamlar</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Kapsamlar</h1>
+    <RadzenButton Icon="add" Text="Yeni kapsam" ButtonStyle="ButtonStyle.Primary" Click="@(() => EditAsync(null))" />
+</div>
+
+<RadzenDataGrid @ref="grid" TItem="ScopeRow" Data="rows" Count="count" LoadData="LoadAsync" IsLoading="loading"
+                AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+    <Columns>
+        <RadzenDataGridColumn TItem="ScopeRow" Property="Name" Title="Ad" Sortable="false" />
+        <RadzenDataGridColumn TItem="ScopeRow" Property="DisplayName" Title="Görünen ad" Sortable="false" />
+        <RadzenDataGridColumn TItem="ScopeRow" Property="Resources" Title="Kaynaklar (audience)" Sortable="false" />
+        <RadzenDataGridColumn TItem="ScopeRow" Title="İşlemler" Sortable="false" Width="8rem" TextAlign="TextAlign.Right">
+            <Template Context="scope">
+                <RadzenButton Icon="edit" Variant="Variant.Text" Size="ButtonSize.Small" title="Düzenle" aria-label="@($"{scope.Name} düzenle")" Click="@(() => EditAsync(scope.Id))" />
+                <RadzenButton Icon="delete" Variant="Variant.Text" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" title="Sil" aria-label="@($"{scope.Name} sil")" Click="@(() => DeleteAsync(scope))" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private sealed record ScopeRow(string Id, string? Name, string? DisplayName, string Resources);
+
+    private RadzenDataGrid<ScopeRow>? grid;
+    private List<ScopeRow> rows = [];
+    private int count;
+    private bool loading;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The grid's initial LoadData runs while prerendering and is lost with the prerendered component: load here.
+        if (firstRender && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task LoadAsync(LoadDataArgs args)
+    {
+        loading = true;
+        try
+        {
+            (rows, count) = await WithScopeAsync(async sp =>
+            {
+                var manager = sp.GetRequiredService<IOpenIddictScopeManager>();
+                var total = (int)await manager.CountAsync();
+                var page = new List<ScopeRow>();
+                await foreach (var scope in manager.ListAsync(args.Top ?? 20, args.Skip ?? 0))
+                {
+                    page.Add(new ScopeRow(
+                        await manager.GetIdAsync(scope) ?? string.Empty,
+                        await manager.GetNameAsync(scope),
+                        await manager.GetDisplayNameAsync(scope),
+                        string.Join(", ", await manager.GetResourcesAsync(scope))));
+                }
+
+                return (page, total);
+            });
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task EditAsync(string? id)
+    {
+        if (await Dialogs.OpenAsync<ScopeEditDialog>(id is null ? "Yeni kapsam" : "Kapsamı düzenle",
+                new Dictionary<string, object?> { [nameof(ScopeEditDialog.Id)] = id }, new DialogOptions { Width = "560px" }) is true && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+
+    private async Task DeleteAsync(ScopeRow scope)
+    {
+        if (await Dialogs.Confirm($"{scope.Name} kapsamı silinecek. Bu kapsamı kullanan uygulamaların izinleri ayrıca güncellenmelidir.", "Kapsamı sil",
+                new ConfirmOptions { OkButtonText = "Sil", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var ok = await RunAsync(async sp =>
+        {
+            var manager = sp.GetRequiredService<IOpenIddictScopeManager>();
+            if (await manager.FindByIdAsync(scope.Id) is { } entity)
+            {
+                await manager.DeleteAsync(entity);
+            }
+
+            return Ok;
+        }, "Kapsam silindi.");
+
+        if (ok && grid is not null)
+        {
+            await grid.Reload();
+        }
+    }
+}

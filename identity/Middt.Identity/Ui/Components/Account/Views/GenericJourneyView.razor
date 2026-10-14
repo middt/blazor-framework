@@ -1,0 +1,73 @@
+@* Fallback for journey states without a registered view: one form per action, fields from the action's JSON schema. *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">@(State.StateTitle ?? "Devam edin")</h1>
+
+<ErrorSummary Errors="Errors" />
+
+@{
+    var first = true;
+}
+@foreach (var action in State.Actions)
+{
+    var fields = JourneyInputMapper.Fields(action.InputSchema);
+    <JourneyForm Action="@action.Key" CssClass="@(fields.Count == 0 ? "idp-form idp-form-inline" : "idp-form")">
+        @foreach (var field in fields)
+        {
+            var id = FieldId(action.Key, field.Name);
+            var autofocus = first;
+            first = false;
+            switch (field.Kind)
+            {
+                case JourneyFieldKind.Boolean:
+                    <div class="idp-check">
+                        <input id="@id" name="@field.Name" type="checkbox" value="true" checked="@(Value(field.Name) is "true" or "on")" autofocus="@autofocus" />
+                        <label for="@id">@field.Title</label>
+                    </div>
+                    break;
+                case JourneyFieldKind.Enum:
+                    <div class="idp-field">
+                        <label for="@id">@field.Title</label>
+                        <select id="@id" name="@field.Name" required="@field.Required" autofocus="@autofocus" class="idp-input">
+                            @if (!field.Required)
+                            {
+                                <option value="">Seçiniz</option>
+                            }
+                            @foreach (var option in field.EnumValues)
+                            {
+                                <option value="@option" selected="@(Value(field.Name) == option)">@option</option>
+                            }
+                        </select>
+                    </div>
+                    break;
+                default:
+                    <InputField Id="@id" Name="@field.Name" Label="@field.Title" Type="@InputType(field.Kind)" Autocomplete="@field.Autocomplete"
+                                InputMode="@(field.Kind is JourneyFieldKind.Code or JourneyFieldKind.WholeNumber ? "numeric" : field.Kind == JourneyFieldKind.Number ? "decimal" : null)"
+                                Value="@(field.Sensitive ? null : Value(field.Name))" Required="field.Required" Autofocus="autofocus"
+                                MaxLength="field.MaxLength" Hint="@field.Description" />
+                    break;
+            }
+        }
+        <button type="submit" class="idp-button @(fields.Count > 0 || action == State.Actions[0] ? "idp-button-primary" : "idp-button-secondary")" autofocus="@(fields.Count == 0 && first && action == State.Actions[0])">
+            @(action.Title ?? action.Key)
+        </button>
+    </JourneyForm>
+}
+
+@if (State.Actions.Count == 0)
+{
+    <p class="idp-muted">Bu adımda yapılacak bir işlem yok.</p>
+}
+
+@code {
+    private static string FieldId(string action, string field) =>
+        "Input_" + new string([.. (action + "_" + field).Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_')]);
+
+    private static string InputType(JourneyFieldKind kind) => kind switch
+    {
+        JourneyFieldKind.Password => "password",
+        JourneyFieldKind.Email => "email",
+        JourneyFieldKind.WholeNumber or JourneyFieldKind.Number => "number",
+        _ => "text",
+    };
+}

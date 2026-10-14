@@ -1,0 +1,15 @@
+@* View "reset-request" (auth-reset-password, step request). *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">Şifremi unuttum</h1>
+<p class="idp-subtitle">Hesabınıza kayıtlı e-posta adresini girin; şifrenizi yenilemeniz için bir doğrulama kodu göndereceğiz.</p>
+
+<ErrorSummary Errors="Errors" />
+
+<JourneyForm Action="submit-email">
+    <InputField Id="Input_Email" Name="email" Label="E-posta" Type="email" Autocomplete="email"
+                Value="@Value("email")" Required="true" Autofocus="true" MaxLength="256" />
+    <button type="submit" class="idp-button idp-button-primary idp-button-block">@Title("submit-email", "Kod gönder")</button>
+</JourneyForm>
+
+<p class="idp-alt"><a href="@LoginUrl">Oturum açma sayfasına dön</a></p>

@@ -1,0 +1,35 @@
+@* View "totp-setup" (auth-enroll-totp): QR code / shared key of the authenticator app, then confirm with a code. *@
+@inherits JourneyViewBase
+
+<h1 class="idp-title">Doğrulayıcı uygulama ekle</h1>
+
+<ErrorSummary Errors="Errors" />
+
+<ol class="idp-steps">
+    <li>
+        <p>Doğrulayıcı uygulamanızla (Microsoft Authenticator, Google Authenticator, …) bu kodu tarayın:</p>
+        @if (QrCodeSvg.Create(Data("totpUri")) is { } svg)
+        {
+            <div class="idp-qr" role="img" aria-label="Doğrulayıcı uygulama için QR kodu">@((MarkupString)svg)</div>
+        }
+        @if (SharedKey is { } key)
+        {
+            <p>Tarayamıyorsanız anahtarı elle girin:</p>
+            <p><code class="idp-key">@QrCodeSvg.FormatKey(key)</code></p>
+        }
+    </li>
+    <li>
+        <p>Uygulamanın gösterdiği 6 haneli kodu girin:</p>
+        <JourneyForm Action="confirm">
+            <InputField Id="Input_Code" Name="code" Label="Doğrulama kodu" Autocomplete="one-time-code" InputMode="numeric"
+                        Required="true" Autofocus="true" MaxLength="10" pattern="[0-9 ]*" />
+            <button type="submit" class="idp-button idp-button-primary idp-button-block">@Title("confirm", "Etkinleştir")</button>
+        </JourneyForm>
+    </li>
+</ol>
+
+<p class="idp-alt"><a href="@MiddtIdentityUi.SecurityPath">Vazgeç</a></p>
+
+@code {
+    private string? SharedKey => Data("totpKey") ?? Data("sharedKey") ?? Data("key");
+}

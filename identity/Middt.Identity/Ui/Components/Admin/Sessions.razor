@@ -1,0 +1,301 @@
+@page "/admin/sessions"
+
+<PageTitle>Oturumlar</PageTitle>
+
+<div class="idp-admin-toolbar">
+    <h1 class="idp-admin-title">Oturumlar</h1>
+    <form class="idp-admin-search" role="search" @onsubmit="LoadAsync">
+        <RadzenTextBox @bind-Value="userFilter" Placeholder="Kullanıcı adı, e-posta veya id" aria-label="Kullanıcıya göre filtrele" />
+        <RadzenTextBox @bind-Value="clientFilter" Placeholder="İstemci kimliği" aria-label="Uygulamaya göre filtrele" />
+        <RadzenButton ButtonType="ButtonType.Submit" Icon="search" Text="Listele" ButtonStyle="ButtonStyle.Base" />
+    </form>
+    @if (subject is not null)
+    {
+        <RadzenButton Icon="block" Text="Kullanıcının tümünü iptal et" ButtonStyle="ButtonStyle.Danger" Click="RevokeAllAsync" />
+    }
+</div>
+
+@if (message is not null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info" Shade="Shade.Lighter" AllowClose="false">@message</RadzenAlert>
+}
+
+<RadzenTabs RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <RadzenTabsItem Text="@($"Yetkilendirmeler ({authorizations.Count})")">
+            <RadzenDataGrid TItem="AuthorizationRow" Data="authorizations" IsLoading="loading" AllowPaging="true" PageSize="20" AllowSorting="true"
+                            EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+                <Columns>
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="UserName" Title="Kullanıcı" />
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="Client" Title="Uygulama" />
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="Type" Title="Tür" />
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="Status" Title="Durum">
+                        <Template Context="row"><StatusBadge Status="@row.Status" /></Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="Scopes" Title="Kapsamlar" />
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Property="CreatedAt" Title="Oluşturma" FormatString="{0:dd.MM.yyyy HH:mm}" />
+                    <RadzenDataGridColumn TItem="AuthorizationRow" Title="" Sortable="false" Width="7rem" TextAlign="TextAlign.Right">
+                        <Template Context="row">
+                            @if (row.Status == OpenIddictConstants.Statuses.Valid)
+                            {
+                                <RadzenButton Text="İptal et" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined"
+                                              aria-label="@($"{row.UserName} / {row.Client} yetkilendirmesini iptal et")" Click="@(() => RevokeAuthorizationAsync(row))" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="@($"Tokenlar ({tokens.Count})")">
+            <RadzenDataGrid TItem="TokenRow" Data="tokens" IsLoading="loading" AllowPaging="true" PageSize="20" AllowSorting="true"
+                            EmptyText="Kayıt bulunamadı." Density="Density.Compact">
+                <Columns>
+                    <RadzenDataGridColumn TItem="TokenRow" Property="UserName" Title="Kullanıcı" />
+                    <RadzenDataGridColumn TItem="TokenRow" Property="Client" Title="Uygulama" />
+                    <RadzenDataGridColumn TItem="TokenRow" Property="Type" Title="Tür" />
+                    <RadzenDataGridColumn TItem="TokenRow" Property="Status" Title="Durum">
+                        <Template Context="row"><StatusBadge Status="@row.Status" /></Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="TokenRow" Property="CreatedAt" Title="Oluşturma" FormatString="{0:dd.MM.yyyy HH:mm}" />
+                    <RadzenDataGridColumn TItem="TokenRow" Property="ExpiresAt" Title="Bitiş" FormatString="{0:dd.MM.yyyy HH:mm}" />
+                    <RadzenDataGridColumn TItem="TokenRow" Title="" Sortable="false" Width="7rem" TextAlign="TextAlign.Right">
+                        <Template Context="row">
+                            @if (row.Status == OpenIddictConstants.Statuses.Valid)
+                            {
+                                <RadzenButton Text="İptal et" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Outlined"
+                                              aria-label="@($"{row.UserName} / {row.Client} tokenını iptal et")" Click="@(() => RevokeTokenAsync(row))" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+@code {
+    private const int Limit = 200;
+
+    private sealed record AuthorizationRow(string Id, string? UserName, string? Client, string? Type, string? Status, string Scopes, DateTimeOffset? CreatedAt);
+
+    private sealed record TokenRow(string Id, string? UserName, string? Client, string? Type, string? Status, DateTimeOffset? CreatedAt, DateTimeOffset? ExpiresAt);
+
+    private List<AuthorizationRow> authorizations = [];
+    private List<TokenRow> tokens = [];
+    private string? userFilter;
+    private string? clientFilter;
+    private string? subject;
+    private string? message;
+    private bool loading;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        message = null;
+        try
+        {
+            await WithScopeAsync(async sp =>
+            {
+                var users = sp.GetRequiredService<UserManager<MiddtIdentityUser>>();
+                var applications = sp.GetRequiredService<IOpenIddictApplicationManager>();
+                var authorizationManager = sp.GetRequiredService<IOpenIddictAuthorizationManager>();
+                var tokenManager = sp.GetRequiredService<IOpenIddictTokenManager>();
+
+                subject = null;
+                string? applicationId = null;
+                if (!string.IsNullOrWhiteSpace(userFilter))
+                {
+                    var term = userFilter.Trim();
+                    var user = await users.FindByNameAsync(term) ?? await users.FindByEmailAsync(term) ?? await users.FindByIdAsync(term);
+                    if (user is null)
+                    {
+                        message = "Kullanıcı bulunamadı.";
+                        authorizations = [];
+                        tokens = [];
+                        return true;
+                    }
+
+                    subject = user.Id;
+                }
+
+                if (!string.IsNullOrWhiteSpace(clientFilter))
+                {
+                    var application = await applications.FindByClientIdAsync(clientFilter.Trim());
+                    if (application is null)
+                    {
+                        message = "Uygulama bulunamadı.";
+                        authorizations = [];
+                        tokens = [];
+                        return true;
+                    }
+
+                    applicationId = await applications.GetIdAsync(application);
+                }
+
+                var userNames = new Dictionary<string, string?>(StringComparer.Ordinal);
+                var clientIds = new Dictionary<string, string?>(StringComparer.Ordinal);
+
+                async Task<string?> UserNameAsync(string? id)
+                {
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        return null;
+                    }
+
+                    if (!userNames.TryGetValue(id, out var name))
+                    {
+                        name = (await users.FindByIdAsync(id))?.UserName ?? id;
+                        userNames[id] = name;
+                    }
+
+                    return name;
+                }
+
+                async Task<string?> ClientIdAsync(string? id)
+                {
+                    if (string.IsNullOrEmpty(id))
+                    {
+                        return null;
+                    }
+
+                    if (!clientIds.TryGetValue(id, out var clientId))
+                    {
+                        clientId = await applications.FindByIdAsync(id) is { } app ? await applications.GetClientIdAsync(app) : id;
+                        clientIds[id] = clientId;
+                    }
+
+                    return clientId;
+                }
+
+                var authorizationSource = subject is not null ? authorizationManager.FindBySubjectAsync(subject)
+                    : applicationId is not null ? authorizationManager.FindByApplicationIdAsync(applicationId)
+                    : authorizationManager.ListAsync(Limit, 0);
+                var authorizationRows = new List<AuthorizationRow>();
+                // Materialized first: the row details below query the database again (no MARS on SQL Server).
+                foreach (var authorization in await authorizationSource.ToListAsync())
+                {
+                    var appId = await authorizationManager.GetApplicationIdAsync(authorization);
+                    if (applicationId is not null && appId != applicationId)
+                    {
+                        continue;
+                    }
+
+                    authorizationRows.Add(new AuthorizationRow(
+                        await authorizationManager.GetIdAsync(authorization) ?? string.Empty,
+                        await UserNameAsync(await authorizationManager.GetSubjectAsync(authorization)),
+                        await ClientIdAsync(appId),
+                        await authorizationManager.GetTypeAsync(authorization),
+                        await authorizationManager.GetStatusAsync(authorization),
+                        string.Join(' ', await authorizationManager.GetScopesAsync(authorization)),
+                        await authorizationManager.GetCreationDateAsync(authorization)));
+                    if (authorizationRows.Count >= Limit)
+                    {
+                        break;
+                    }
+                }
+
+                var tokenSource = subject is not null ? tokenManager.FindBySubjectAsync(subject)
+                    : applicationId is not null ? tokenManager.FindByApplicationIdAsync(applicationId)
+                    : tokenManager.ListAsync(Limit, 0);
+                var tokenRows = new List<TokenRow>();
+                foreach (var token in await tokenSource.ToListAsync())
+                {
+                    var appId = await tokenManager.GetApplicationIdAsync(token);
+                    if (applicationId is not null && appId != applicationId)
+                    {
+                        continue;
+                    }
+
+                    tokenRows.Add(new TokenRow(
+                        await tokenManager.GetIdAsync(token) ?? string.Empty,
+                        await UserNameAsync(await tokenManager.GetSubjectAsync(token)),
+                        await ClientIdAsync(appId),
+                        await tokenManager.GetTypeAsync(token),
+                        await tokenManager.GetStatusAsync(token),
+                        await tokenManager.GetCreationDateAsync(token),
+                        await tokenManager.GetExpirationDateAsync(token)));
+                    if (tokenRows.Count >= Limit)
+                    {
+                        break;
+                    }
+                }
+
+                authorizations = [.. authorizationRows.OrderByDescending(r => r.CreatedAt)];
+                tokens = [.. tokenRows.OrderByDescending(r => r.CreatedAt)];
+                if (subject is null && applicationId is null && (authorizations.Count >= Limit || tokens.Count >= Limit))
+                {
+                    message = $"İlk {Limit} kayıt gösteriliyor; kullanıcı veya uygulamaya göre filtreleyin.";
+                }
+
+                return true;
+            });
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RevokeAuthorizationAsync(AuthorizationRow row)
+    {
+        if (await Dialogs.Confirm("Yetkilendirme ve ona bağlı tüm tokenlar iptal edilecek.", "İptal et",
+                new ConfirmOptions { OkButtonText = "İptal et", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        if (await RunAsync(async sp =>
+            {
+                var manager = sp.GetRequiredService<IOpenIddictAuthorizationManager>();
+                if (await manager.FindByIdAsync(row.Id) is { } authorization)
+                {
+                    await manager.TryRevokeAsync(authorization);
+                }
+
+                await sp.GetRequiredService<IOpenIddictTokenManager>().RevokeByAuthorizationIdAsync(row.Id);
+                return Ok;
+            }, "Yetkilendirme iptal edildi."))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task RevokeTokenAsync(TokenRow row)
+    {
+        if (await RunAsync(async sp =>
+            {
+                var manager = sp.GetRequiredService<IOpenIddictTokenManager>();
+                if (await manager.FindByIdAsync(row.Id) is { } token)
+                {
+                    await manager.TryRevokeAsync(token);
+                }
+
+                return Ok;
+            }, "Token iptal edildi."))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task RevokeAllAsync()
+    {
+        var id = subject;
+        if (id is null || await Dialogs.Confirm("Kullanıcının tüm yetkilendirmeleri ve tokenları iptal edilecek; uygulamalarda yeniden oturum açması gerekir.", "Tümünü iptal et",
+                new ConfirmOptions { OkButtonText = "Tümünü iptal et", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        if (await RunAsync(async sp =>
+            {
+                await sp.GetRequiredService<IOpenIddictAuthorizationManager>().RevokeBySubjectAsync(id);
+                await sp.GetRequiredService<IOpenIddictTokenManager>().RevokeBySubjectAsync(id);
+                return Ok;
+            }, "Kullanıcının tüm oturumları iptal edildi."))
+        {
+            await LoadAsync();
+        }
+    }
+}

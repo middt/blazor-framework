@@ -1,0 +1,174 @@
+@page "/account/security"
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [Authorize(Policy = MiddtIdentityUi.AccountPolicy)]
+@layout AccountLayout
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.Net.Http.Headers
+@inject UserManager<MiddtIdentityUser> Users
+@inject IAuthJourneyService Journeys
+@inject NavigationManager Navigation
+
+<PageTitle>Hesap güvenliği</PageTitle>
+
+<section class="idp-card idp-card-wide" aria-labelledby="idp-security-title">
+    <h1 id="idp-security-title" class="idp-title">Hesap güvenliği</h1>
+
+    @if (StatusText is { } status)
+    {
+        <div class="idp-alert idp-alert-success" role="status">@status</div>
+    }
+
+    @if (user is null)
+    {
+        <p>Oturumunuzun süresi doldu. Lütfen yeniden oturum açın.</p>
+        <a class="idp-button idp-button-primary" href="@JourneyLinks.WithReturnUrl(MiddtIdentityDefaults.LoginPath, MiddtIdentityUi.SecurityPath)">Oturum aç</a>
+    }
+    else
+    {
+        <dl class="idp-summary">
+            <dt>Kullanıcı adı</dt>
+            <dd>@user.UserName</dd>
+            <dt>E-posta</dt>
+            <dd>@(user.Email ?? "–")</dd>
+            @if (!string.IsNullOrEmpty(user.DisplayName))
+            {
+                <dt>Ad</dt>
+                <dd>@user.DisplayName</dd>
+            }
+        </dl>
+
+        <h2 class="idp-section-title">İki adımlı doğrulama</h2>
+        @if (user.TwoFactorEnabled)
+        {
+            <p><span class="idp-badge idp-badge-success">Etkin</span> Oturum açarken doğrulayıcı uygulamanızdaki kod istenir.</p>
+            <div class="idp-actions">
+                <form method="post" @formname="enroll-totp" @onsubmit="EnrollAsync" class="idp-form-inline">
+                    <AntiforgeryToken />
+                    <button type="submit" class="idp-button idp-button-secondary">Yeni cihaz kur</button>
+                </form>
+                <form method="post" @formname="disable-totp" @onsubmit="DisableTotpAsync" class="idp-form-inline">
+                    <AntiforgeryToken />
+                    <button type="submit" class="idp-button idp-button-danger">Devre dışı bırak</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <p><span class="idp-badge">Kapalı</span> Hesabınızı korumak için bir doğrulayıcı uygulama ekleyin.</p>
+            <form method="post" @formname="enroll-totp" @onsubmit="EnrollAsync" class="idp-form-inline">
+                <AntiforgeryToken />
+                <button type="submit" class="idp-button idp-button-primary">Doğrulayıcı uygulama ekle</button>
+            </form>
+        }
+
+        <h2 class="idp-section-title" id="change-password">Şifre değiştir</h2>
+        <ErrorSummary Errors="passwordErrors" Id="idp-password-errors" />
+        <form method="post" @formname="change-password" @onsubmit="ChangePasswordAsync" class="idp-form">
+            <AntiforgeryToken />
+            @if (hasPassword)
+            {
+                <InputField Id="Input_CurrentPassword" Name="currentPassword" Label="Mevcut şifre" Type="password" Autocomplete="current-password" Required="true" />
+            }
+            <InputField Id="Input_NewPassword" Name="newPassword" Label="Yeni şifre" Type="password" Autocomplete="new-password" Required="true" />
+            <InputField Id="Input_ConfirmPassword" Name="confirmPassword" Label="Yeni şifre (tekrar)" Type="password" Autocomplete="new-password" Required="true" />
+            <button type="submit" class="idp-button idp-button-primary">Şifreyi değiştir</button>
+        </form>
+
+        <p class="idp-alt"><a href="@MiddtIdentityDefaults.LogoutPath">Çıkış yap</a></p>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? Status { get; set; }
+
+    private MiddtIdentityUser? user;
+    private bool hasPassword;
+    private IReadOnlyList<string> passwordErrors = [];
+
+    // Only known codes are shown (no arbitrary text from the query string).
+    private string? StatusText => Status switch
+    {
+        "totp-enabled" => "İki adımlı doğrulama etkinleştirildi.",
+        "totp-disabled" => "İki adımlı doğrulama devre dışı bırakıldı.",
+        "password-changed" => "Şifreniz değiştirildi.",
+        _ => null,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        HttpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
+        // Null when the session is stale (user deleted/locked, security stamp changed elsewhere).
+        user = await MiddtIdentitySession.GetValidUserAsync(Users, await AccountSession.GetPrincipalAsync(HttpContext));
+        hasPassword = user is not null && await Users.HasPasswordAsync(user);
+    }
+
+    private async Task EnrollAsync()
+    {
+        if (user is null)
+        {
+            return;
+        }
+
+        var handle = await Journeys.StartAsync(AuthJourneys.EnrollTotp, new AuthJourneyStart
+        {
+            UserId = user.Id,
+            ReturnUrl = MiddtIdentityUi.SecurityPath + "?status=totp-enabled",
+        }, HttpContext.RequestAborted);
+        AuthJourneyCookie.Write(HttpContext, handle);
+        Navigation.NavigateTo(MiddtIdentityDefaults.JourneyPath(handle.Id), forceLoad: true);
+    }
+
+    private async Task DisableTotpAsync()
+    {
+        if (user is null)
+        {
+            return;
+        }
+
+        await Users.SetTwoFactorEnabledAsync(user, false);
+        await Users.ResetAuthenticatorKeyAsync(user);
+
+        // The security stamp changed: renew this session (other sessions end at their next authorization request).
+        await MiddtIdentitySession.SignInAsync(HttpContext, user);
+        Navigation.NavigateTo(MiddtIdentityUi.SecurityPath + "?status=totp-disabled", forceLoad: true);
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (user is null)
+        {
+            return;
+        }
+
+        var form = await HttpContext.Request.ReadFormAsync(HttpContext.RequestAborted);
+        var current = form["currentPassword"].ToString();
+        var next = form["newPassword"].ToString();
+        if (string.IsNullOrEmpty(next) || (hasPassword && string.IsNullOrEmpty(current)))
+        {
+            passwordErrors = ["Lütfen tüm alanları doldurun."];
+            return;
+        }
+
+        if (!string.Equals(next, form["confirmPassword"].ToString(), StringComparison.Ordinal))
+        {
+            passwordErrors = ["Şifreler eşleşmiyor."];
+            return;
+        }
+
+        var result = hasPassword
+            ? await Users.ChangePasswordAsync(user, current, next)
+            : await Users.AddPasswordAsync(user, next);
+        if (!result.Succeeded)
+        {
+            passwordErrors = [.. result.Errors.Select(e => e.Description)];
+            return;
+        }
+
+        await MiddtIdentitySession.SignInAsync(HttpContext, user);
+        Navigation.NavigateTo(MiddtIdentityUi.SecurityPath + "?status=password-changed", forceLoad: true);
+    }
+}

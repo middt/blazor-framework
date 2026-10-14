@@ -14,5 +14,6 @@
 | Angular page doesn't update after `await` | zoneless + OnPush | update signals, not plain fields |
 | Blazor circuit crashes after closing a dialog | cancelled task cached in a shared cache | cache-owned tokens, evict canceled/faulted |
 | Login retried 3× and took 6.7 s | resilience handler retried POST/429 | retries only for safe methods, never 429 |
-| `docker compose up` fails with "Set JWT_SECRET" | secrets have no defaults | `cp .env.example .env` and fill it |
+| `docker compose up` fails with "Set IDP_BLAZOR_CLIENT_SECRET" (or another variable) | secrets have no defaults | `cp .env.example .env` and fill it |
+| Demo login fails with `invalid_client` after changing a client secret in `.env` | the IdP keeps the secret stored on first start | change it in `http://localhost:8083/admin/clients` too, or drop the `MiddtIdentity` database |
 | E2E logout test hangs | typed `/Account/Logout` needs confirmation (logout CSRF protection) | navigate from the app (same-origin) or click the button |

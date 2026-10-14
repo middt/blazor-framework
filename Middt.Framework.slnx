@@ -27,6 +27,10 @@
     <Project Path="sdk/client/blazor/Middt.Framework.Blazor.Web/Middt.Framework.Blazor.Web.csproj" />
     <Project Path="sdk/client/blazor/Middt.Framework.Workflow.Razor/Middt.Framework.Workflow.Razor.csproj" />
   </Folder>
+  <!-- identity: the OAuth 2.0 / OpenID Connect server (one ready to run service, configured by appsettings). -->
+  <Folder Name="/identity/">
+    <Project Path="identity/Middt.Identity/Middt.Identity.csproj" />
+  </Folder>
   <!-- demo: the bike store sample (same layout: shared / server / client). -->
   <Folder Name="/demo/">
     <Project Path="demo/Middt.Sample.AppHost/Middt.Sample.AppHost.csproj" />

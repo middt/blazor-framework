@@ -1,0 +1,99 @@
+{
+  "ConnectionStrings": {
+    "Identity": "Server=localhost,1433;Database=MiddtIdentity;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True"
+  },
+  "Identity": {
+    "Issuer": "http://localhost:8083/",
+    "AutoCreateSchema": true,
+    "Password": {
+      "RequiredLength": 4,
+      "RequireDigit": false,
+      "RequireLowercase": false,
+      "RequireUppercase": false,
+      "RequireNonAlphanumeric": false
+    },
+    "Seed": {
+      "Roles": [
+        "manager",
+        "ui-admin",
+        "idp-admin"
+      ],
+      "Scopes": [
+        {
+          "Name": "api",
+          "DisplayName": "Middt örnek API",
+          "Description": "Sipariş, ürün ve iş akışı verilerine erişim",
+          "Resources": [
+            "middt-api"
+          ]
+        }
+      ],
+      "Clients": [
+        {
+          "ClientId": "middt-blazor",
+          "ClientSecret": "development-only-blazor-secret",
+          "DisplayName": "Middt Blazor örneği",
+          "Type": "confidential",
+          "ConsentType": "implicit",
+          "RedirectUris": [
+            "http://localhost:8080/signin-oidc",
+            "https://localhost:7020/signin-oidc"
+          ],
+          "PostLogoutRedirectUris": [
+            "http://localhost:8080/signout-callback-oidc",
+            "https://localhost:7020/signout-callback-oidc"
+          ],
+          "Scopes": [
+            "openid",
+            "profile",
+            "email",
+            "roles",
+            "offline_access",
+            "api"
+          ]
+        },
+        {
+          "ClientId": "middt-angular",
+          "ClientSecret": "development-only-angular-secret",
+          "DisplayName": "Middt Angular örneği",
+          "Type": "confidential",
+          "ConsentType": "explicit",
+          "RedirectUris": [
+            "http://localhost:8081/signin-oidc"
+          ],
+          "PostLogoutRedirectUris": [
+            "http://localhost:8081/signout-callback-oidc"
+          ],
+          "Scopes": [
+            "openid",
+            "profile",
+            "email",
+            "roles",
+            "offline_access",
+            "api"
+          ]
+        }
+      ],
+      "Users": [
+        {
+          "UserName": "test@test.com",
+          "Email": "test@test.com",
+          "Password": "test",
+          "DisplayName": "Test Kullanıcı",
+          "Roles": [
+            "manager",
+            "ui-admin",
+            "idp-admin"
+          ]
+        },
+        {
+          "UserName": "user@test.com",
+          "Email": "user@test.com",
+          "Password": "test",
+          "DisplayName": "Örnek Kullanıcı",
+          "Roles": []
+        }
+      ]
+    }
+  }
+}

@@ -42,4 +42,26 @@ public sealed class MiddtApiOptions
 
     /// <summary>Permitted token requests per client IP per minute (login/refresh brute-force protection).</summary>
     public int TokenRequestsPerMinute { get; set; } = 10;
+
+    /// <summary>
+    /// OpenID Connect issuer (public URL) whose access tokens the API accepts. When set (here or in configuration
+    /// <c>Authentication:Authority</c>), JWT bearer validation uses the authority's discovery document and signing keys
+    /// instead of the symmetric <c>JwtSettings</c> key, and <c>JwtSettings</c> becomes optional.
+    /// </summary>
+    public string? Authority { get; set; }
+
+    /// <summary>Expected <c>aud</c> of access tokens in authority mode (configuration <c>Authentication:Audience</c>, default <c>middt-api</c>).</summary>
+    public string? Audience { get; set; }
+
+    /// <summary>
+    /// Internal URL the API uses to reach the authority (configuration <c>Authentication:BackchannelAuthority</c>, e.g.
+    /// <c>http://middt-identity:8080/</c> inside a container network). The issuer stays <see cref="Authority"/>.
+    /// </summary>
+    public string? BackchannelAuthority { get; set; }
+
+    /// <summary>
+    /// Requires HTTPS for discovery and key retrieval (configuration <c>Authentication:RequireHttpsMetadata</c>);
+    /// <c>null</c> = required outside Development.
+    /// </summary>
+    public bool? RequireHttpsMetadata { get; set; }
 }
