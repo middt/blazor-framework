@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { SignalRDemoComponent } from './signalr-demo.component';
+import { SignalRDemoComponent } from '../components/signalr-demo.component';
 
 @Component({
   selector: 'app-home',

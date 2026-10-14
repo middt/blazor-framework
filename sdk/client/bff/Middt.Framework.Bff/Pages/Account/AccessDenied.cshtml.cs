@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 
 namespace Middt.Framework.Bff.Pages.Account;
 

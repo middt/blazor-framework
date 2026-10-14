@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Middt.Framework.Model.Model.Configuration;
+namespace Middt.Framework.Model.Configuration;
 
 public class DependencyModel
 {

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Plugin Syncfusion Export</Product>
+    <Description>Word and Excel template-based document export plugin using Syncfusion DocIO and XlsIO.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Syncfusion.DocIO.Net.Core" />
+    <PackageReference Include="Syncfusion.DocIORenderer.Net.Core" />
+    <PackageReference Include="Syncfusion.XlsIO.Net.Core" />
+    <PackageReference Include="Syncfusion.XlsIORenderer.Net.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+  </ItemGroup>
+
+</Project>

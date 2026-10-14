@@ -8,7 +8,7 @@ using Middt.Framework.Bff.DependencyInjection;
 using Middt.Framework.Bff.Oidc;
 using Middt.Framework.Bff.Security;
 using Middt.Framework.Common.Web;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 
 namespace Middt.Framework.Bff.Pages.Account;
 

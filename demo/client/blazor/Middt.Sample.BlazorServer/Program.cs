@@ -6,7 +6,6 @@ using Middt.Framework.Common.DependencyInjection;
 using Middt.Framework.Client.Http;
 using Middt.Sample.BlazorServer.Service;
 using Middt.Sample.BlazorServer.SignalR;
-using Middt.Sample.Common.Service;
 using Middt.Framework.Client.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);

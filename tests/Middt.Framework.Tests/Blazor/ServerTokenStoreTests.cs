@@ -7,7 +7,7 @@ using Microsoft.Extensions.Time.Testing;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Blazor.Web.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 using Middt.Framework.Tests.Infrastructure;
 using Middt.Framework.Tests.Security;
 using Middt.Framework.Bff.Security;

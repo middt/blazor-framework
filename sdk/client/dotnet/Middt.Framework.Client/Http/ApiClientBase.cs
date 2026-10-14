@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Client.Http;
 

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Model.Workflow;
 
 namespace Middt.Framework.Tests.Workflow;

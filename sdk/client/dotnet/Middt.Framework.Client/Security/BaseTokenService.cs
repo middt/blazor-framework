@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Client.Http;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Client.Security;
 

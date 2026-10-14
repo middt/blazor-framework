@@ -51,6 +51,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Build
+        run: npm ci && npm run build
+
       - name: Test
         run: node --test test/
 
@@ -71,6 +74,10 @@ jobs:
       - name: Build @middt/angular
         working-directory: sdk/client/angular
         run: npm ci && npx ng build middt-angular
+
+      - name: Test @middt/angular
+        working-directory: sdk/client/angular
+        run: npx ng test --watch=false
 
       - name: Build demo app
         working-directory: demo/client/angular/app

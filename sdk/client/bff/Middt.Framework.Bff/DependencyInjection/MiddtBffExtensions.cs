@@ -19,7 +19,7 @@ using Middt.Framework.Bff.Security;
 using Middt.Framework.Client.DependencyInjection;
 using Middt.Framework.Common.DependencyInjection;
 using Middt.Framework.Common.Web;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 
 namespace Middt.Framework.Bff.DependencyInjection;
 

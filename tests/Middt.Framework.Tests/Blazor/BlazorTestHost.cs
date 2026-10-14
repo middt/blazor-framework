@@ -18,7 +18,7 @@ using Middt.Framework.Bff.Pages.Account;
 using Middt.Framework.Blazor.Web.Security;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Tests.Api;
 using Middt.Framework.Tests.Client;
 using Middt.Framework.Bff.Security;

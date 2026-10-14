@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Tests.Infrastructure;
 
 namespace Middt.Framework.Tests.Api;

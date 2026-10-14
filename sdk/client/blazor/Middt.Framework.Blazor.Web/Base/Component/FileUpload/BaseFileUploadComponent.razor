@@ -1,15 +1,14 @@
 @inherits Middt.Framework.Blazor.Web.Base.BaseComponent
 
+@using Microsoft.AspNetCore.Components.Forms
 @using Middt.Framework.Blazor.Web.Model
-@using Syncfusion.Blazor.Inputs
 
-<SfUploader AutoUpload="true"
-            AllowedExtensions="@AcceptedFileTypes"
-            ShowFileList="false"
-            MaxFileSize="@MaxFileSize"
-            AllowMultiple="@(MaxFileCount > 1)">
-    <UploaderEvents ValueChange="HandleSelection"></UploaderEvents>
-</SfUploader>
+<div class="middt-file-upload rz-mb-3">
+    <InputFile OnChange="HandleInputFileChange"
+               accept="@AcceptedFileTypes"
+               multiple="@(MaxFileCount > 1)"
+               class="form-control" />
+</div>
 
 @if (ActiveFileUploadModelList.Count > 0)
 {

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Blazor.Web.Extensions;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Security;
 

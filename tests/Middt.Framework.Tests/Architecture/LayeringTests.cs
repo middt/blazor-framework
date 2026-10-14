@@ -22,7 +22,16 @@ public sealed class LayeringTests
         ["Middt.Framework.Model", "Middt.Framework.Expressions", "Middt.Framework.Ui.Abstractions"];
 
     public static TheoryData<string> Backend() =>
-        ["Middt.Framework.Common", "Middt.Framework.Data", "Middt.Framework.Api", "Middt.Framework.Workflow", "Middt.Framework.Ui.Server"];
+        [
+            "Middt.Framework.Common",
+            "Middt.Framework.Data",
+            "Middt.Framework.Api",
+            "Middt.Framework.Workflow",
+            "Middt.Framework.Ui.Server",
+            "Middt.Framework.Plugin.Redis",
+            "Middt.Framework.Plugin.Rebus",
+            "Middt.Framework.Plugin.SyncfusionExport",
+        ];
 
     [Theory]
     [MemberData(nameof(Contracts))]
@@ -33,6 +42,17 @@ public sealed class LayeringTests
     [MemberData(nameof(Backend))]
     public void Backend_does_not_depend_on_frontends(string assembly) =>
         References(assembly).Should().NotContain(r => IsFrontend(r));
+
+    [Fact]
+    public void Sample_common_does_not_depend_on_client_or_frontends() =>
+        References("Middt.Sample.Common").Should().NotContain(r => IsFrontend(r));
+
+    [Fact]
+    public void Sample_api_backend_does_not_depend_on_client_or_blazor_web() =>
+        References("Middt.Sample.Api").Should().NotContain(r => IsClientOrBlazorWeb(r));
+
+    private static bool IsClientOrBlazorWeb(string r) =>
+        r is "Middt.Framework.Client" or "Middt.Framework.Bff" or "Middt.Framework.Blazor.Web" or "Radzen.Blazor";
 
     [Fact]
     public void Client_sdk_does_not_depend_on_backend_or_ui_technology() =>

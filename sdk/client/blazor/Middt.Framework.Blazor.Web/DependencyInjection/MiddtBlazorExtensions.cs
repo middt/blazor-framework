@@ -16,10 +16,10 @@ using Middt.Framework.Blazor.Web.Base.Notification;
 using Middt.Framework.Blazor.Web.Security;
 using Middt.Framework.Bff.DependencyInjection;
 using Middt.Framework.Common.DependencyInjection;
-using Middt.Framework.Common.Licence;
+using Middt.Framework.Common.License;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Common.Web;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 using Radzen;
 using Syncfusion.Blazor;
 using Middt.Framework.Client.DependencyInjection;
@@ -119,7 +119,7 @@ public static class MiddtBlazorExtensions
     public static IServiceCollection AddMiddtSyncfusion(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSyncfusionBlazor();
-        BaseLicence.Register(configuration["Syncfusion:LicenseKey"]);
+        SyncfusionLicenseHelper.Register(configuration["Syncfusion:LicenseKey"]);
         return services;
     }
 

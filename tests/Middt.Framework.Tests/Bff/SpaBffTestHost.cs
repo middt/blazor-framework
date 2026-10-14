@@ -15,7 +15,7 @@ using Middt.Framework.Bff.DependencyInjection;
 using Middt.Framework.Bff.Security;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Tests.Api;
 using Middt.Framework.Tests.Blazor;
 using Middt.Framework.Tests.Client;

@@ -5,7 +5,7 @@ using StackExchange.Redis;
 namespace Middt.Framework.Plugin.Redis;
 
 /// <summary>JSON cache on Redis with distributed-lock protected population.</summary>
-public class MiddtRedisCache(MiddtRedisConnection connection, MiddtRedislock redisLock, IOptions<RedisSettings> options)
+public class MiddtRedisCache(MiddtRedisConnection connection, MiddtRedisLock redisLock, IOptions<RedisSettings> options)
 {
     private static readonly TimeSpan LockWait = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan LockRetry = TimeSpan.FromMilliseconds(200);

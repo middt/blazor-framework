@@ -19,6 +19,7 @@ COPY sdk/client/blazor/Middt.Framework.Workflow.Razor/*.csproj sdk/client/blazor
 COPY sdk/server/Middt.Framework.Ui.Server/*.csproj sdk/server/Middt.Framework.Ui.Server/
 COPY sdk/server/plugins/Middt.Framework.Plugin.Redis/*.csproj sdk/server/plugins/Middt.Framework.Plugin.Redis/
 COPY sdk/server/plugins/Middt.Framework.Plugin.Rebus/*.csproj sdk/server/plugins/Middt.Framework.Plugin.Rebus/
+COPY sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/*.csproj sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/
 COPY demo/shared/Middt.Sample.Common/*.csproj demo/shared/Middt.Sample.Common/
 COPY demo/shared/Middt.Sample.Views/*.csproj demo/shared/Middt.Sample.Views/
 COPY demo/shared/Middt.Sample.ServiceDefaults/*.csproj demo/shared/Middt.Sample.ServiceDefaults/

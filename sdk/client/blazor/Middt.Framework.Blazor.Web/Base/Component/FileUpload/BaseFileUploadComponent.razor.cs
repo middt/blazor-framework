@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
 using Middt.Framework.Blazor.Web.Model;
-using Middt.Framework.Model.Model.Enumerations;
-using Syncfusion.Blazor.Inputs;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.FileUpload;
 
@@ -27,18 +27,19 @@ public partial class BaseFileUploadComponent : BaseComponent
     public List<FileUploadModel> ActiveFileUploadModelList =>
         FileUploadModelList.Where(x => x.IsDeleted == YesNoEnum.No).ToList();
 
-    public async Task HandleSelection(UploadChangeEventArgs args)
+    public async Task HandleInputFileChange(InputFileChangeEventArgs args)
     {
         var errors = new List<string>();
+        var files = args.GetMultipleFiles(MaxFileCount);
 
-        foreach (var upload in args.Files)
+        foreach (var upload in files)
         {
-            var name = upload.FileInfo.Name;
+            var name = upload.Name;
             var error =
                 ActiveFileUploadModelList.Count >= MaxFileCount ? "Dosya sayısı için izin verilen sayıyı aştınız." :
                 !IsAllowedExtension(name) ? $"{name} dosyasının uzantısına izin verilmiyor." :
                 FileUploadModelList.Any(x => x.Name == name && x.IsDeleted == YesNoEnum.No) ? $"{name} dosyası sisteme daha önce eklenmiş." :
-                upload.FileInfo.Size > MaxFileSize ? $"{name} dosyası için izin verilen en büyük boyut: {MaxFileSize / (1024 * 1024)} MB." :
+                upload.Size > MaxFileSize ? $"{name} dosyası için izin verilen en büyük boyut: {MaxFileSize / (1024 * 1024)} MB." :
                 null;
 
             if (error is not null)
@@ -47,7 +48,7 @@ public partial class BaseFileUploadComponent : BaseComponent
                 continue;
             }
 
-            await using var source = upload.File.OpenReadStream(MaxFileSize, ComponentCancellation);
+            await using var source = upload.OpenReadStream(MaxFileSize, ComponentCancellation);
             using var buffer = new MemoryStream();
             await source.CopyToAsync(buffer, ComponentCancellation);
 

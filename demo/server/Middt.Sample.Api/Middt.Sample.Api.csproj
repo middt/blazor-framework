@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\..\sdk\server\Middt.Framework.Workflow\Middt.Framework.Workflow.csproj" />
     <ProjectReference Include="..\..\..\sdk\server\Middt.Framework.Ui.Server\Middt.Framework.Ui.Server.csproj" />
     <ProjectReference Include="..\..\..\sdk\server\plugins\Middt.Framework.Plugin.Redis\Middt.Framework.Plugin.Redis.csproj" />
+    <ProjectReference Include="..\..\..\sdk\server\plugins\Middt.Framework.Plugin.SyncfusionExport\Middt.Framework.Plugin.SyncfusionExport.csproj" />
     <ProjectReference Include="..\..\shared\Middt.Sample.Common\Middt.Sample.Common.csproj" />
     <ProjectReference Include="..\..\shared\Middt.Sample.Views\Middt.Sample.Views.csproj" />
     <ProjectReference Include="..\..\shared\Middt.Sample.ServiceDefaults\Middt.Sample.ServiceDefaults.csproj" />

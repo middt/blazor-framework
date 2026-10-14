@@ -24,6 +24,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\server\plugins\Middt.Framework.Plugin.Rebus\Middt.Framework.Plugin.Rebus.csproj" />
+    <ProjectReference Include="..\..\sdk\server\plugins\Middt.Framework.Plugin.Redis\Middt.Framework.Plugin.Redis.csproj" />
+    <ProjectReference Include="..\..\sdk\server\plugins\Middt.Framework.Plugin.SyncfusionExport\Middt.Framework.Plugin.SyncfusionExport.csproj" />
     <ProjectReference Include="..\..\sdk\server\Middt.Framework.Api\Middt.Framework.Api.csproj" />
     <ProjectReference Include="..\..\sdk\server\Middt.Framework.Data\Middt.Framework.Data.csproj" />
     <ProjectReference Include="..\..\sdk\server\Middt.Framework.Common\Middt.Framework.Common.csproj" />
@@ -36,6 +38,7 @@
     <ProjectReference Include="..\..\sdk\client\blazor\Middt.Framework.Workflow.Razor\Middt.Framework.Workflow.Razor.csproj" />
     <ProjectReference Include="..\..\sdk\server\Middt.Framework.Ui.Server\Middt.Framework.Ui.Server.csproj" />
     <ProjectReference Include="..\..\identity\Middt.Identity\Middt.Identity.csproj" />
+    <ProjectReference Include="..\..\demo\server\Middt.Sample.Api\Middt.Sample.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

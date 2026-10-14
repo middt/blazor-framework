@@ -12,10 +12,6 @@
 
   <ItemGroup>
     <PackageReference Include="Syncfusion.Licensing" />
-    <PackageReference Include="Syncfusion.DocIO.Net.Core" />
-    <PackageReference Include="Syncfusion.DocIORenderer.Net.Core" />
-    <PackageReference Include="Syncfusion.XlsIO.Net.Core" />
-    <PackageReference Include="Syncfusion.XlsIORenderer.Net.Core" />
   </ItemGroup>
 
   <ItemGroup>

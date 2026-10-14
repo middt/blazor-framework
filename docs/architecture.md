@@ -58,14 +58,14 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 |---|---|---|
 | Blazor (interactive) | `Middt.Framework.Blazor.Web` (`Ui/`) | display widgets + `grid`/`record` (Radzen) |
 | Static HTML | `Middt.Framework.Ui.Server` (`UiHtmlRenderer`, plain C#) | display widgets; interactive ones render a placeholder |
-| Angular (future) | `@middt/ui-angular` on top of `@middt/ui-core` | same names, Angular components |
+| Angular | `@middt/angular` on top of `@middt/ui-core` | same names, Angular components (Material) |
 
 Custom widgets are registered in each place: the **spec** in the API (`MiddtUiOptions.AddWidget(spec, html?)`) and
 in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a component map in Angular).
 
 ## How the Angular frontend was added (and how to add another)
 
-1. **Workspace**: `sdk/client/angular` (Angular 22 + Material) with the library `@middt/angular` and the demo app; it
+1. **Workspace**: `sdk/client/angular` (Angular 22 + Material) with the library `@middt/angular` (demo app in `demo/client/angular/app`); it
    compiles `@middt/ui-core` from source through a `tsconfig` path.
 2. **Authentication**: the SPA is served by a BFF host (`demo/client/angular/Middt.Sample.Angular`: `AddMiddtSpaBff()` +
    `UseMiddtSpaBff()`). It owns the cookie session and the tokens, serves the server rendered login/logout pages,
@@ -103,4 +103,4 @@ Folders follow the layers: `sdk/shared` (contracts), `sdk/server` (backend + plu
 | Middt.Framework.Blazor.Web | Blazor | BFF auth, base pages, workflow screens, layout widgets/hosts/editor (`Ui/`) |
 | Middt.Framework.Workflow.Razor | Blazor | Razor workflow view base classes and catalog – separate so the API and shared view libraries can use them without the Blazor frontend |
 | sdk/client/typescript/ui-core | TypeScript | `@middt/ui-core` – contract, expressions, formats, layout/data/workflow clients |
-| sdk/client/angular | Angular | `@middt/angular` library + demo app |
+| sdk/client/angular | Angular | `@middt/angular` library workspace (demo app: `demo/client/angular/app`) |

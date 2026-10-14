@@ -145,7 +145,7 @@ public static class QueryFilterBuilder
 
         return property.IntSearchType switch
         {
-            IntSearchType.GreatThan => Operator.GreaterThan,
+            IntSearchType.GreaterThan => Operator.GreaterThan,
             IntSearchType.GreaterThanOrEqual => Operator.GreaterThanOrEqual,
             IntSearchType.LessThan => Operator.LessThan,
             IntSearchType.LessThanOrEqual => Operator.LessThanOrEqual,
@@ -155,7 +155,7 @@ public static class QueryFilterBuilder
 
     private static Operator Compare(DateSearchType searchType) => searchType switch
     {
-        DateSearchType.GreatThan => Operator.GreaterThan,
+        DateSearchType.GreaterThan => Operator.GreaterThan,
         DateSearchType.GreaterThanOrEqual => Operator.GreaterThanOrEqual,
         DateSearchType.LessThan => Operator.LessThan,
         DateSearchType.LessThanOrEqual => Operator.LessThanOrEqual,

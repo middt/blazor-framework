@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Api.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Tests.Api;
 

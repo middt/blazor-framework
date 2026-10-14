@@ -16,7 +16,7 @@ using Middt.Framework.Bff.Security;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Common.Http;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Bff.Oidc;
 

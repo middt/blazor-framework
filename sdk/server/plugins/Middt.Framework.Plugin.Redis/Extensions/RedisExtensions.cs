@@ -33,7 +33,7 @@ public static class RedisExtensions
             .ValidateOnStart();
 
         services.AddSingleton<MiddtRedisConnection>();
-        services.AddSingleton<MiddtRedislock>();
+        services.AddSingleton<MiddtRedisLock>();
         services.AddSingleton<MiddtRedisCache>();
         return services;
     }

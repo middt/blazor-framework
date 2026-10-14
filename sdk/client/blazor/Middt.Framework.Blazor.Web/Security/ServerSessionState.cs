@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Middt.Framework.Blazor.Web.Extensions;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
-using Middt.Framework.Model.Model.Configuration;
+using Middt.Framework.Model.Configuration;
 using Middt.Framework.Bff.Security;
 
 namespace Middt.Framework.Blazor.Web.Security;

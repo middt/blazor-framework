@@ -16,6 +16,7 @@
   <Folder Name="/sdk/server/plugins/">
     <Project Path="sdk/server/plugins/Middt.Framework.Plugin.Rebus/Middt.Framework.Plugin.Rebus.csproj" />
     <Project Path="sdk/server/plugins/Middt.Framework.Plugin.Redis/Middt.Framework.Plugin.Redis.csproj" />
+    <Project Path="sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/Middt.Framework.Plugin.SyncfusionExport.csproj" />
   </Folder>
   <Folder Name="/sdk/client/">
     <Project Path="sdk/client/dotnet/Middt.Framework.Client/Middt.Framework.Client.csproj" />

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Common.Model.Email;
-using Middt.Framework.Model.Model.Enumerations;
+using Middt.Framework.Model.Enumerations;
 
 namespace Middt.Framework.Common.Email;
 
@@ -36,7 +36,15 @@ public sealed class SmtpEmailSender(IOptions<EmailSettings> options, ILogger<Smt
 
         try
         {
-            mail.From ??= new MailAddress(settings.From);
+            if (mail.From is null && !string.IsNullOrWhiteSpace(settings.From))
+            {
+                mail.From = new MailAddress(settings.From);
+            }
+            else if (mail.From is null)
+            {
+                return new EmailResponseModel { Result = ResultEnum.Error, MessageList = ["Gönderici e-posta adresi (From) belirtilmemiş."] };
+            }
+
             await smtp.SendMailAsync(mail, cancellationToken);
             return new EmailResponseModel { Result = ResultEnum.Success, Data = true };
         }
