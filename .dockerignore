@@ -10,3 +10,5 @@
 .github
 data
 docker-compose*.yml
+**/dist
+**/.angular

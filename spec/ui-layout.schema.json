@@ -1,0 +1,1291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://middt.dev/schemas/ui-layout.json",
+  "title": "Middt UI layout",
+  "type": "object",
+  "required": [
+    "key",
+    "body"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$",
+      "description": "Unique key, also the page route /ui/{key}."
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "page",
+        "view"
+      ],
+      "default": "page"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seed files: higher versions replace stored layouts. PUT: the version the change is based on (0 = new)."
+    },
+    "menu": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Material icon name."
+        },
+        "order": {
+          "type": "integer"
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "body": {
+      "$ref": "#/$defs/nodes"
+    }
+  },
+  "$defs": {
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "widget"
+      ],
+      "properties": {
+        "widget": {
+          "enum": [
+            "alert",
+            "badge",
+            "columns",
+            "divider",
+            "fields",
+            "grid",
+            "heading",
+            "link",
+            "list",
+            "record",
+            "section",
+            "text"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "alert"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-alert"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "badge"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-badge"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "columns"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-columns"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "divider"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-divider"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "fields"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-fields"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "grid"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-grid"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "heading"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-heading"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "link"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-link"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "list"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-list"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "record"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-record"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "section"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-section"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-text"
+          }
+        }
+      ]
+    },
+    "widget-alert": {
+      "type": "object",
+      "description": "Highlighted message.",
+      "properties": {
+        "widget": {
+          "const": "alert",
+          "description": "Highlighted message."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "text": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "success",
+            "warning",
+            "danger"
+          ]
+        }
+      },
+      "required": [
+        "widget",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "widget-badge": {
+      "type": "object",
+      "description": "Small status label.",
+      "properties": {
+        "widget": {
+          "const": "badge",
+          "description": "Small status label."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "text": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "color": {
+          "enum": [
+            "primary",
+            "secondary",
+            "success",
+            "warning",
+            "danger",
+            "info"
+          ]
+        }
+      },
+      "required": [
+        "widget",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "widget-columns": {
+      "type": "object",
+      "description": "Shows its children side by side (one column each, stacked on small screens).",
+      "properties": {
+        "widget": {
+          "const": "columns",
+          "description": "Shows its children side by side (one column each, stacked on small screens)."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "children": {
+          "$ref": "#/$defs/nodes"
+        },
+        "widths": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "description": "Relative widths, e.g. [\"2\", \"1\"]."
+        }
+      },
+      "required": [
+        "widget",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "widget-divider": {
+      "type": "object",
+      "description": "Horizontal line.",
+      "properties": {
+        "widget": {
+          "const": "divider",
+          "description": "Horizontal line."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        }
+      },
+      "required": [
+        "widget"
+      ],
+      "additionalProperties": false
+    },
+    "widget-fields": {
+      "type": "object",
+      "description": "Label/value list.",
+      "properties": {
+        "widget": {
+          "const": "fields",
+          "description": "Label/value list."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string",
+                "x-middt": "template"
+              },
+              "format": {
+                "enum": [
+                  "N0",
+                  "N1",
+                  "N2",
+                  "N3",
+                  "N4",
+                  "N5",
+                  "N6",
+                  "F0",
+                  "F1",
+                  "F2",
+                  "F3",
+                  "F4",
+                  "F5",
+                  "F6",
+                  "d",
+                  "D",
+                  "g",
+                  "t"
+                ]
+              },
+              "visibleWhen": {
+                "type": "string",
+                "x-middt": "expression"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "value"
+            ]
+          }
+        }
+      },
+      "required": [
+        "widget",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "widget-grid": {
+      "type": "object",
+      "description": "Server paged data grid of an entity with search, row actions and optional create/edit/delete. (interactive)",
+      "properties": {
+        "widget": {
+          "const": "grid",
+          "description": "Server paged data grid of an entity with search, row actions and optional create/edit/delete."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "entity": {
+          "type": "string",
+          "description": "Controller name, e.g. Category (api/v{version}/{entity}/getitems)."
+        },
+        "title": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Property of the row (camelCase)."
+              },
+              "title": {
+                "type": "string"
+              },
+              "format": {
+                "enum": [
+                  "N0",
+                  "N1",
+                  "N2",
+                  "N3",
+                  "N4",
+                  "N5",
+                  "N6",
+                  "F0",
+                  "F1",
+                  "F2",
+                  "F3",
+                  "F4",
+                  "F5",
+                  "F6",
+                  "d",
+                  "D",
+                  "g",
+                  "t"
+                ],
+                "description": "N0–N6, F0–F6 (numbers) or d, D, g, t (dates)."
+              },
+              "width": {
+                "type": "string",
+                "description": "CSS width, e.g. 120px."
+              },
+              "sortable": {
+                "type": "boolean",
+                "description": "Default true."
+              },
+              "template": {
+                "type": "string",
+                "x-middt": "template",
+                "description": "Cell text, e.g. {{ row.firstName + \" \" + row.lastName }}."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ]
+          }
+        },
+        "search": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Property name (camelCase)."
+              },
+              "label": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "text",
+                  "textarea",
+                  "number",
+                  "integer",
+                  "date",
+                  "datetime",
+                  "checkbox",
+                  "select",
+                  "picker"
+                ],
+                "description": "Default text."
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "maxLength": {
+                "type": "integer"
+              },
+              "placeholder": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "value"
+                      ]
+                    }
+                  ]
+                },
+                "description": "Static select options: strings or { value, text }."
+              },
+              "lookup": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "description": "Entity (controller) the options are loaded from."
+                  },
+                  "valueField": {
+                    "type": "string"
+                  },
+                  "textField": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Picker dialog title."
+                  },
+                  "columns": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Property of the row (camelCase)."
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "enum": [
+                            "N0",
+                            "N1",
+                            "N2",
+                            "N3",
+                            "N4",
+                            "N5",
+                            "N6",
+                            "F0",
+                            "F1",
+                            "F2",
+                            "F3",
+                            "F4",
+                            "F5",
+                            "F6",
+                            "d",
+                            "D",
+                            "g",
+                            "t"
+                          ],
+                          "description": "N0–N6, F0–F6 (numbers) or d, D, g, t (dates)."
+                        },
+                        "width": {
+                          "type": "string",
+                          "description": "CSS width, e.g. 120px."
+                        },
+                        "sortable": {
+                          "type": "boolean",
+                          "description": "Default true."
+                        },
+                        "template": {
+                          "type": "string",
+                          "x-middt": "template",
+                          "description": "Cell text, e.g. {{ row.firstName + \" \" + row.lastName }}."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "field"
+                      ]
+                    },
+                    "description": "Picker dialog columns."
+                  },
+                  "search": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Property name (camelCase)."
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "text",
+                            "textarea",
+                            "number",
+                            "integer",
+                            "date",
+                            "datetime",
+                            "checkbox",
+                            "select",
+                            "picker"
+                          ],
+                          "description": "Default text."
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        },
+                        "maxLength": {
+                          "type": "integer"
+                        },
+                        "placeholder": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": [
+                                  "string",
+                                  "number"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "value": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          "description": "Static select options: strings or { value, text }."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "field"
+                      ]
+                    },
+                    "description": "Picker dialog search fields."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "entity",
+                  "valueField",
+                  "textField"
+                ],
+                "description": "Options (select) or dialog (picker) loaded from an entity."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ]
+          },
+          "description": "Search fields (filter object properties)."
+        },
+        "filter": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Fixed filter, e.g. { \"categoryId\": \"{{ query.id }}\" }."
+        },
+        "pageSize": {
+          "type": "integer",
+          "description": "Default 10."
+        },
+        "autoLoad": {
+          "type": "boolean",
+          "description": "Search when the page opens (default true)."
+        },
+        "create": {
+          "type": "boolean"
+        },
+        "edit": {
+          "type": "boolean"
+        },
+        "delete": {
+          "type": "boolean"
+        },
+        "form": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Property name (camelCase)."
+              },
+              "label": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "text",
+                  "textarea",
+                  "number",
+                  "integer",
+                  "date",
+                  "datetime",
+                  "checkbox",
+                  "select",
+                  "picker"
+                ],
+                "description": "Default text."
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "maxLength": {
+                "type": "integer"
+              },
+              "placeholder": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "value"
+                      ]
+                    }
+                  ]
+                },
+                "description": "Static select options: strings or { value, text }."
+              },
+              "lookup": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "description": "Entity (controller) the options are loaded from."
+                  },
+                  "valueField": {
+                    "type": "string"
+                  },
+                  "textField": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Picker dialog title."
+                  },
+                  "columns": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Property of the row (camelCase)."
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "format": {
+                          "enum": [
+                            "N0",
+                            "N1",
+                            "N2",
+                            "N3",
+                            "N4",
+                            "N5",
+                            "N6",
+                            "F0",
+                            "F1",
+                            "F2",
+                            "F3",
+                            "F4",
+                            "F5",
+                            "F6",
+                            "d",
+                            "D",
+                            "g",
+                            "t"
+                          ],
+                          "description": "N0–N6, F0–F6 (numbers) or d, D, g, t (dates)."
+                        },
+                        "width": {
+                          "type": "string",
+                          "description": "CSS width, e.g. 120px."
+                        },
+                        "sortable": {
+                          "type": "boolean",
+                          "description": "Default true."
+                        },
+                        "template": {
+                          "type": "string",
+                          "x-middt": "template",
+                          "description": "Cell text, e.g. {{ row.firstName + \" \" + row.lastName }}."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "field"
+                      ]
+                    },
+                    "description": "Picker dialog columns."
+                  },
+                  "search": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "field": {
+                          "type": "string",
+                          "description": "Property name (camelCase)."
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "enum": [
+                            "text",
+                            "textarea",
+                            "number",
+                            "integer",
+                            "date",
+                            "datetime",
+                            "checkbox",
+                            "select",
+                            "picker"
+                          ],
+                          "description": "Default text."
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "min": {
+                          "type": "number"
+                        },
+                        "max": {
+                          "type": "number"
+                        },
+                        "maxLength": {
+                          "type": "integer"
+                        },
+                        "placeholder": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": [
+                                  "string",
+                                  "number"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "value": {
+                                    "type": "string"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                  "value"
+                                ]
+                              }
+                            ]
+                          },
+                          "description": "Static select options: strings or { value, text }."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "field"
+                      ]
+                    },
+                    "description": "Picker dialog search fields."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "entity",
+                  "valueField",
+                  "textField"
+                ],
+                "description": "Options (select) or dialog (picker) loaded from an entity."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ]
+          },
+          "description": "Create/edit form fields."
+        },
+        "formTitle": {
+          "type": "string"
+        },
+        "rowActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string",
+                "description": "Material icon name."
+              },
+              "navigate": {
+                "type": "string",
+                "x-middt": "template",
+                "description": "Local URL, e.g. /ui/bike-category-products?id={{ row.categoryId }}."
+              },
+              "style": {
+                "enum": [
+                  "primary",
+                  "secondary",
+                  "light",
+                  "danger"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "navigate"
+            ]
+          }
+        }
+      },
+      "required": [
+        "widget",
+        "entity",
+        "columns"
+      ],
+      "additionalProperties": false
+    },
+    "widget-heading": {
+      "type": "object",
+      "description": "Title text.",
+      "properties": {
+        "widget": {
+          "const": "heading",
+          "description": "Title text."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "text": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "level": {
+          "type": "integer",
+          "description": "1-6, default 2."
+        }
+      },
+      "required": [
+        "widget",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "widget-link": {
+      "type": "object",
+      "description": "Link to a local page (or http/https URL).",
+      "properties": {
+        "widget": {
+          "const": "link",
+          "description": "Link to a local page (or http/https URL)."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "text": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "href": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "style": {
+          "enum": [
+            "link",
+            "button"
+          ]
+        }
+      },
+      "required": [
+        "widget",
+        "text",
+        "href"
+      ],
+      "additionalProperties": false
+    },
+    "widget-list": {
+      "type": "object",
+      "description": "Repeats its children for each item of an array (the item is 'row').",
+      "properties": {
+        "widget": {
+          "const": "list",
+          "description": "Repeats its children for each item of an array (the item is 'row')."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "children": {
+          "$ref": "#/$defs/nodes"
+        },
+        "source": {
+          "type": "string",
+          "x-middt": "expression",
+          "description": "Expression returning an array, e.g. data.items."
+        },
+        "empty": {
+          "type": "string",
+          "description": "Text shown when the array is empty."
+        }
+      },
+      "required": [
+        "widget",
+        "source",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "widget-record": {
+      "type": "object",
+      "description": "Loads one entity by id and shows its children with it as 'record'. (interactive)",
+      "properties": {
+        "widget": {
+          "const": "record",
+          "description": "Loads one entity by id and shows its children with it as 'record'."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "children": {
+          "$ref": "#/$defs/nodes"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "recordId": {
+          "type": "string",
+          "x-middt": "template",
+          "description": "Id of the record, e.g. {{ query.id }}."
+        },
+        "notFound": {
+          "type": "string",
+          "description": "Text shown when the record does not exist."
+        }
+      },
+      "required": [
+        "widget",
+        "entity",
+        "recordId",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "widget-section": {
+      "type": "object",
+      "description": "Card with an optional title.",
+      "properties": {
+        "widget": {
+          "const": "section",
+          "description": "Card with an optional title."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "children": {
+          "$ref": "#/$defs/nodes"
+        },
+        "title": {
+          "type": "string",
+          "x-middt": "template"
+        }
+      },
+      "required": [
+        "widget",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "widget-text": {
+      "type": "object",
+      "description": "Paragraph.",
+      "properties": {
+        "widget": {
+          "const": "text",
+          "description": "Paragraph."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "text": {
+          "type": "string",
+          "x-middt": "template"
+        },
+        "style": {
+          "enum": [
+            "normal",
+            "muted",
+            "lead",
+            "small",
+            "code"
+          ]
+        }
+      },
+      "required": [
+        "widget",
+        "text"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

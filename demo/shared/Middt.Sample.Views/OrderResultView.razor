@@ -1,0 +1,71 @@
+@* State view of the final states: the decision. *@
+@attribute [WorkflowView("order-result")]
+@inherits WorkflowViewBase
+
+<article class="sv-view" aria-labelledby="sv-result-title">
+    <header class="sv-header">
+        <h3 id="sv-result-title">Sipariş #@Text("orderId") · @Text("customerName")</h3>
+        <span class="@(Approved ? "sv-badge sv-good" : "sv-badge sv-bad")">@(Approved ? "Onaylandı" : "Reddedildi")</span>
+    </header>
+
+    <dl class="sv-grid">
+        <dt>Tutar</dt>
+        <dd class="sv-amount">@ViewFormat.Money(Number("amount"))</dd>
+        @if (Has("product"))
+        {
+            <dt>Ürün grubu</dt>
+            <dd>@Text("product")</dd>
+        }
+        @if (Has("deliveryType"))
+        {
+            <dt>Teslimat</dt>
+            <dd data-field="deliveryType"><span class="@(Text("deliveryType", "") == "Ekspres" ? "sv-badge sv-express" : "sv-badge")">@Text("deliveryType")</span>
+                @if (Has("review.changedBy"))
+                {
+                    <small class="sv-muted"> (@Text("review.changedBy") tarafından standarda çevrildi)</small>
+                }
+            </dd>
+        }
+        @if (Has("customerType"))
+        {
+            <dt>Müşteri</dt>
+            <dd>@Text("customerType")@(Has("company.taxNumber") ? $" · VKN {Text("company.taxNumber")}" : Has("person.identityNumber") ? $" · TCKN {ViewFormat.MaskIdentity(Text("person.identityNumber", string.Empty))}" : null)</dd>
+        }
+        @if (ReviewText is { } review)
+        {
+            <dt>Onay seviyesi</dt>
+            <dd>@review</dd>
+        }
+        <dt>Karar veren</dt>
+        <dd>@DecidedBy</dd>
+        <dt>Karar zamanı</dt>
+        <dd>@ViewFormat.Date(Date("review.decidedAt") ?? Date("approvedAt"))</dd>
+        @if (Approved)
+        {
+            <dt>Açıklama</dt>
+            <dd>@Text("review.comment")</dd>
+        }
+        else
+        {
+            <dt>Red nedeni</dt>
+            <dd>@Text("review.reason", Text("credit.score", "") is { Length: > 0 } score && Number("credit.score") < 50 ? $"Kredi skoru yetersiz ({score})" : "-")</dd>
+        }
+    </dl>
+</article>
+
+@code {
+    private bool Approved => Instance.State == "approved";
+
+    private bool Has(string path) => Text(path, string.Empty).Length > 0;
+
+    private string DecidedBy => Approved
+        ? Text("review.approvedBy", Text("review.changedBy", "Otomatik onay"))
+        : Text("review.rejectedBy", "-");
+
+    private string? ReviewText => Text("review.level", string.Empty) switch
+    {
+        "finance" => "Finans onayı",
+        { Length: > 0 } other => other,
+        _ => Has("review.changedBy") ? "Ekspres teslimat onayı" : null,
+    };
+}

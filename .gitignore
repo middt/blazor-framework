@@ -15,3 +15,6 @@ TestResults/
 
 /NugetSuges
 /node_modules/
+
+# Local secrets for docker compose
+.env

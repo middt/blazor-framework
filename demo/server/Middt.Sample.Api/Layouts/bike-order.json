@@ -1,0 +1,38 @@
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "bike-order",
+  "title": "Siparişler",
+  "kind": "page",
+  "version": 1,
+  "menu": { "title": "Order", "icon": "receipt_long", "order": 30 },
+  "body": [
+    { "widget": "heading", "text": "Siparişler" },
+    {
+      "widget": "grid",
+      "id": "orders",
+      "entity": "ViewOrder",
+      "columns": [
+        { "field": "orderId", "title": "Sipariş", "width": "110px" },
+        { "field": "storeName", "title": "Mağaza" },
+        { "field": "staffName", "title": "Personel", "sortable": false },
+        { "field": "customerName", "title": "Müşteri", "sortable": false },
+        { "field": "orderDate", "title": "Sipariş tarihi", "format": "d" }
+      ],
+      "search": [
+        { "field": "orderId", "label": "Sipariş no", "type": "integer" },
+        { "field": "storeId", "label": "Mağaza", "type": "select", "lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } },
+        {
+          "field": "customerId", "label": "Müşteri", "type": "picker",
+          "lookup": {
+            "entity": "Customer", "valueField": "customerId", "textField": "name", "title": "Müşteri seç",
+            "columns": [ { "field": "firstName", "title": "Ad" }, { "field": "lastName", "title": "Soyad" }, { "field": "email", "title": "E-posta" } ],
+            "search": [ { "field": "firstName", "label": "Ad" }, { "field": "lastName", "label": "Soyad" } ]
+          }
+        },
+        { "field": "staffId", "label": "Personel", "type": "select", "lookup": { "entity": "Staff", "valueField": "staffId", "textField": "name" } },
+        { "field": "orderStartDate", "label": "Başlangıç tarihi", "type": "date" },
+        { "field": "orderEndDate", "label": "Bitiş tarihi", "type": "date" }
+      ]
+    }
+  ]
+}

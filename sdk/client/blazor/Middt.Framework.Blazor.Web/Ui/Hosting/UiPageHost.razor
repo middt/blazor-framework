@@ -1,0 +1,117 @@
+@namespace Middt.Framework.Blazor.Web.Ui
+@using System.Text.Json.Nodes
+@using Microsoft.AspNetCore.WebUtilities
+@using Middt.Framework.Expressions
+@using Middt.Framework.Blazor.Web.Ui.Components
+@using Middt.Framework.Ui.Model
+@using Middt.Framework.Ui.Rendering
+@using Middt.Framework.Ui.Widgets
+@implements IDisposable
+
+@* Routable host of a JSON layout: add a page such as  @page "/ui/{Key}"  <UiPageHost Key="@Key" />  *@
+@if (error is not null)
+{
+    <div class="middt-ui-alert middt-ui-alert-danger" role="alert">@error</div>
+}
+else if (layout is null || context is null)
+{
+    <p class="middt-ui-text middt-ui-text-muted" role="status">Yükleniyor...</p>
+}
+else
+{
+    <UiLayoutView @key="renderKey" Layout="layout" Context="context" />
+}
+
+@code {
+    private UiLayoutDocument? layout;
+    private UiRenderContext? context;
+    private string? error;
+    private string? renderKey;
+    private PersistingComponentStateSubscription persisting;
+
+    [Inject]
+    private UiApiClient Client { get; set; } = default!;
+
+    [Inject]
+    private UiWidgetCatalog Catalog { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    [Inject]
+    private PersistentComponentState ApplicationState { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>Raised after the layout is loaded (e.g. to set the page title).</summary>
+    [Parameter]
+    public EventCallback<UiLayoutDocument> OnLoaded { get; set; }
+
+    private string StateKey => $"middt-ui-layout:{Key}";
+
+    protected override void OnInitialized() =>
+        // The layout loaded while prerendering is handed over to the interactive circuit (one API call per page load).
+        persisting = ApplicationState.RegisterOnPersisting(() =>
+        {
+            if (layout is not null && layout.Key == Key)
+            {
+                ApplicationState.PersistAsJson(StateKey, layout);
+            }
+
+            return Task.CompletedTask;
+        });
+
+    protected override async Task OnParametersSetAsync()
+    {
+        error = null;
+        if (layout?.Key != Key)
+        {
+            layout = null;
+            context = null;
+            if (ApplicationState.TryTakeFromJson<UiLayoutDocument>(StateKey, out var persisted) && persisted?.Key == Key)
+            {
+                layout = persisted;
+            }
+            else
+            {
+                var response = await Client.GetAsync(Key);
+                if (!response.IsSuccess || response.Data is null)
+                {
+                    error = response.ErrorText is { Length: > 0 } text ? text : "Sayfa bulunamadı.";
+                    return;
+                }
+
+                layout = response.Data;
+            }
+
+            await OnLoaded.InvokeAsync(layout);
+        }
+
+        // The render context only changes with the layout or the query string; reusing it lets the widgets skip re-rendering.
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var key = $"{layout.Key}:{layout.Version}:{uri.Query}";
+        if (context is not null && key == renderKey)
+        {
+            return;
+        }
+
+        var query = new JsonObject();
+        foreach (var (name, value) in QueryHelpers.ParseQuery(uri.Query))
+        {
+            query[name] = value.ToString();
+        }
+
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        context = new UiRenderContext(Catalog, ExpressionUser.FromPrincipal(state.User), new Dictionary<string, JsonNode?> { [UiExpressions.Query] = query }, interactive: true)
+        {
+            IdPrefix = $"ui-{layout.Key}",
+        };
+        renderKey = key;
+    }
+
+    public void Dispose() => persisting.Dispose();
+}

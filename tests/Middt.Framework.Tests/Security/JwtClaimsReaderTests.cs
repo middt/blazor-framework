@@ -2,8 +2,9 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using Middt.Framework.Common.Security;
+using Middt.Framework.Client.Security;
 using Microsoft.AspNetCore.Components.Authorization;
+using Middt.Framework.Blazor.Web.Security;
 
 namespace Middt.Framework.Tests.Security;
 

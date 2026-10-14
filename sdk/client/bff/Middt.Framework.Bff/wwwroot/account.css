@@ -1,0 +1,54 @@
+/* Middt BFF account pages (login / logout). */
+.middt-account {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f4f5f7;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.middt-account-card {
+    width: min(360px, 92vw);
+    padding: 2rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.middt-account-card h1 {
+    margin: 0 0 1.25rem;
+    font-size: 1.5rem;
+}
+
+.middt-account-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.middt-account-card input {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #c8ccd2;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.middt-account-card button {
+    margin-top: 1rem;
+    padding: 0.65rem;
+    border: 0;
+    border-radius: 4px;
+    background: #4340d2;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.middt-account-error {
+    padding: 0.6rem 0.75rem;
+    border-radius: 4px;
+    background: #fdecea;
+    color: #8a1c13;
+}

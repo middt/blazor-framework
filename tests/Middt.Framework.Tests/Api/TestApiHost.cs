@@ -352,11 +352,11 @@ public sealed class TestApiHost : IAsyncDisposable
     }
 }
 
-public abstract class ApiHostFixture(string environment) : IAsyncLifetime
+public abstract class ApiHostFixture(string environment, Action<MiddtApiOptions>? configure = null) : IAsyncLifetime
 {
     public TestApiHost Host { get; private set; } = null!;
 
-    public async ValueTask InitializeAsync() => Host = await TestApiHost.StartAsync(environment);
+    public async ValueTask InitializeAsync() => Host = await TestApiHost.StartAsync(environment, configure);
 
     public async ValueTask DisposeAsync()
     {
@@ -367,4 +367,5 @@ public abstract class ApiHostFixture(string environment) : IAsyncLifetime
 
 public sealed class DevelopmentApiFixture() : ApiHostFixture("Development");
 
-public sealed class ProductionApiFixture() : ApiHostFixture("Production");
+/// <summary>Production with OpenAPI explicitly enabled (it is Development-only by default).</summary>
+public sealed class ProductionApiFixture() : ApiHostFixture("Production", o => o.EnableOpenApi = true);

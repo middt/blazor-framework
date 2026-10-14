@@ -1,0 +1,81 @@
+@namespace Middt.Framework.Blazor.Web.Ui.Widgets
+@using System.Text.Json.Nodes
+@using Middt.Framework.Blazor.Web.Ui.Components
+@using Middt.Framework.Ui.Rendering
+@inherits UiWidgetBase
+@implements IDisposable
+
+@if (loading)
+{
+    <p class="middt-ui-text middt-ui-text-muted" role="status">Yükleniyor...</p>
+}
+else if (record is null)
+{
+    <div class="middt-ui-alert middt-ui-alert-warning" role="alert">@(error ?? Node.StringProp("notFound") ?? "Kayıt bulunamadı.")</div>
+}
+else
+{
+    <UiNodeList Nodes="Node.Children" Context="@RecordContext(record)" />
+}
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private JsonObject? record;
+    private string? loadedId;
+    private string? error;
+    private bool loading = true;
+    private (UiRenderContext Parent, JsonObject Record, UiRenderContext Context)? recordContext;
+
+    [Inject]
+    private UiDataClient DataClient { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var id = Text("recordId");
+        if (id == loadedId)
+        {
+            return;
+        }
+
+        loadedId = id;
+        record = null;
+        error = null;
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            loading = false;
+            return;
+        }
+
+        loading = true;
+        try
+        {
+            var response = await DataClient.GetByIdAsync(Node.StringProp("entity") ?? string.Empty, id, cancellation.Token);
+            record = response.IsSuccess ? response.Data : null;
+            error = response.IsSuccess ? null : response.ErrorText;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    /// <summary>Same child context while the context and the record are unchanged, so the children are not re-rendered.</summary>
+    private UiRenderContext RecordContext(JsonObject value)
+    {
+        if (recordContext is not { } cached || !ReferenceEquals(cached.Parent, Context) || !ReferenceEquals(cached.Record, value))
+        {
+            recordContext = cached = (Context, value, Context.With(UiExpressions.Record, value));
+        }
+
+        return cached.Context;
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

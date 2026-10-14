@@ -113,6 +113,26 @@ public sealed class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task DefaultSortProperty_orders_pages_when_the_client_sends_no_sort()
+    {
+        await using var context = database.NewContext();
+        var repository = new StockSortedRepository(context);
+
+        var page = await repository.GetItemsAsync(new BaseSearchRequestModel<Product> { RequestItemSize = 2, CurrentPage = 1 }, Ct);
+        var explicitSort = await repository.GetItemsAsync(new BaseSearchRequestModel<Product> { RequestItemSize = 2, SortProperty = "Id", SortReverse = true }, Ct);
+
+        page.Data!.Select(p => p.Stock).Should().Equal(50, 25);
+        explicitSort.Data!.Select(p => p.Id).Should().Equal(1, 2);
+    }
+
+    private sealed class StockSortedRepository(ProductDbContext context) : BaseCrudRepository<Product, ProductDbContext>(context)
+    {
+        protected override string? DefaultSortProperty => nameof(Product.Stock);
+
+        protected override bool DefaultSortDescending => true;
+    }
+
+    [Fact]
     public async Task Insert_and_SaveChanges_persist_entity()
     {
         await using (var context = database.NewContext())

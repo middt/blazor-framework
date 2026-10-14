@@ -1,21 +1,44 @@
-# Container based alternative to the Aspire AppHost (Sample/Middt.Sample.AppHost).
-#   docker compose up --build   → UI: http://localhost:8080   API docs: http://localhost:8180/scalar
+# Container based alternative to the Aspire AppHost (demo/Middt.Sample.AppHost).
+#   docker compose up --build   → Blazor UI: http://localhost:8080   Angular UI: http://localhost:8081   API docs: http://127.0.0.1:8180/scalar
 name: middt-sample
 
-x-sql-password: &sql-password ${MSSQL_SA_PASSWORD:-yourStrong(!)Password}
+# Secrets have no defaults: copy .env.example to .env (git ignored) and set them, or export them in the shell.
+x-sql-password: &sql-password ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)}
 
 services:
   middt-sample-blazorserver:
     build:
       context: .
-      dockerfile: Sample/Middt.Sample.BlazorServer/Dockerfile
+      dockerfile: demo/client/blazor/Middt.Sample.BlazorServer/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ApiSettings__URL: http://middt-sample-api:8080
       ConnectionStrings__redis: redis:6379
     ports:
       - "8080:8080"
-    networks: [backend]
+    networks:
+      backend:
+        # Fixed address: the API trusts X-Forwarded-For only from the two BFFs (see ForwardedHeaders__KnownProxies).
+        ipv4_address: 172.29.0.250
+    depends_on:
+      middt-sample-api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  middt-sample-angular:
+    build:
+      context: .
+      dockerfile: demo/client/angular/Middt.Sample.Angular/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ApiSettings__URL: http://middt-sample-api:8080
+      ConnectionStrings__redis: redis:6379
+    ports:
+      - "8081:8080"
+    networks:
+      backend:
+        ipv4_address: 172.29.0.251
     depends_on:
       middt-sample-api:
         condition: service_started
@@ -25,17 +48,21 @@ services:
   middt-sample-api:
     build:
       context: .
-      dockerfile: Sample/Middt.Sample.Api/Dockerfile
+      dockerfile: demo/server/Middt.Sample.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__BikeStores: "Server=db_server,1433;Database=BikeStores;User Id=sa;Password=${MSSQL_SA_PASSWORD:-yourStrong(!)Password};TrustServerCertificate=True"
+      ConnectionStrings__BikeStores: "Server=db_server,1433;Database=BikeStores;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)};TrustServerCertificate=True"
       ConnectionStrings__redis: redis:6379
-      ConnectionStrings__messaging: amqp://guest:guest@mq:5672
-      JwtSettings__Secret: ${JWT_SECRET:-development-only-signing-key-change-me-0123456789}
-      # The Blazor BFF forwards the end user's IP (X-Forwarded-For); trust only this compose network.
-      ForwardedHeaders__KnownNetworks__0: 172.29.0.0/24
+      ConnectionStrings__messaging: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@mq:5672
+      JwtSettings__Secret: ${JWT_SECRET:?Set JWT_SECRET to a random value of at least 32 characters (see .env.example)}
+      # The BFFs forward the end user's IP (X-Forwarded-For). Trust exactly these two containers, not the whole network:
+      # requests through the published port arrive from the docker gateway and must not be able to spoof their IP
+      # (the per-IP login rate limiter depends on it).
+      ForwardedHeaders__KnownProxies__0: 172.29.0.250
+      ForwardedHeaders__KnownProxies__1: 172.29.0.251
     ports:
-      - "8180:8080"
+      # Local tooling only (Scalar, curl); browsers go through the BFFs.
+      - "127.0.0.1:8180:8080"
     networks: [backend]
     depends_on:
       db_server:
@@ -48,9 +75,13 @@ services:
   mq:
     image: rabbitmq:4-management
     networks: [backend]
+    environment:
+      # Only applied when the broker's data is created; change both together with .env.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -75,7 +106,7 @@ services:
       - ./data:/scripts:ro
       - mssql-data:/var/opt/mssql
     ports:
-      - "1433:1433"
+      - "127.0.0.1:1433:1433"
     healthcheck:
       # Healthy only after the BikeStores seed script has run.
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1 FROM sys.databases WHERE name = 'BikeStores'\" -h -1 | grep -q 1"]

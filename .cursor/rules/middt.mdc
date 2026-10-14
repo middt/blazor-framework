@@ -1,0 +1,14 @@
+---
+description: Middt Framework – project rules (see AGENTS.md)
+alwaysApply: true
+---
+
+Read `AGENTS.md` at the repository root and the nested `AGENTS.md` of the folder you edit before changing code.
+Playbooks for recurring tasks are in `docs/ai/`.
+
+- Definition of done: CI build with 0 warnings (`-p:ContinuousIntegrationBuild=true`), `dotnet test --project tests/Middt.Framework.Tests` green,
+  ui-core `node --test` and both Angular builds clean when TypeScript changed.
+- Respect layering (sdk/shared → no UI/ASP.NET; sdk/server → no frontend packages); LayeringTests enforce it.
+- Contracts change in .NET and TypeScript together; update `spec/`.
+- Keep Blazor and Angular feature-equal (same ids/classes/aria labels, Turkish UI texts).
+- Never commit secrets; compose reads them from `.env`. Don't weaken security defaults.

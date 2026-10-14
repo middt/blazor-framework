@@ -37,3 +37,41 @@ jobs:
         with:
           name: nuget-packages
           path: artifacts/*.nupkg
+
+  # TypeScript core of the server driven UI: runs the same conformance suite (spec/) as the .NET tests.
+  typescript-ui-core:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/client/typescript/ui-core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test
+        run: node --test test/
+
+  # Angular: build the SDK packages (@middt/ui-core, @middt/angular) and the demo app that consumes them.
+  angular:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build @middt/ui-core
+        working-directory: sdk/client/typescript/ui-core
+        run: npm ci && npm run build
+
+      - name: Build @middt/angular
+        working-directory: sdk/client/angular
+        run: npm ci && npx ng build middt-angular
+
+      - name: Build demo app
+        working-directory: demo/client/angular/app
+        run: npm ci && npx ng build sample --configuration production

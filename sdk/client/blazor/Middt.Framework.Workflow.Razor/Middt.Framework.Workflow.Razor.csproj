@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Workflow Razor views</Product>
+    <Description>Base classes and catalog of Razor workflow views ([WorkflowView]) for Blazor frontends. The API can render the same components to HTML (MiddtWorkflowOptions.UseViews); portable frontends use JSON layouts instead.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\Middt.Framework.Model\Middt.Framework.Model.csproj" />
+  </ItemGroup>
+
+</Project>

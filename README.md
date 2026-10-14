@@ -1,33 +1,82 @@
 # Middt Framework
 
-Building blocks for line-of-business applications made of an **ASP.NET Core REST API** and a **Blazor Server UI**:
-generic repositories with attribute-driven search, CRUD controllers, JWT token endpoints, typed API clients and
-ready-made list/detail/CRUD pages.
+Building blocks for line-of-business applications made of an **ASP.NET Core REST API** and a replaceable frontend
+(**Blazor Server** and **Angular** today, both over the same backend): generic repositories with attribute-driven
+search, CRUD controllers, JWT token endpoints, a workflow engine, server driven UI (JSON layouts), typed API clients
+and ready-made list/detail/CRUD pages. See [docs/architecture.md](docs/architecture.md) for the layering.
 
 Targets **.NET 10 (LTS)**.
 
 ## Packages
 
-| Project | Purpose |
-|---|---|
-| `Middt.Framework.Model` | Wire contracts: `BaseResponseModel`/`BaseResponseDataModel<T>` (result envelope), `BaseSearchRequestModel<T>`, settings, `Query*` filter attributes. No dependencies. |
-| `Middt.Framework.Data` | `IBaseRepository<T>` / `BaseCrudRepository<T, TContext>` on EF Core 10, `QueryFilterBuilder` (filter / sort / page). |
-| `Middt.Framework.Common` | Typed API clients (`BaseCrudApiClient<T>`) on `IHttpClientFactory` + resilience, token client, SignalR hub/client, e-mail, Syncfusion document export. |
-| `Middt.Framework.Api` | `AddMiddtApi()` / `UseMiddtApi()`, CRUD + token controllers, ProblemDetails, versioning, OpenAPI + Scalar, JWT, rate limiting, HybridCache. |
-| `Middt.Framework.Blazor.Web` | `AddMiddtBlazor()` / `UseMiddtBlazor()`, Radzen based list/detail/CRUD pages, modals, authorization view, SignalR component, file upload, captcha. |
-| `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions, tasks, retries, timers, subflows, history – on EF Core, no Dapr. |
-| `Middt.Framework.Plugin.Redis` | Redis connection, RedLock distributed lock, lock-protected read-through cache. |
-| `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
+| Layer | Project | Purpose |
+|---|---|---|
+| Contracts | `Middt.Framework.Model` | Wire contracts: `BaseResponseModel`/`BaseResponseDataModel<T>` (result envelope), `BaseSearchRequestModel<T>`, auth, workflow and SignalR DTOs, settings, `Query*` filter attributes. No dependencies. |
+| Contracts | `Middt.Framework.Expressions` | The **portable expression language** (identical in .NET and TypeScript, verified by `spec/expressions.conformance.json`) and the richer DynamicExpresso evaluator used by workflow rules. |
+| Contracts | `Middt.Framework.Ui.Abstractions` | Server driven UI contract: layout model, widget specs, validator, portable formats, JSON Schema generator. No UI technology. |
+| Backend | `Middt.Framework.Common` | Server side helpers for API and frontend hosts: security headers, forwarded headers, SignalR hub base, e-mail, Syncfusion document export. |
+| Backend | `Middt.Framework.Data` | `IBaseRepository<T>` / `BaseCrudRepository<T, TContext>` on EF Core 10, `QueryFilterBuilder` (filter / sort / page). |
+| Backend | `Middt.Framework.Api` | `AddMiddtApi()` / `UseMiddtApi()`, CRUD + token controllers, ProblemDetails, versioning, OpenAPI + Scalar, JWT, rate limiting, HybridCache. |
+| Backend | `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions, tasks, retries, timers, subflows, history – on EF Core, no Dapr. |
+| Backend | `Middt.Framework.Ui.Server` | Layout store on EF Core (`ui` schema, revisions, optimistic concurrency), seeding, `MapMiddtUi()` REST API (incl. widgets and JSON Schema), plain C# static HTML renderer. |
+| Client SDK | `Middt.Framework.Client` | Typed API clients (`BaseCrudApiClient<T>`, `WorkflowApiClient`, `UiApiClient`, `UiDataClient`) on `IHttpClientFactory` + resilience, token refresh, SignalR client. |
+| Frontends | `Middt.Framework.Bff` | Backend-for-frontend blocks for any browser frontend: HttpOnly cookie session, server side token store with refresh, Login/Logout pages, `GET /bff/user`, YARP proxy of `/api` + `/hubs` with the session's token and CSRF protection (`AddMiddtSpaBff()` / `UseMiddtSpaBff()`). |
+| Blazor | `Middt.Framework.Blazor.Web` | The Blazor frontend: `AddMiddtBlazor()` / `UseMiddtBlazor()`, BFF cookie auth, Radzen based list/detail/CRUD pages, workflow screens, modals, SignalR, file upload, captcha; layout renderer under `Ui/` (`AddMiddtUi()`, display + interactive widgets, `UiPageHost`, `UiLayoutHost`, runtime `UiLayoutEditor`). |
+| Blazor | `Middt.Framework.Workflow.Razor` | Razor workflow views (`[WorkflowView]`, `WorkflowViewBase`, `WorkflowTransitionViewBase`, `WorkflowViewCatalog`). |
+| TypeScript | `sdk/client/typescript/ui-core` (`@middt/ui-core`) | Types, portable expressions, formats, layout/data/workflow API clients for non-.NET frontends. |
+| Angular | `sdk/client/angular` (`@middt/angular`) | Angular 22 frontend library: BFF auth, layout renderer/widgets/editor, workflow list/detail/wizard, SignalR – see [sdk/client/angular/README.md](sdk/client/angular/README.md). Demo app: `demo/client/angular/app`. |
+| Plugins | `Middt.Framework.Plugin.Redis` | Redis connection, RedLock distributed lock, lock-protected read-through cache. |
+| Plugins | `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
+
+### Repository layout
+
+The repository has two halves with the same shape: **`sdk/`** (the framework) and **`demo/`** (the bike store sample).
+Each is split into `shared` (used by server and client), `server` and `client`, and `client` has one folder per
+frontend technology.
+
+```
+sdk/                              the framework (NuGet / npm packages)
+  shared/                         Model · Expressions · Ui.Abstractions         contracts, no UI technology
+  server/                         Common · Data · Api · Workflow · Ui.Server    backend, no frontend dependencies
+    plugins/                      Plugin.Redis · Plugin.Rebus
+  client/
+    dotnet/                       Client                                        .NET client SDK (typed API clients)
+    typescript/ui-core/           @middt/ui-core                                TypeScript contract, expressions, API clients
+    bff/                          Bff                                           backend-for-frontend host blocks (Blazor + Angular)
+    blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
+    angular/                      @middt/angular                                Angular frontend (library workspace)
+demo/                             the bike store sample
+  shared/                         Sample.Common · Sample.Views · ServiceDefaults
+  server/                         Sample.Api (+ Layouts/, Workflows/ seeds)
+  client/
+    blazor/                       Sample.BlazorServer
+    angular/                      Sample.Angular (BFF host) · app/ (Angular demo app using @middt/angular as a package)
+  Middt.Sample.AppHost            Aspire orchestration of everything
+spec/                             expressions.conformance.json · ui-layout.schema.json (shared by .NET and TypeScript)
+tests/  docs/  data/
+```
+
+`Middt.Framework.Workflow.Razor` stays a separate package on purpose: it only holds the Razor workflow view base
+classes, which the shared view library *and the API* (static HTML of `view.component` states) reference – putting it into
+`Blazor.Web` would drag Radzen and the BFF into the backend.
 
 ## Architecture
 
 ```
- Blazor Server (Middt.Framework.Blazor.Web)
-   BaseRadzenListCrudPage<TService, TModel> ──► ICrudApiClient<TModel> (typed HttpClient + resilience + token refresh)
+ Contracts      Model · Expressions (portable) · Ui.Abstractions · spec/*.json      ← shared by every layer and language
+ Backend        Api · Data · Workflow · Ui.Server · Common                          ← no Razor/Blazor/Radzen
+ Client SDK     Client (typed HttpClient + resilience + token refresh)
+ Frontends      BFF: Bff   Blazor: Blazor.Web · Workflow.Razor   Angular: @middt/ui-core · @middt/angular
+
+ Blazor Server   BaseRadzenListCrudPage<TService, TModel> / layout widgets ──► Middt.Framework.Client
                                                         │  HTTPS / JSON, RFC 9457 ProblemDetails on errors
- ASP.NET Core API (Middt.Framework.Api)                 ▼
+ ASP.NET Core API                                       ▼
    BaseCrudController<TModel, TRepository> ──► IBaseRepository<TModel> ──► EF Core DbContext (DI scoped)
 ```
+
+The backend never references a frontend package; a frontend talks to it only through REST/JSON and the shared
+contracts. The Angular frontend was added exactly that way – a renderer on top of `@middt/ui-core` behind the same BFF – see
+[docs/architecture.md](docs/architecture.md).
 
 Design choices:
 
@@ -97,7 +146,7 @@ Null / empty values and read-only (computed) properties are ignored, zero is ign
 ### Blazor Server
 
 ```csharp
-builder.AddMiddtBlazor();                               // Radzen, Syncfusion, token storage, auth state, ApiSettings
+builder.AddMiddtBlazor();                               // Radzen, BFF session, auth state, ApiSettings (Syncfusion: o.UseSyncfusion = true)
 builder.Services.AddMiddtApiClient<ProductService>();   // typed client with standard resilience handler
 
 var app = builder.Build();
@@ -143,7 +192,7 @@ builder.Services.AddMiddtWorkflow(o =>
 app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
 ```
 
-A definition ([full example](Sample/Middt.Sample.Api/Workflows/order-approval.json)):
+A definition ([full example](demo/server/Middt.Sample.Api/Workflows/order-approval.json)):
 
 ```jsonc
 {
@@ -171,8 +220,9 @@ A definition ([full example](Sample/Middt.Sample.Api/Workflows/order-approval.js
 | Concept | Supported |
 |---|---|
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
-| Transitions | `Manual` (API, `roles`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
-| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when a transition declares `input` (`into` path, computed `set` values) |
+| Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
+| Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [order-approval.v2.json](demo/server/Middt.Sample.Api/Workflows/order-approval.v2.json) |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body) |
 | Tasks | `onEntry`, `onExit`, `onExecute`; built-ins `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`; custom `IWorkflowTask`; `when` condition |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
@@ -187,12 +237,102 @@ REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
 `Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, start dialog generated from the
 start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
-with a form generated from its input schema) and `JsonSchemaForm`. See `Sample/Middt.Sample.BlazorServer/Pages/Workflow/OrderApprovalPage.razor`
+with a form generated from its input schema) and `JsonSchemaForm`. See `demo/client/blazor/Middt.Sample.BlazorServer/Pages/Workflow/OrderApprovalPage.razor`
 (menu "Sipariş Onayı").
+
+### Server driven UI (Razor views)
+
+States and transitions can name a Razor component that renders them; the definition decides which screen is shown,
+the screens themselves stay compiled, type checked Razor (no runtime compilation, no view DSL):
+
+```jsonc
+{ "key": "manager-review", "view": { "component": "order-review" },
+  "transitions": [ { "key": "reject", "target": "rejected", "view": { "component": "reject-reason" }, "input": { … } } ] }
+```
+
+```razor
+@attribute [WorkflowView("order-review")]   @* state view: WorkflowViewBase (Instance, Data, Text("path")) *@
+@inherits WorkflowViewBase
+<h3>Order #@Text("orderId") · @Text("customerName")</h3>
+```
+
+- `WorkflowViewBase` (state screens) and `WorkflowTransitionViewBase` (input forms: call `SubmitAsync(body)`; API
+  validation errors arrive in `Errors`) live in `Middt.Framework.Workflow.Razor`. Razor views are a Blazor feature;
+  states that must work in every frontend use JSON layouts (`view.layout`).
+- Blazor: `builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>())` –
+  `WorkflowInstanceDetail` renders the state view with `DynamicComponent` (raw data stays available under "Ham veri")
+  and uses the transition view instead of the schema generated form. Without a registered view it falls back to the
+  generic UI.
+- API: `o.UseViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>().Views)` validates view names at startup and
+  enables `GET /api/workflows/{workflow}/instances/{id}/view`, which renders the state view to static HTML
+  (`HtmlRenderer`) for non-Blazor clients, e-mails or PDFs. The endpoint asks every registered
+  `IWorkflowViewRenderer` (Razor components, JSON layouts, your own) and returns the first result. Keep views free of JS interop and never output instance
+  data with `MarkupString` – Razor encodes everything else.
+- Sample: `demo/shared/Middt.Sample.Views` (`order-review`, `order-result`, `reject-reason`) is shared by the API and the UI.
 
 Compared to vNext this engine intentionally leaves out the separate execution host, Dapr (jobs, locks, pub/sub, state),
 inbox/outbox relays, Roslyn C# scripts, schema-per-flow storage, views/functions/extensions and long polling; tasks run
 in-process and side effects should be idempotent (at-least-once on retries).
+
+## Server driven UI (JSON layouts)
+
+Screens can also be data: a **layout** is a JSON tree of registered **widgets**, stored in the database and editable at
+runtime – no deployment for a new list page, a changed column or a new workflow state screen. Layouts never contain
+code or markup: only widget names, properties and sandboxed expressions, validated against the widget catalog.
+A layout is frontend independent: Blazor renders it today (`Middt.Framework.Blazor.Web`, namespace `Middt.Framework.Blazor.Web.Ui`), the API renders it to static
+HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@middt/ui-core`).
+
+```jsonc
+{ "key": "bike-category", "title": "Kategoriler", "kind": "page", "version": 1,
+  "menu": { "title": "Category", "icon": "category", "order": 10 }, "roles": [],
+  "body": [
+    { "widget": "heading", "text": "Kategoriler" },
+    { "widget": "grid", "entity": "Category",                       // api/v1/Category/getitems|insert|update|delete
+      "columns": [ { "field": "categoryName", "title": "Ad" } ],
+      "search":  [ { "field": "categoryName", "label": "Ad" } ],
+      "create": true, "edit": true, "delete": true,
+      "form":    [ { "field": "categoryName", "label": "Ad", "required": true, "maxLength": 255 } ],
+      "rowActions": [ { "text": "Ürünler", "icon": "search", "navigate": "/ui/bike-category-products?id={{ row.categoryId }}" } ] } ] }
+```
+
+| Widget | Purpose |
+|---|---|
+| `heading`, `text`, `alert`, `badge`, `divider`, `link` | Display; text properties are `{{ }}` templates |
+| `fields` | Label/value list with formats (`N2`, `d`, `g`) |
+| `section`, `columns`, `list` | Containers (`list` repeats its children per array item as `row`) |
+| `grid` *(interactive)* | Server paged/sorted grid of a CRUD controller: search fields, fixed `filter`, row actions, create/edit/delete dialog |
+| `record` *(interactive)* | Loads one entity by `recordId` and shows its children with it as `record` |
+
+- Every node accepts `visibleWhen` (e.g. `user.IsInRole("manager")`, `data.amount > 20000`). Variables: `data`,
+  `query`, `row`, `record`, `instance`, `user`, `now`. Expressions use the **portable language**: member access with
+  null propagation, `! - * / % + < <= > >= == != && || ?? ?:`, text methods (`Contains`, `StartsWith`, `ToUpper`, …),
+  `Math.Round/Abs/Floor/Ceiling/Min/Max`; `==` is strict (`query.id == "42"`, not `42`). Unknown variables or methods
+  are rejected when the layout is saved. Formats: `N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`. Form/search field types: `text`, `textarea`, `number`,
+  `integer`, `date`, `datetime`, `checkbox`, `select` (static `options` or a `lookup` entity) and `picker` (search
+  dialog over a lookup entity).
+- **API**: `builder.Services.AddMiddtUi(o => o.UseDbContext(...).AddLayoutsFromDirectory("Layouts"))` and
+  `app.MapMiddtUi()`. Seed files are validated at startup (a broken file stops the app) and overwrite stored layouts
+  only when their `version` is higher, so runtime edits survive restarts. Reads are open to authenticated users
+  (filtered by the layout's `roles`); `PUT/DELETE/validate/revisions` need `MiddtUiOptions.AdminRole` (`ui-admin`).
+  `PUT` carries the version it is based on (0 = new) – a stale save gets 409; every change keeps a revision.
+- **Blazor**: `builder.Services.AddMiddtUi()`, a page `@page "/ui/{Key}"` with `<UiPageHost Key="@Key" />` and an
+  admin page with `<UiLayoutEditor />` (edit JSON, validate on the server, preview, save, revisions, delete).
+  Grid/record widgets call the CRUD controllers **with the signed-in user's token**, so API authorization is unchanged;
+  a layout can only show what the user may already read.
+- **Workflows**: a state can use `"view": { "layout": "order-escalated" }` instead of a Razor component;
+  `WorkflowInstanceDetail` renders it with `data` and `instance`. For `GET …/instances/{id}/view` register an
+  `IWorkflowViewRenderer` (the sample's `WorkflowLayoutRenderer` uses `UiLayoutStore` + `UiHtmlRenderer`).
+- **Editors**: `GET api/ui/schema` (also committed as `spec/ui-layout.schema.json`) is the JSON Schema of layouts;
+  seed files reference it with `"$schema"` for completion in VS Code / Rider.
+- **Custom widgets**: register the spec in the API – `o.AddWidget(spec, html)` (optional static HTML) – and an
+  implementation in each frontend: `AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor (component deriving from
+  `UiWidgetBase`), `provideMiddtUiWidgets({ name, component })` in Angular.
+- Razor views (`[WorkflowView]`) remain the choice for complex, bespoke screens; layouts cover the many list / detail /
+  form / status screens that only need configuration.
+
+The sample's Category, Category → Products, Product and Order screens are layouts
+(`demo/server/Middt.Sample.Api/Layouts`), reachable from the menu, which lists every page layout with a `menu` entry.
+Old `/Bike/...` URLs redirect.
 
 ## Messaging (Rebus)
 
@@ -226,10 +366,30 @@ Publishing after `SaveChanges` is not atomic with the database write; use Rebus'
 
 ## Security
 
+### Secure defaults (10.x review)
+
+| Area | Default | Opt out / configure |
+|---|---|---|
+| OpenAPI + Scalar | Development only | `MiddtApiOptions.EnableOpenApi = true` |
+| Page size | `getitems` clamped to 500, `getall` capped at 1000 | `MaxPageSize`, `MaxGetAllItems` |
+| Search filters | values sent as SQL parameters (no literals, stable plans) | – |
+| Workflow errors | raw task errors hidden from API callers (logged + stored) | `MiddtWorkflowOptions.ExposeErrorDetails` |
+| Workflow instances | everyone allowed by `roles` sees all instances | `"instanceAccess": { "mode": "owner", "supervisorRoles": ["manager"] }` (the demo uses it) |
+| Workflow `http` task | no redirects; any host of the definition | `AllowedHttpHosts` |
+| BFF proxy | `/api/**/token/**` is not proxied (tokens never reach JS) | `MiddtBffOptions.ProxyDeniedPaths` |
+| BFF login | per IP and per user name (failed logins) | `LoginAttemptsPerMinute`, `LoginAttemptsPerUsernamePerMinute` |
+| Logout | auto-submits only from the same origin (no logout CSRF) | – |
+| SPA shell | `*.html` only for signed-in users; no `Server` header | – |
+| Compression | Brotli/Gzip for API, BFF and Blazor responses (login pages excluded: BREACH) | `EnableResponseCompression` / `ResponseCompression` / `UseResponseCompression` |
+| .NET client | retries only safe methods, never 429, no retry for the token client | – |
+| docker compose | secrets from `.env` (no defaults), DB/broker/API ports on localhost only, API trusts only the BFF containers' IPs for `X-Forwarded-For` | copy `.env.example` to `.env` |
+
+
 The framework follows the OWASP Top 10 / ASVS recommendations by default.
 
-**Authentication (Blazor ↔ browser) – BFF pattern.** The browser only gets an `HttpOnly`, `SameSite=Lax`, `Secure`
-(outside Development) session cookie `middt.auth` that carries the user's claims and a server side session id.
+**Authentication (browser ↔ frontend host) – BFF pattern (`Middt.Framework.Bff`, used by Blazor and Angular).** The
+browser only gets an `HttpOnly`, `SameSite=Lax`, `Secure` (outside Development) session cookie (`middt.auth`, name
+configurable per app) that carries the user's claims and a server side session id.
 The API's access and refresh tokens are stored on the server (`IServerTokenStore`, encrypted with Data Protection,
 in `IDistributedCache`), so no token is ever readable by JavaScript or stored in the browser. Login and logout are
 server rendered Razor Pages (`/Account/Login`, `/Account/Logout`) with antiforgery tokens, per-IP rate limiting,
@@ -237,6 +397,13 @@ generic error messages and open-redirect protection (`LocalUrl`). Sessions have 
 are revalidated every minute by the circuit, and a replayed cookie is rejected once its server session is gone.
 For more than one instance (or containers) register a shared `IDistributedCache` and persist the Data Protection keys
 (e.g. Redis, see the sample).
+
+**SPA (Angular) calls.** The Angular app never sees a token: it calls `/api/**` and `/hubs/**` on its own origin and the
+BFF forwards them to the API (YARP) with the session's access token, refreshing it shortly before it expires (single
+flight per session; a failed refresh ends the session → 401 → login page). Browser cookies are not forwarded. CSRF: API
+calls must carry the `X-CSRF` header (cannot be set cross-site without a CORS preflight) and WebSocket upgrades must have a
+same-origin `Origin`. API style paths answer 401/403 instead of redirects; page navigations go to the login page. The SPA
+gets a strict CSP (`script-src 'self'`, no inline scripts).
 
 **Tokens (Blazor ↔ API).** Short lived JWT access tokens (HS256, issuer/audience/lifetime validated, zero clock skew).
 Refresh tokens are random 256-bit values, stored hashed, single use (rotation) and grouped in families with an absolute
@@ -269,35 +436,65 @@ token reuse; personal data is kept out of logs; vulnerable transitive packages a
 
 ## Running the sample
 
-The sample (`Sample/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the API and the Blazor UI. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
+The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the API, the Blazor UI and the Angular UI. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
 
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
 ```bash
-dotnet run --project Sample/Middt.Sample.AppHost
+dotnet run --project demo/Middt.Sample.AppHost
 ```
 
 The Aspire dashboard shows all resources, logs, traces and metrics. Set the SQL password once with
-`dotnet user-secrets set Parameters:sql-password "<password>" --project Sample/Middt.Sample.AppHost`
+`dotnet user-secrets set Parameters:sql-password "<password>" --project demo/Middt.Sample.AppHost`
 (Aspire prompts for missing parameters otherwise).
 
 **With Docker Compose:**
 
 ```bash
+cp .env.example .env    # then set JWT_SECRET, MSSQL_SA_PASSWORD, RABBITMQ_DEFAULT_USER / _PASS
 docker compose up --build
 ```
 
-UI: <http://localhost:8080> (login page `/Account/Login`, demo user `test@test.com` / `test`) · API reference: <http://localhost:8180/scalar>.
+Blazor UI: <http://localhost:8080> · Angular UI: <http://localhost:8081> (same screens, layouts and workflows) · login
+page `/Account/Login`, demo user `test@test.com` / `test` (roles `manager` and `ui-admin`) · layout editor: `/ui-admin` ·
+API reference: <http://localhost:8180/scalar>.
 
 ## Development
+
+**AI-assisted development:** [`AGENTS.md`](AGENTS.md) (map, commands, conventions, definition of done) plus nested
+`AGENTS.md` files per area and task playbooks in [`docs/ai/`](docs/ai/README.md). Tool entry points: `CLAUDE.md`
+(Claude Code, slash commands `/verify`, `/add-entity`, `/add-widget`, `/add-workflow`), `.github/copilot-instructions.md`,
+`.cursor/rules/middt.mdc`.
 
 ```bash
 dotnet build Middt.Framework.slnx
 dotnet test --solution Middt.Framework.slnx
 dotnet pack Middt.Framework.slnx -c Release -o artifacts
+(cd sdk/client/typescript/ui-core && node --test test/)     # TypeScript core, same conformance suite
+(cd sdk/client/typescript/ui-core && npm ci && npm run build)            # @middt/ui-core package
+(cd sdk/client/angular && npm ci && npx ng build middt-angular)           # @middt/angular package
+(cd demo/client/angular/app && npm ci && npx ng build sample)             # Angular demo app (consumes both packages)
 ```
 
+`spec/ui-layout.schema.json` is generated from the widget catalog; after changing widget specs regenerate it with
+`MIDDT_UPDATE_SPEC=1 dotnet test --project tests/Middt.Framework.Tests` (a test fails while it is out of date).
+
 Package versions are managed centrally in `Directory.Packages.props`; shared build settings live in `Directory.Build.props`.
+
+## Upgrade notes (within 10.x)
+
+- Syncfusion is opt-in in Blazor (`AddMiddtBlazor(o => o.UseSyncfusion = true)` or `AddMiddtSyncfusion`); pages using
+  `BaseFileUploadComponent` must include `_content/Syncfusion.Blazor.Themes/bootstrap5.css` and
+  `_content/Syncfusion.Blazor.Core/scripts/syncfusion-blazor.min.js`.
+- Blazor host pages should keep `<persist-component-state />` and `~/` asset URLs (fingerprinted static assets).
+- Custom layout widgets skip updates whose `Node` and `Context` are unchanged; override `SkipUnchangedParameters` if a
+  widget renders state from elsewhere. Pass the same `Variables` dictionary to `UiLayoutHost` while nothing changed.
+- Workflow commands answer 409 when the instance changed between validation and claim; workflow ids on SQL Server are
+  SQL-Server-sequential GUIDs; new indexes are created at startup with `AutoCreateSchema`, otherwise via migration.
+- `LocalUrl` and `UiUrl` reject control characters, non-ASCII (LocalUrl) and leading/trailing whitespace – percent-encode.
+- Signing in again ends the previous server session; the .NET client no longer retries POST/PUT/PATCH/DELETE or 429.
+- Workflow owner checks compare `StartedBy` with the user name – user names must be unique.
+- `BaseSignalRHub` lets any signed-in user broadcast and join any group; override `Send`/`JoinGroup` to authorize targets.
 
 ## Migrating from 6.x
 
@@ -332,6 +529,8 @@ Version 10 is a breaking release. The main changes for consumers:
 | `RedisSettings.RedisModelList` | `RedisSettings.ConnectionString` |
 | `Middt.Framework.Plugin.RabbitMQ` / `Middt.Framework.Plugin.MassTransit` (`BaseMassTransitConnection`, producer/consumer bases) | `Middt.Framework.Plugin.Rebus`: `AddMiddtRebus(...)`, `IBus.Send/Publish`, `IHandleMessages<T>` handlers |
 | `StringSearchType.Any` | `StringSearchType.Equal` |
+| `Middt.Framework.Common` typed clients, token service, SignalR client (`Middt.Framework.Common.Http/Security/SignalR`) | `Middt.Framework.Client` (`Middt.Framework.Client.Http/Security/SignalR`, `AddMiddtApiClient(s)` in `Middt.Framework.Client.DependencyInjection`); SignalR DTOs in `Middt.Framework.Model.SignalR` |
+| `BaseTokenHelper`, `INotification` in Common | `Middt.Framework.Blazor.Web.Security.BaseTokenHelper`, `Middt.Framework.Blazor.Web.Base.Notification.INotification` |
 | `ArrayMaxLength` / `ArrayMinLength` were exclusive and rejected `null` | inclusive bounds, `null` is valid (combine with `[Required]`) |
 
 ## License

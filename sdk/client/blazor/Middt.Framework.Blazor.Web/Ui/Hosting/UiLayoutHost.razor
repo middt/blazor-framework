@@ -1,0 +1,70 @@
+@namespace Middt.Framework.Blazor.Web.Ui
+@using System.Text.Json.Nodes
+@using Microsoft.Extensions.DependencyInjection
+@using Middt.Framework.Expressions
+@using Middt.Framework.Blazor.Web.Ui.Components
+@using Middt.Framework.Ui.Model
+@using Middt.Framework.Ui.Rendering
+@using Middt.Framework.Ui.Widgets
+
+@* Embeds a JSON layout (kind "view") with the given variables, e.g. a workflow state view with data and instance. *@
+@if (error is not null)
+{
+    <div class="middt-ui-alert middt-ui-alert-warning" role="alert">@error</div>
+}
+else if (layout is not null && context is not null)
+{
+    <UiLayoutView Layout="layout" Context="context" />
+}
+
+@code {
+    private UiLayoutDocument? layout;
+    private UiRenderContext? context;
+    private string? error;
+    private ExpressionUser? user;
+    private UiLayoutDocument? contextLayout;
+    private IReadOnlyDictionary<string, JsonNode?>? contextVariables;
+
+    [Inject]
+    private IServiceProvider Services { get; set; } = default!;
+
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>Expression variables (<c>data</c>, <c>instance</c>, ...). Pass the same instance while nothing changed: a new
+    /// dictionary creates a new render context and re-renders every widget.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<string, JsonNode?>? Variables { get; set; }
+
+    [Parameter]
+    public string IdPrefix { get; set; } = "ui-view";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Services.GetService<UiApiClient>() is not { } client || Services.GetService<UiWidgetCatalog>() is not { } catalog)
+        {
+            error = "JSON yerleşimler için services.AddMiddtUi() çağrılmalıdır.";
+            return;
+        }
+
+        if (layout?.Key != Key)
+        {
+            var response = await client.GetAsync(Key);
+            layout = response.IsSuccess ? response.Data : null;
+            error = layout is null ? $"'{Key}' yerleşimi yüklenemedi: {response.ErrorText}" : null;
+            context = null;
+        }
+
+        // Same layout, variables and prefix: keep the context so the widgets (grids, selects) are not re-rendered and reloaded.
+        if (layout is not null && (context is null || !ReferenceEquals(contextLayout, layout) || !ReferenceEquals(contextVariables, Variables) || context.IdPrefix != IdPrefix))
+        {
+            user ??= ExpressionUser.FromPrincipal((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User);
+            context = new UiRenderContext(catalog, user, Variables, interactive: true) { IdPrefix = IdPrefix };
+            contextLayout = layout;
+            contextVariables = Variables;
+        }
+    }
+}

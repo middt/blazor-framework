@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework UI Server</Product>
+    <Description>Backend of the Middt server driven UI, independent of any frontend: layout store (EF Core, revisions), seeding from JSON files, REST endpoints (layouts, widgets, JSON Schema) and a plain C# static HTML renderer.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\Middt.Framework.Model\Middt.Framework.Model.csproj" />
+    <ProjectReference Include="..\..\shared\Middt.Framework.Ui.Abstractions\Middt.Framework.Ui.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

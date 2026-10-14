@@ -1,6 +1,7 @@
 using System.Net;
 using Middt.Framework.Blazor.Web.DependencyInjection;
 using Middt.Framework.Tests.Api;
+using Middt.Framework.Bff.Security;
 
 namespace Middt.Framework.Tests.Blazor;
 
@@ -89,7 +90,7 @@ public sealed class BffAuthenticationTests(BlazorHostFixture fixture) : IClassFi
         me!.ClaimTypes.Should().Contain(System.Security.Claims.ClaimTypes.Sid)
             .And.Contain(System.Security.Claims.ClaimTypes.Name)
             .And.Contain(System.Security.Claims.ClaimTypes.Role)
-            .And.Contain(Middt.Framework.Blazor.Web.Security.MiddtClaimTypes.SessionId);
+            .And.Contain(Middt.Framework.Bff.Security.MiddtClaimTypes.SessionId);
         me.ClaimTypes.Should().NotContain(["exp", "nbf", "iat", "iss", "aud", "jti"]);
     }
 

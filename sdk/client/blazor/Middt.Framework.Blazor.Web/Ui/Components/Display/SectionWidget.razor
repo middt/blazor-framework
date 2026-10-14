@@ -1,0 +1,9 @@
+@inherits UiWidgetBase
+
+<section class="middt-ui-section" aria-labelledby="@(Node.StringProp("title") is null ? null : ElementId("title"))">
+    @if (Node.StringProp("title") is not null)
+    {
+        <h3 class="middt-ui-section-title" id="@ElementId("title")">@Text("title")</h3>
+    }
+    <UiNodeList Nodes="Node.Children" Context="Context" />
+</section>

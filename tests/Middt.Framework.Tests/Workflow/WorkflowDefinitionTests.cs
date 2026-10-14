@@ -9,7 +9,7 @@ namespace Middt.Framework.Tests.Workflow;
 public sealed class WorkflowDefinitionTests
 {
     private static string SampleDefinition(string file) =>
-        File.ReadAllText(Path.Combine(RepositoryRoot(), "Sample", "Middt.Sample.Api", "Workflows", file));
+        File.ReadAllText(Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows", file));
 
     private static string RepositoryRoot()
     {
@@ -80,6 +80,24 @@ public sealed class WorkflowDefinitionTests
         order.FindState("manager-review")!.Transitions.Should().Contain(t => t.Key == "escalate" && t.Trigger == TriggerType.Scheduled);
         order.SharedTransitions.Should().ContainSingle(t => t.Key == "cancel" && t.AvailableIn.Contains("*"));
         registry.Latest.Select(d => d.Key).Should().BeEquivalentTo("order-approval", "credit-check");
+    }
+
+    [Fact]
+    public void All_sample_definition_versions_load_together_and_the_wizard_is_latest()
+    {
+        var files = Directory.GetFiles(Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows"), "*.json")
+            .Select(f => SampleDefinition(Path.GetFileName(f)))
+            .ToArray();
+
+        var (registry, errors) = Load(files);
+
+        errors.Should().BeEmpty();
+        var latest = registry!.GetLatest("order-approval");
+        latest.Version.Should().Be(2);
+        latest.Start.Target.Should().Be("customer");
+        latest.States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4, 5 });
+        registry.Get("order-approval", 1).Start.Target.Should().Be("credit-check", "running v1 instances keep their definition");
+        registry.GetLatest("credit-check").Version.Should().Be(2);
     }
 
     [Fact]

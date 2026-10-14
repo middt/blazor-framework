@@ -1,0 +1,11 @@
+@inherits UiWidgetBase
+
+@switch (Math.Clamp(Node.IntProp("level", 2), 1, 6))
+{
+    case 1: <h1 class="middt-ui-heading">@Text("text")</h1> break;
+    case 2: <h2 class="middt-ui-heading">@Text("text")</h2> break;
+    case 3: <h3 class="middt-ui-heading">@Text("text")</h3> break;
+    case 4: <h4 class="middt-ui-heading">@Text("text")</h4> break;
+    case 5: <h5 class="middt-ui-heading">@Text("text")</h5> break;
+    default: <h6 class="middt-ui-heading">@Text("text")</h6> break;
+}

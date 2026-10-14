@@ -18,6 +18,7 @@ using Middt.Framework.Model.Workflow;
 using Middt.Framework.Workflow;
 using Middt.Framework.Workflow.DependencyInjection;
 using Middt.Framework.Workflow.Endpoints;
+using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Persistence;
 using Middt.Framework.Workflow.Runtime;
@@ -107,6 +108,7 @@ public sealed class WorkflowTestHost : IAsyncDisposable
             });
             o.AutoCreateSchema = true;
             o.EnableJobProcessor = false;
+            o.ExposeErrorDetails = true; // engine tests assert error texts; hiding them is tested separately
             foreach (var json in definitionList)
             {
                 o.AddDefinition(json, "test-" + definitionList.IndexOf(json));

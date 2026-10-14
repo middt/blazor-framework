@@ -51,4 +51,16 @@ public sealed class ProductionOpenApiTests(ProductionApiFixture fixture) : IClas
 
         paths.Should().Equal("/api/v1/token/login");
     }
+
+    [Fact]
+    public async Task Production_does_not_publish_openapi_or_scalar_by_default()
+    {
+        await using var host = await TestApiHost.StartAsync("Production");
+
+        using var document = await host.Client.GetAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
+        using var scalar = await host.Client.GetAsync("/scalar", TestContext.Current.CancellationToken);
+
+        document.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+        scalar.StatusCode.Should().Be(System.Net.HttpStatusCode.NotFound);
+    }
 }

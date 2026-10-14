@@ -1,0 +1,288 @@
+@namespace Middt.Framework.Blazor.Web.Base.Component.Workflow
+@using Middt.Framework.Model.Workflow
+@using Middt.Framework.Workflow.Razor
+@inherits BaseComponent
+
+<section class="middt-wf-detail" aria-live="polite">
+    @if (InstanceId is null)
+    {
+        <RadzenCard class="middt-wf-card">
+            <p class="middt-wf-muted">Detayı görmek için listeden bir kayıt seçin.</p>
+        </RadzenCard>
+    }
+    else if (instance is null)
+    {
+        <RadzenCard class="middt-wf-card">
+            <p class="middt-wf-muted">@(loadFailed ? "Kayıt yüklenemedi." : "Yükleniyor...")</p>
+        </RadzenCard>
+    }
+    else
+    {
+        var steps = Steps;
+        <RadzenCard class="@(ShowStepForm ? "middt-wf-card middt-wf-card-step" : "middt-wf-card")">
+            @if (steps.Count > 0)
+            {
+                <nav class="middt-wf-stepper" aria-label="Adımlar">
+                    <ol>
+                        @foreach (var step in steps)
+                        {
+                            <li class="@StepClass(step)" aria-current="@(step.Current ? "step" : null)" data-step="@step.Number">
+                                <span class="middt-wf-step-marker" aria-hidden="true">@(step.Completed && !step.Current ? "✓" : step.Number.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                                <span class="middt-wf-step-label">@step.Label</span>
+                                <span class="middt-wf-sr-only">(@StepStatusText(step))</span>
+                            </li>
+                        }
+                    </ol>
+                </nav>
+            }
+            <div class="middt-wf-toolbar">
+                <div>
+                    <h2 @ref="stateHeading" id="@($"{IdPrefix}-state-title")" tabindex="-1" class="middt-wf-heading middt-wf-state">@(instance.StateTitle ?? instance.State)</h2>
+                    <div class="middt-wf-meta">
+                        <RadzenBadge BadgeStyle="@WorkflowUi.StatusBadge(instance.Status)" Text="@WorkflowUi.StatusText(instance.Status)" IsPill="true" class="middt-wf-status" />
+                        @if (WorkflowUi.SubTypeText(instance.StateSubType) is { Length: > 0 } subType)
+                        {
+                            <span class="middt-wf-subtype">@subType</span>
+                        }
+                        <span title="Akış sürümü">v@(instance.WorkflowVersion)</span>
+                    </div>
+                </div>
+                <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" title="Yenile" aria-label="Detayı yenile" Click="RefreshAsync" />
+            </div>
+
+            @if (ShowStepForm && stepTransition is { } stepTr)
+            {
+                @* Wizard: the inline transition is the form of this step. *@
+                <form class="middt-wf-step-form" aria-labelledby="@($"{IdPrefix}-state-title")" novalidate
+                      data-transition="@stepTr.Key" @onsubmit="SubmitStepAsync" @onsubmit:preventDefault>
+                    @if (StepViewType is { } stepViewType)
+                    {
+                        <div @ref="stepFormElement" tabindex="-1" class="middt-wf-step-view">
+                            <DynamicComponent Type="@stepViewType" Parameters="@StepViewParameters" />
+                        </div>
+                    }
+                    else
+                    {
+                        <JsonSchemaForm @key="@($"{instance.Id}:{instance.State}:{instance.DataVersion}:{stepTr.Key}")" @ref="stepForm"
+                                        Schema="@stepTr.InputSchema" Value="@stepPrefill" IdPrefix="@($"{IdPrefix}-step-{stepTr.Key}")" Disabled="@executing" />
+                        @if (stepErrors.Count > 0)
+                        {
+                            <ul class="middt-wf-errors" role="alert">
+                                @foreach (var error in stepErrors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        }
+                    }
+                    <div class="middt-wf-step-actions">
+                        @foreach (var transition in ButtonTransitions.Where(RunsDirectly))
+                        {
+                            var text = transition.Title ?? transition.Key;
+                            <RadzenButton ButtonType="ButtonType.Button" Text="@text" ButtonStyle="ButtonStyle.Light" Icon="arrow_back"
+                                          title="@($"{text} → {StateTitle(transition.Target)}")" Click="@(() => OnTransitionClick(transition))"
+                                          Disabled="@executing" data-transition="@transition.Key" class="middt-wf-step-secondary" />
+                        }
+                        @if (StepViewType is null)
+                        {
+                            <RadzenButton ButtonType="ButtonType.Submit" Text="@(stepTr.Title ?? stepTr.Key)" Icon="arrow_forward" ButtonStyle="ButtonStyle.Primary"
+                                          IsBusy="@executing" BusyText="İşleniyor..." data-transition="@stepTr.Key" class="middt-wf-step-submit" />
+                        }
+                    </div>
+                </form>
+            }
+
+            <dl class="middt-wf-props">
+                <dt>Anahtar</dt><dd>@(instance.Key ?? "-")</dd>
+                <dt>Kayıt no</dt><dd class="middt-wf-mono">@instance.Id</dd>
+                <dt>Başlatan</dt><dd>@(instance.StartedBy ?? "-")</dd>
+                <dt>Oluşturma</dt><dd>@WorkflowUi.FormatDate(instance.CreatedAt, timeZone)</dd>
+                <dt>Güncelleme</dt><dd>@WorkflowUi.FormatDate(instance.UpdatedAt, timeZone)</dd>
+                @if (instance.CompletedAt is not null)
+                {
+                    <dt>Tamamlanma</dt><dd>@WorkflowUi.FormatDate(instance.CompletedAt, timeZone)</dd>
+                }
+                @if (instance.ParentInstanceId is { } parent)
+                {
+                    <dt>Üst akış</dt><dd class="middt-wf-mono">@parent</dd>
+                }
+            </dl>
+
+            @if (instance.WaitingForInstanceId is { } child)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="false">
+                    Alt akışın tamamlanması bekleniyor (<span class="middt-wf-mono">@child</span>).
+                </RadzenAlert>
+            }
+
+            @if (instance.Status == WorkflowInstanceStatus.Faulted)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="false">
+                    <div class="middt-wf-fault">
+                        <span>@(instance.Error ?? "Akış hata aldı.")</span>
+                        <RadzenButton Text="Tekrar dene" Icon="replay" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small"
+                                      title="Hatalı adımı tekrar çalıştır" Click="RetryAsync" IsBusy="@retrying" />
+                    </div>
+                </RadzenAlert>
+            }
+
+            @if (ButtonTransitions.Where(t => !RunsDirectly(t)).ToList() is { Count: > 0 } buttons)
+            {
+                <div class="middt-wf-actions" role="group" aria-label="Yapılabilecek işlemler">
+                    @foreach (var transition in buttons)
+                    {
+                        var text = transition.Title ?? transition.Key;
+                        <RadzenButton Text="@text" ButtonStyle="@TransitionStyle(transition)" Icon="@TransitionIcon(transition)"
+                                      title="@($"{text} → {StateTitle(transition.Target)}")" Click="@(() => OnTransitionClick(transition))"
+                                      Disabled="@executing" data-transition="@transition.Key" />
+                    }
+                </div>
+            }
+            else if (!ShowStepForm && instance.Status == WorkflowInstanceStatus.Active && instance.WaitingForInstanceId is null)
+            {
+                <p class="middt-wf-muted">Bu adımda yapabileceğiniz bir işlem yok.</p>
+            }
+
+            @if (instance.ScheduledTransitions.Count > 0)
+            {
+                <h3 class="middt-wf-subheading">Zamanlanmış geçişler</h3>
+                <ul class="middt-wf-scheduled">
+                    @foreach (var scheduled in instance.ScheduledTransitions)
+                    {
+                        <li><strong>@scheduled.Key</strong> · @WorkflowUi.FormatDate(scheduled.DueAt, timeZone)</li>
+                    }
+                </ul>
+            }
+        </RadzenCard>
+
+        <RadzenCard class="middt-wf-card">
+            @if (StateViewType is { } viewType)
+            {
+                @* Server driven UI: the state's registered view renders the instance. *@
+                <div class="middt-wf-view" data-view="@instance.View">
+                    <DynamicComponent Type="@viewType" Parameters="@StateViewParameters" />
+                </div>
+                <details class="middt-wf-raw">
+                    <summary>Ham veri</summary>
+                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                </details>
+            }
+            else if (instance.Layout is { } layoutKey)
+            {
+                @* Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). *@
+                <div class="middt-wf-view" data-layout="@layoutKey">
+                    <Middt.Framework.Blazor.Web.Ui.UiLayoutHost @key="@($"{instance.Id}:{instance.DataVersion}:{layoutKey}")" Key="@layoutKey" Variables="@LayoutVariables" IdPrefix="@($"{IdPrefix}-layout")" />
+                </div>
+                <details class="middt-wf-raw">
+                    <summary>Ham veri</summary>
+                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                </details>
+            }
+            else if (ShowStepForm)
+            {
+                @* Wizard step: the form is the focus, the collected data stays available but collapsed. *@
+                <details class="middt-wf-raw">
+                    <summary>Girilen veriler</summary>
+                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                </details>
+            }
+            else
+            {
+                <h3 class="middt-wf-subheading">Veri</h3>
+                <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+            }
+        </RadzenCard>
+
+        <RadzenCard class="middt-wf-card">
+            <h3 class="middt-wf-subheading">Geçmiş</h3>
+            @if (history.Count == 0)
+            {
+                <p class="middt-wf-muted">Kayıt yok.</p>
+            }
+            else
+            {
+                <RadzenTimeline class="middt-wf-history">
+                    <Items>
+                        @foreach (var entry in history)
+                        {
+                            <RadzenTimelineItem PointStyle="@HistoryPointStyle(entry)">
+                                <LabelContent>
+                                    <span class="middt-wf-muted">@WorkflowUi.FormatDate(entry.FinishedAt, timeZone)</span>
+                                </LabelContent>
+                                <ChildContent>
+                                    <div class="middt-wf-history-item">
+                                        <strong>@(entry.Trigger == "Start" ? "Başlatıldı" : TransitionTitle(entry.TransitionKey))</strong>
+                                        <span>@StateTitle(entry.FromState) → @StateTitle(entry.ToState)</span>
+                                        <small class="middt-wf-muted">@TriggerText(entry.Trigger)@(entry.ExecutedBy is null ? null : $" · {entry.ExecutedBy}")</small>
+                                    </div>
+                                </ChildContent>
+                            </RadzenTimelineItem>
+                        }
+                    </Items>
+                </RadzenTimeline>
+            }
+        </RadzenCard>
+
+        @if (incidents.Count > 0)
+        {
+            <RadzenCard class="middt-wf-card">
+                <h3 class="middt-wf-subheading">Hatalar</h3>
+                <RadzenDataGrid TItem="WorkflowIncidentModel" Data="@incidents" AllowPaging="@(incidents.Count > 10)" PageSize="10" EmptyText="Kayıt yok.">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Title="Zaman" Width="170px">
+                            <Template Context="item">@WorkflowUi.FormatDate(item.CreatedAt, timeZone)</Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Title="Adım">
+                            <Template Context="item">@(item.State is null ? "-" : StateTitle(item.State))</Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="TaskKey" Title="Görev" />
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="Error" Title="Hata" />
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Property="Attempts" Title="Deneme" Width="90px" />
+                        <RadzenDataGridColumn TItem="WorkflowIncidentModel" Title="Çözüldü" Width="170px">
+                            <Template Context="item">@(item.ResolvedAt is null ? "-" : WorkflowUi.FormatDate(item.ResolvedAt, timeZone))</Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenCard>
+        }
+    }
+</section>
+
+<WorkflowDialog Id="@($"{IdPrefix}-transition-dialog")" Visible="@(pendingTransition is not null)" Title="@(pendingTransition?.Title ?? pendingTransition?.Key)"
+                Busy="@executing" OnClose="CloseTransition">
+    <ChildContent>
+        @if (pendingTransition is not null)
+        {
+            @if (TransitionViewType is { } formType)
+            {
+                @* Server driven UI: custom input form registered for this transition (renders its own buttons). *@
+                <DynamicComponent Type="@formType" Parameters="@TransitionViewParameters" />
+            }
+            else if (pendingHasInput)
+            {
+                <JsonSchemaForm @ref="transitionForm" Schema="@pendingTransition.InputSchema" IdPrefix="@($"{IdPrefix}-tr-{pendingTransition.Key}")" Disabled="@executing" />
+            }
+            else
+            {
+                <p>"@(pendingTransition.Title ?? pendingTransition.Key)" işlemi uygulanacak. Onaylıyor musunuz?</p>
+            }
+            @if (transitionErrors.Count > 0 && TransitionViewType is null)
+            {
+                <ul class="middt-wf-errors" role="alert">
+                    @foreach (var error in transitionErrors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            }
+        }
+    </ChildContent>
+    <FooterContent>
+        @if (TransitionViewType is null)
+        {
+        <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="CloseTransition" Disabled="@executing" />
+        <RadzenButton Text="@(pendingTransition?.Title ?? "Uygula")" Icon="check" ButtonStyle="@(pendingTransition is null ? ButtonStyle.Primary : TransitionStyle(pendingTransition))"
+                      Click="ExecuteTransitionAsync" IsBusy="@executing" BusyText="İşleniyor..." class="middt-wf-transition-submit" />
+        }
+    </FooterContent>
+</WorkflowDialog>

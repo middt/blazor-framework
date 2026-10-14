@@ -1,0 +1,35 @@
+@page "/Account/Logout"
+@model LogoutModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Çıkış</title>
+    <link rel="stylesheet" href="~/_content/Middt.Framework.Bff/account.css" />
+</head>
+<body class="middt-account">
+    <main class="middt-account-card">
+        <h1>Çıkış</h1>
+        @if (Model.AutoSubmit)
+        {
+            <form method="post" data-middt-autosubmit>
+                <p>Oturumunuz kapatılıyor…</p>
+                <button type="submit">Çıkış yap</button>
+            </form>
+        }
+        else
+        {
+            <form method="post">
+                <p>Oturumunuzu kapatmak istiyor musunuz?</p>
+                <button type="submit">Çıkış yap</button>
+            </form>
+        }
+    </main>
+    <script src="~/_content/Middt.Framework.Bff/account.js"></script>
+</body>
+</html>

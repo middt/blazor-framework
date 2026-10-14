@@ -10,6 +10,7 @@ using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Configuration;
 using Middt.Framework.Tests.Infrastructure;
 using Middt.Framework.Tests.Security;
+using Middt.Framework.Bff.Security;
 
 namespace Middt.Framework.Tests.Blazor;
 

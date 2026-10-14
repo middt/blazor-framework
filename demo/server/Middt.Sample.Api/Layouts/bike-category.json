@@ -1,0 +1,32 @@
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "bike-category",
+  "title": "Kategoriler",
+  "kind": "page",
+  "version": 1,
+  "menu": { "title": "Category", "icon": "category", "order": 10 },
+  "body": [
+    { "widget": "heading", "text": "Kategoriler" },
+    {
+      "widget": "grid",
+      "id": "categories",
+      "entity": "Category",
+      "columns": [
+        { "field": "categoryName", "title": "Ad" }
+      ],
+      "search": [
+        { "field": "categoryName", "label": "Ad" }
+      ],
+      "create": true,
+      "edit": true,
+      "delete": true,
+      "formTitle": "Kategori",
+      "form": [
+        { "field": "categoryName", "label": "Ad", "required": true, "maxLength": 255 }
+      ],
+      "rowActions": [
+        { "text": "Ürünler", "icon": "search", "navigate": "/ui/bike-category-products?id={{ row.categoryId }}" }
+      ]
+    }
+  ]
+}

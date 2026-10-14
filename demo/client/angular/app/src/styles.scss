@@ -1,0 +1,45 @@
+@use '@angular/material' as mat;
+
+// Material 3 theme; `color-scheme` switches light/dark (see ThemeService).
+html {
+  color-scheme: light;
+  @include mat.theme((
+    color: (primary: mat.$violet-palette, tertiary: mat.$azure-palette),
+    typography: Roboto,
+    density: -1,
+  ));
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, system-ui, sans-serif;
+  background: var(--mat-sys-surface-container-lowest);
+  color: var(--mat-sys-on-surface);
+}
+
+// middt-ui.css reads Radzen variables with fallbacks; map them to the Material system tokens.
+:root {
+  --rz-primary: var(--mat-sys-primary);
+  --rz-primary-lighter: var(--mat-sys-primary-container);
+  --rz-base-background-color: var(--mat-sys-surface);
+  --rz-text-secondary-color: var(--mat-sys-on-surface-variant);
+  --rz-base-300: var(--mat-sys-outline-variant);
+  --rz-base-400: var(--mat-sys-outline);
+  --rz-danger: var(--mat-sys-error);
+  --rz-border-radius: 8px;
+  --rz-card-shadow: var(--mat-sys-level1);
+}
+
+.middt-snack-error { --mat-snack-bar-container-color: var(--mat-sys-error); --mat-snack-bar-supporting-text-color: var(--mat-sys-on-error); }
+.middt-snack-success { --mat-snack-bar-container-color: #1b6b3a; --mat-snack-bar-supporting-text-color: #fff; }
+
+.page-title { margin: 0 0 1rem; font: var(--mat-sys-headline-small); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

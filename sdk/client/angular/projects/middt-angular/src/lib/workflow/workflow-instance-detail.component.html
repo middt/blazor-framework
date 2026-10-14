@@ -1,0 +1,269 @@
+<section class="middt-wf-detail" aria-live="polite">
+  @if (instanceId() === null) {
+    <mat-card appearance="outlined" class="middt-wf-card">
+      <mat-card-content><p class="middt-wf-muted">Detayı görmek için listeden bir kayıt seçin.</p></mat-card-content>
+    </mat-card>
+  } @else if (instance(); as instance) {
+    <mat-card appearance="outlined" class="middt-wf-card" [class.middt-wf-card-step]="stepTransition() !== null">
+      <mat-card-content>
+        @if (steps().length > 0) {
+          <nav class="middt-wf-stepper" aria-label="Adımlar">
+            <ol>
+              @for (step of steps(); track step.number) {
+                <li [class]="stepClass(step)" [attr.aria-current]="step.current ? 'step' : null" [attr.data-step]="step.number">
+                  <span class="middt-wf-step-marker" aria-hidden="true">{{ step.completed && !step.current ? '✓' : step.number }}</span>
+                  <span class="middt-wf-step-label">{{ step.label }}</span>
+                  <span class="middt-wf-sr-only">({{ stepStatusText(step) }})</span>
+                </li>
+              }
+            </ol>
+          </nav>
+        }
+
+        <div class="middt-wf-toolbar">
+          <div>
+            <h2 #stateHeading [id]="idPrefix() + '-state-title'" tabindex="-1" class="middt-wf-heading middt-wf-state">{{ instance.stateTitle ?? instance.state }}</h2>
+            <div class="middt-wf-meta">
+              <span class="middt-wf-badge middt-wf-status middt-wf-badge-{{ badge(instance.status) }}">{{ statusText(instance.status) }}</span>
+              @if (subTypeText(instance.stateSubType); as subType) {
+                <span class="middt-wf-subtype">{{ subType }}</span>
+              }
+              <span title="Akış sürümü">v{{ instance.workflowVersion }}</span>
+            </div>
+          </div>
+          <button mat-icon-button type="button" title="Yenile" aria-label="Detayı yenile" (click)="refresh()"><mat-icon>refresh</mat-icon></button>
+        </div>
+
+        @if (stepTransition(); as stepTr) {
+          <!-- Wizard: the inline transition is the form of this step. -->
+          <form class="middt-wf-step-form" [attr.aria-labelledby]="idPrefix() + '-state-title'" novalidate [attr.data-transition]="stepTr.key"
+                (submit)="$event.preventDefault(); submitStep()">
+            @if (stepViewType(); as stepType) {
+              <div #stepViewElement tabindex="-1" class="middt-wf-step-view">
+                <middt-wf-view-outlet [component]="stepType" kind="transition" [instance]="instance" [transition]="stepTr" [errors]="stepErrors()"
+                                      [busy]="executing()" (submitted)="submitCustomStep($event)" (cancelled)="clearStepErrors()" />
+              </div>
+            } @else {
+              @for (key of stepFormKey(); track key) {
+                <middt-json-schema-form #stepForm [schema]="stepTr.inputSchema" [value]="stepPrefill()" [idPrefix]="idPrefix() + '-step-' + stepTr.key"
+                                        [disabled]="executing()" />
+              }
+              @if (stepErrors().length > 0) {
+                <ul class="middt-wf-errors" role="alert">
+                  @for (error of stepErrors(); track $index) {
+                    <li>{{ error }}</li>
+                  }
+                </ul>
+              }
+            }
+            <div class="middt-wf-step-actions">
+              @for (transition of directTransitions(); track transition.key) {
+                <button mat-stroked-button type="button" class="middt-wf-step-secondary" [attr.data-transition]="transition.key" [disabled]="executing()"
+                        [title]="transitionText(transition) + ' → ' + stateTitle(transition.target)" (click)="onTransitionClick(transition)">
+                  <mat-icon>arrow_back</mat-icon>{{ transitionText(transition) }}
+                </button>
+              }
+              @if (stepViewType() === null) {
+                <button mat-flat-button type="submit" class="middt-wf-step-submit" [attr.data-transition]="stepTr.key" [disabled]="executing()"
+                        [attr.aria-busy]="executing()">
+                  {{ executing() ? 'İşleniyor...' : transitionText(stepTr) }}<mat-icon iconPositionEnd>{{ executing() ? 'hourglass_empty' : 'arrow_forward' }}</mat-icon>
+                </button>
+              }
+            </div>
+          </form>
+        }
+
+        <dl class="middt-wf-props">
+          <dt>Anahtar</dt><dd>{{ instance.key ?? '-' }}</dd>
+          <dt>Kayıt no</dt><dd class="middt-wf-mono">{{ instance.id }}</dd>
+          <dt>Başlatan</dt><dd>{{ instance.startedBy ?? '-' }}</dd>
+          <dt>Oluşturma</dt><dd>{{ date(instance.createdAt) }}</dd>
+          <dt>Güncelleme</dt><dd>{{ date(instance.updatedAt) }}</dd>
+          @if (instance.completedAt) {
+            <dt>Tamamlanma</dt><dd>{{ date(instance.completedAt) }}</dd>
+          }
+          @if (instance.parentInstanceId) {
+            <dt>Üst akış</dt><dd class="middt-wf-mono">{{ instance.parentInstanceId }}</dd>
+          }
+        </dl>
+
+        @if (instance.waitingForInstanceId) {
+          <div class="middt-wf-alert middt-wf-alert-info" role="status">
+            Alt akışın tamamlanması bekleniyor (<span class="middt-wf-mono">{{ instance.waitingForInstanceId }}</span>).
+          </div>
+        }
+
+        @if (instance.status === 'Faulted') {
+          <div class="middt-wf-alert middt-wf-alert-danger" role="alert">
+            <div class="middt-wf-fault">
+              <span>{{ instance.error ?? 'Akış hata aldı.' }}</span>
+              <button mat-flat-button type="button" class="middt-wf-btn-danger" title="Hatalı adımı tekrar çalıştır" (click)="retry()" [disabled]="retrying()">
+                <mat-icon>{{ retrying() ? 'hourglass_empty' : 'replay' }}</mat-icon>Tekrar dene
+              </button>
+            </div>
+          </div>
+        }
+
+        @if (dialogTransitions().length > 0) {
+          <div class="middt-wf-actions" role="group" aria-label="Yapılabilecek işlemler">
+            @for (transition of dialogTransitions(); track transition.key) {
+              @let style = transitionStyle(transition);
+              @if (style === 'light') {
+                <button mat-stroked-button type="button" [attr.data-transition]="transition.key" [disabled]="executing()"
+                        [title]="transitionText(transition) + ' → ' + stateTitle(transition.target)" (click)="onTransitionClick(transition)">
+                  <mat-icon>{{ transitionIcon(transition) }}</mat-icon>{{ transitionText(transition) }}
+                </button>
+              } @else {
+                <button mat-flat-button type="button" class="middt-wf-btn-{{ style }}" [attr.data-transition]="transition.key" [disabled]="executing()"
+                        [title]="transitionText(transition) + ' → ' + stateTitle(transition.target)" (click)="onTransitionClick(transition)">
+                  <mat-icon>{{ transitionIcon(transition) }}</mat-icon>{{ transitionText(transition) }}
+                </button>
+              }
+            }
+          </div>
+        } @else if (stepTransition() === null && instance.status === 'Active' && !instance.waitingForInstanceId) {
+          <p class="middt-wf-muted">Bu adımda yapabileceğiniz bir işlem yok.</p>
+        }
+
+        @if (instance.scheduledTransitions.length > 0) {
+          <h3 class="middt-wf-subheading">Zamanlanmış geçişler</h3>
+          <ul class="middt-wf-scheduled">
+            @for (scheduled of instance.scheduledTransitions; track scheduled.key) {
+              <li><strong>{{ scheduled.key }}</strong> · {{ date(scheduled.dueAt) }}</li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="middt-wf-card">
+      <mat-card-content>
+        @if (stateView(); as viewType) {
+          <!-- Server driven UI: the state's registered Angular view renders the instance. -->
+          <div class="middt-wf-view" [attr.data-view]="instance.view">
+            <middt-wf-view-outlet [component]="viewType" kind="state" [instance]="instance" [interactive]="true" />
+          </div>
+          <details class="middt-wf-raw">
+            <summary>Ham veri</summary>
+            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+          </details>
+        } @else if (instance.layout) {
+          <!-- Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). -->
+          <div class="middt-wf-view" [attr.data-layout]="instance.layout">
+            @for (key of layoutKeyId(); track key) {
+              <middt-layout-host [layoutKey]="instance.layout" [variables]="layoutVariables()" [idPrefix]="idPrefix() + '-layout'" />
+            }
+          </div>
+          <details class="middt-wf-raw">
+            <summary>Ham veri</summary>
+            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+          </details>
+        } @else if (serverHtml(); as html) {
+          <!-- Server rendered state view (Razor view rendered by the API); inserted through Angular's HTML sanitizer. -->
+          <div class="middt-wf-view middt-wf-server-view" [attr.data-view]="instance.view" [innerHTML]="html"></div>
+          <details class="middt-wf-raw">
+            <summary>Ham veri</summary>
+            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+          </details>
+        } @else if (stepTransition() !== null) {
+          <!-- Wizard step: the form is the focus, the collected data stays available but collapsed. -->
+          <details class="middt-wf-raw">
+            <summary>Girilen veriler</summary>
+            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+          </details>
+        } @else {
+          <h3 class="middt-wf-subheading">Veri</h3>
+          <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="middt-wf-card">
+      <mat-card-content>
+        <h3 class="middt-wf-subheading">Geçmiş</h3>
+        @if (history().length === 0) {
+          <p class="middt-wf-muted">Kayıt yok.</p>
+        } @else {
+          <ol class="middt-wf-history">
+            @for (entry of history(); track $index) {
+              <li class="middt-wf-history-entry middt-wf-point-{{ pointStyle(entry) }}">
+                <span class="middt-wf-muted middt-wf-history-time">{{ date(entry.finishedAt) }}</span>
+                <div class="middt-wf-history-item">
+                  <strong>{{ entry.trigger === 'Start' ? 'Başlatıldı' : transitionTitle(entry.transitionKey) }}</strong>
+                  <span>{{ stateTitle(entry.fromState) }} → {{ stateTitle(entry.toState) }}</span>
+                  <small class="middt-wf-muted">{{ triggerText(entry.trigger) }}{{ entry.executedBy ? ' · ' + entry.executedBy : '' }}</small>
+                </div>
+              </li>
+            }
+          </ol>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    @if (incidents().length > 0) {
+      <mat-card appearance="outlined" class="middt-wf-card">
+        <mat-card-content>
+          <h3 class="middt-wf-subheading">Hatalar</h3>
+          <div class="middt-wf-table-wrap">
+            <table class="middt-wf-incidents">
+              <thead>
+                <tr><th scope="col">Zaman</th><th scope="col">Adım</th><th scope="col">Görev</th><th scope="col">Hata</th><th scope="col">Deneme</th><th scope="col">Çözüldü</th></tr>
+              </thead>
+              <tbody>
+                @for (item of incidents(); track item.id) {
+                  <tr>
+                    <td>{{ date(item.createdAt) }}</td>
+                    <td>{{ item.state ? stateTitle(item.state) : '-' }}</td>
+                    <td>{{ item.taskKey }}</td>
+                    <td>{{ item.error }}</td>
+                    <td>{{ item.attempts }}</td>
+                    <td>{{ item.resolvedAt ? date(item.resolvedAt) : '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  } @else {
+    <mat-card appearance="outlined" class="middt-wf-card">
+      <mat-card-content><p class="middt-wf-muted">{{ loadFailed() ? 'Kayıt yüklenemedi.' : 'Yükleniyor...' }}</p></mat-card-content>
+    </mat-card>
+  }
+</section>
+
+<middt-wf-dialog [dialogId]="idPrefix() + '-transition-dialog'" [visible]="pendingTransition() !== null"
+                 [title]="pendingTransition()?.title ?? pendingTransition()?.key" [busy]="executing()" (closed)="closeTransition()">
+  @if (pendingTransition(); as pending) {
+    @if (transitionView(); as formType) {
+      <!-- Server driven UI: custom input form registered for this transition (renders its own buttons). -->
+      <middt-wf-view-outlet [component]="formType" kind="transition" [instance]="instance()!" [transition]="pending" [errors]="transitionErrors()"
+                            [busy]="executing()" (submitted)="submitCustomForm($event)" (cancelled)="closeTransition()" />
+    } @else {
+      <form [id]="idPrefix() + '-transition-form'" novalidate (submit)="$event.preventDefault(); executePending()">
+        @if (pendingHasInput()) {
+          <middt-json-schema-form #transitionForm [schema]="pending.inputSchema" [idPrefix]="idPrefix() + '-tr-' + pending.key" [disabled]="executing()" />
+        } @else {
+          <p>"{{ transitionText(pending) }}" işlemi uygulanacak. Onaylıyor musunuz?</p>
+        }
+        @if (transitionErrors().length > 0) {
+          <ul class="middt-wf-errors" role="alert">
+            @for (error of transitionErrors(); track $index) {
+              <li>{{ error }}</li>
+            }
+          </ul>
+        }
+      </form>
+    }
+  }
+  @if (pendingTransition() !== null && transitionView() === null) {
+    <ng-container footer>
+      <button mat-button type="button" (click)="closeTransition()" [disabled]="executing()">Vazgeç</button>
+      <button mat-flat-button type="submit" [attr.form]="idPrefix() + '-transition-form'" class="middt-wf-transition-submit middt-wf-btn-{{ transitionStyle(pendingTransition()!) }}"
+              [disabled]="executing()" [attr.aria-busy]="executing()">
+        <mat-icon>{{ executing() ? 'hourglass_empty' : 'check' }}</mat-icon>{{ executing() ? 'İşleniyor...' : (pendingTransition()!.title ?? 'Uygula') }}
+      </button>
+    </ng-container>
+  }
+</middt-wf-dialog>

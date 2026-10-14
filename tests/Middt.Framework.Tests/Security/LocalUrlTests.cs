@@ -31,10 +31,21 @@ public sealed class LocalUrlTests
     [InlineData("~/\\evil")]
     [InlineData("~")]
     [InlineData("\\\\evil.com")]
+    [InlineData("/ürün")]
+    [InlineData("/a\u00A0b")]
+    [InlineData("/a b")]
+    [InlineData("/\u007F/evil")]
+    [InlineData("/\u2028/evil")]
     public void Non_local_urls_are_rejected(string? url)
     {
         LocalUrl.IsLocal(url).Should().BeFalse();
         LocalUrl.OrDefault(url).Should().Be("/");
         LocalUrl.OrDefault(url, "/home").Should().Be("/home");
+    }
+
+    [Fact]
+    public void Percent_encoded_non_ascii_paths_are_accepted()
+    {
+        LocalUrl.IsLocal("/%C3%BCr%C3%BCn?q=a%20b").Should().BeTrue();
     }
 }

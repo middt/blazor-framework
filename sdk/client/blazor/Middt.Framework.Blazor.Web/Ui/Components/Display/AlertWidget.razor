@@ -1,0 +1,4 @@
+@inherits UiWidgetBase
+
+@{ var severity = Node.StringProp("severity") ?? "info"; }
+<div class="middt-ui-alert middt-ui-alert-@severity" role="@(severity is "danger" or "warning" ? "alert" : "status")">@Text("text")</div>

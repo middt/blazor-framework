@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Expressions</Product>
+    <Description>Sandboxed C#-like expressions and {{ }} templates over JSON data (DynamicExpresso), shared by workflows and server driven UI.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DynamicExpresso.Core" />
+  </ItemGroup>
+
+</Project>

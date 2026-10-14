@@ -1,0 +1,57 @@
+@* Transition view of "reject": guided reason selection instead of a free text field. *@
+@attribute [WorkflowView("reject-reason")]
+@inherits WorkflowTransitionViewBase
+
+<form class="sv-form" @onsubmit="OnFormSubmitAsync" @onsubmit:preventDefault>
+    <fieldset>
+        <legend>Red nedeni</legend>
+        @foreach (var option in Options)
+        {
+            var id = $"sv-reason-{option.Key}";
+            <label class="sv-option" for="@id">
+                <input type="radio" id="@id" name="sv-reason" value="@option.Key" checked="@(selected == option.Key)"
+                       @onchange="@(() => selected = option.Key)" disabled="@Busy" />
+                @option.Value
+            </label>
+        }
+    </fieldset>
+
+    <label for="sv-reason-detail">Açıklama @(selected == "other" ? "(zorunlu)" : "(isteğe bağlı)")</label>
+    <textarea id="sv-reason-detail" rows="3" maxlength="400" @bind="detail" @bind:event="oninput" disabled="@Busy"></textarea>
+
+    @if ((localError ?? Errors.FirstOrDefault()) is { } error)
+    {
+        <p class="sv-error" role="alert">@error</p>
+    }
+
+    <div class="sv-actions">
+        <button type="button" class="sv-button" @onclick="CancelAsync" disabled="@Busy">Vazgeç</button>
+        <button type="submit" class="sv-button sv-danger" disabled="@Busy">@(Busy ? "İşleniyor..." : "Reddet")</button>
+    </div>
+</form>
+
+@code {
+    private static readonly Dictionary<string, string> Options = new()
+    {
+        ["stock"] = "Stok yetersiz",
+        ["price"] = "Fiyat / iskonto uygun değil",
+        ["risk"] = "Müşteri riski yüksek",
+        ["other"] = "Diğer",
+    };
+
+    private string selected = "stock";
+    private string detail = string.Empty;
+    private string? localError;
+
+    private Task OnFormSubmitAsync()
+    {
+        localError = selected == "other" && string.IsNullOrWhiteSpace(detail) ? "\"Diğer\" için açıklama yazın." : null;
+        if (localError is not null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var reason = string.IsNullOrWhiteSpace(detail) ? Options[selected] : $"{Options[selected]}: {detail.Trim()}";
+        return SubmitAsync(new JsonObject { ["reason"] = reason });
+    }
+}

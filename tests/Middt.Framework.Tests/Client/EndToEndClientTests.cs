@@ -1,5 +1,5 @@
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Common.Security;
+using Middt.Framework.Client.Security;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Model.Authentication;

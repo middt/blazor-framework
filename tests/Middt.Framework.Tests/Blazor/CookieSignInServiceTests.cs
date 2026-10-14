@@ -14,6 +14,7 @@ using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
 using Middt.Framework.Tests.Client;
 using Middt.Framework.Tests.Infrastructure;
+using Middt.Framework.Bff.Security;
 
 namespace Middt.Framework.Tests.Blazor;
 

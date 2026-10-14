@@ -139,6 +139,33 @@ public sealed class QueryFilterTests : IDisposable
         (await FilterIds(new Product { Code = "' OR '1'='1" })).Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Filter_values_are_sent_as_sql_parameters_so_the_query_plan_is_reused()
+    {
+        await using var context = database.NewContext();
+        var filter = new Product { Name = "Zebra-literal", Stock = 7777, Price = 12.34m, IsActive = true, CreatedFrom = new DateTime(2031, 1, 2) };
+
+        var text = QueryFilterBuilder.ApplyFilter(context.Products.AsNoTracking(), filter).ToQueryString();
+
+        // ToQueryString lists the parameter values first (".param set ..."); the SQL itself must only reference them.
+        var sql = string.Join('\n', text.Split('\n').Where(l => !l.StartsWith(".param", StringComparison.Ordinal)));
+        sql.Should().NotContain("Zebra").And.NotContain("7777").And.NotContain("12.34").And.NotContain("2031");
+        sql.Should().Contain("@");
+        text.Should().Contain("Zebra-literal", "the value is still passed, as a parameter");
+    }
+
+    [Fact]
+    public async Task Different_filter_values_reuse_the_same_sql_text()
+    {
+        await using var context = database.NewContext();
+
+        string Sql(string name) => string.Join('\n', QueryFilterBuilder.ApplyFilter(context.Products.AsNoTracking(), new Product { Name = name })
+            .ToQueryString().Split('\n').Where(l => !l.StartsWith(".param", StringComparison.Ordinal)));
+
+        Sql("Apple").Should().Be(Sql("Banana"));
+        (await QueryFilterBuilder.ApplyFilter(context.Products.AsNoTracking(), new Product { Name = "Ban" }).CountAsync(TestContext.Current.CancellationToken)).Should().Be(1);
+    }
+
     [Theory]
     [InlineData("Name", "Name")]
     [InlineData("stock", "Stock")]

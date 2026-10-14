@@ -1,0 +1,408 @@
+.middt-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.middt-captcha {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.top-space {
+    margin-top: 20px;
+}
+
+/* Workflow components (Base/Component/Workflow) */
+.middt-wf-card {
+    margin-bottom: 1rem;
+}
+
+.middt-wf-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.middt-wf-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.middt-wf-filter {
+    width: 170px;
+}
+
+.middt-wf-heading {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.middt-wf-subheading {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.middt-wf-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+    font-size: 0.875rem;
+}
+
+.middt-wf-subtype,
+.middt-wf-muted {
+    color: var(--rz-text-secondary-color, #6c757d);
+}
+
+.middt-wf-muted {
+    margin: 0;
+}
+
+.middt-wf-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    word-break: break-all;
+}
+
+.middt-wf-props {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.25rem 1rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+}
+
+.middt-wf-props dt {
+    font-weight: 600;
+}
+
+.middt-wf-props dd {
+    margin: 0;
+}
+
+.middt-wf-fault {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.middt-wf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.middt-wf-scheduled {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 0.875rem;
+}
+
+.middt-wf-json {
+    max-height: 320px;
+    margin: 0;
+    padding: 0.75rem;
+    overflow: auto;
+    border-radius: 4px;
+    background: var(--rz-base-100, #f5f5f5);
+    color: var(--rz-text-color, inherit);
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.middt-wf-history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.middt-wf-errors {
+    margin: 0.75rem 0 0;
+    padding: 0.5rem 0.75rem 0.5rem 1.75rem;
+    border-radius: 4px;
+    background: var(--rz-danger-lighter, #fdecea);
+    color: var(--rz-danger-darker, #8a1c13);
+}
+
+.middt-wf-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.middt-wf-dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(560px, 100%);
+    max-height: 90vh;
+    border-radius: 8px;
+    background: var(--rz-base-background-color, #fff);
+    color: var(--rz-text-color, inherit);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    outline: none;
+}
+
+.middt-wf-dialog-header,
+.middt-wf-dialog-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.middt-wf-dialog-header {
+    justify-content: space-between;
+    border-bottom: 1px solid var(--rz-base-300, #e0e0e0);
+}
+
+.middt-wf-dialog-footer {
+    justify-content: flex-end;
+    border-top: 1px solid var(--rz-base-300, #e0e0e0);
+}
+
+.middt-wf-dialog-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.middt-wf-dialog-body {
+    padding: 1rem;
+    overflow: auto;
+}
+
+.middt-wf-layout {
+    display: grid;
+    /* the detail column hosts wizard step forms: keep it at least ~460px wide next to the list */
+    grid-template-columns: minmax(0, 1fr) minmax(min(100%, 460px), 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .middt-wf-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* JsonSchemaForm */
+.middt-jsf {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.middt-jsf-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.middt-jsf .middt-jsf-field {
+    margin-bottom: 0;
+}
+
+.middt-jsf-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.middt-jsf-required {
+    margin-left: 0.15rem;
+    color: var(--rz-danger, #d32f2f);
+}
+
+.middt-jsf-input {
+    width: 100%;
+}
+
+.middt-jsf-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.middt-jsf-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.middt-jsf-help {
+    color: var(--rz-text-secondary-color, #6c757d);
+}
+
+.middt-jsf-error {
+    color: var(--rz-danger, #d32f2f);
+    font-size: 0.8rem;
+}
+
+.middt-jsf-empty {
+    margin: 0;
+    color: var(--rz-text-secondary-color, #6c757d);
+}
+
+.middt-wf-view {
+    margin-bottom: 0.75rem;
+}
+
+.middt-wf-raw summary {
+    cursor: pointer;
+    color: var(--rz-text-secondary-color, #6b6b6b);
+    font-size: 0.875rem;
+}
+
+/* Wizard (WorkflowInstanceDetail): step indicator and inline step form */
+.middt-wf-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.middt-wf-stepper {
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--rz-base-300, #e0e0e0);
+}
+
+.middt-wf-stepper ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: none;
+}
+
+.middt-wf-step {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    min-width: 72px;
+    gap: 0.3rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--rz-text-secondary-color, #6c757d);
+}
+
+/* connector line between markers */
+.middt-wf-step + .middt-wf-step::before {
+    content: "";
+    position: absolute;
+    top: 0.85rem;
+    right: calc(50% + 1.1rem);
+    left: calc(-50% + 1.1rem);
+    height: 2px;
+    background: var(--rz-base-300, #d0d4da);
+}
+
+.middt-wf-step-done + .middt-wf-step::before {
+    background: var(--rz-success, #2e7d32);
+}
+
+.middt-wf-step-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 2px solid var(--rz-base-400, #b6bcc4);
+    border-radius: 50%;
+    background: var(--rz-base-background-color, #fff);
+    font-weight: 600;
+    line-height: 1;
+}
+
+.middt-wf-step-label {
+    max-width: 12rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.middt-wf-step-done .middt-wf-step-marker {
+    border-color: var(--rz-success, #2e7d32);
+    background: var(--rz-success, #2e7d32);
+    color: #fff;
+}
+
+.middt-wf-step-current {
+    color: var(--rz-text-color, #212529);
+    font-weight: 600;
+}
+
+.middt-wf-step-current .middt-wf-step-marker {
+    border-color: var(--rz-primary, #1976d2);
+    background: var(--rz-primary, #1976d2);
+    color: #fff;
+    box-shadow: 0 0 0 3px var(--rz-primary-lighter, rgba(25, 118, 210, 0.2));
+}
+
+.middt-wf-step-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0.5rem 0 1rem;
+    padding: 1rem;
+    border: 1px solid var(--rz-base-300, #e0e0e0);
+    border-radius: 6px;
+    background: var(--rz-base-50, #fafbfc);
+}
+
+.middt-wf-step-view:focus {
+    outline: none;
+}
+
+.middt-wf-step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.middt-wf-step-actions .middt-wf-step-secondary {
+    margin-right: auto;
+}
+
+@media (max-width: 600px) {
+    /* only the current step keeps a visible label; the others stay readable for screen readers */
+    .middt-wf-step:not(.middt-wf-step-current) .middt-wf-step-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
+}

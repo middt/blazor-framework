@@ -1,0 +1,36 @@
+@inherits UiWidgetBase
+
+@if (Items() is { } items)
+{
+    if (items.Count == 0)
+    {
+        <p class="middt-ui-text middt-ui-text-muted">@(Node.StringProp("empty") ?? "Kayıt yok.")</p>
+    }
+    else
+    {
+        <ul class="middt-ui-list">
+            @foreach (var item in items)
+            {
+                <li><UiNodeList Nodes="Node.Children" Context="@Context.With(UiExpressions.Row, item)" /></li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    private const int MaxItems = 1000;
+
+    private List<JsonNode?>? Items()
+    {
+        try
+        {
+            return Node.StringProp("source") is { } source && Context.Render(JsonValue.Create($"{{{{ {source} }}}}")) is JsonArray array
+                ? [.. array.Take(MaxItems).Select(i => i?.DeepClone())]
+                : [];
+        }
+        catch (Middt.Framework.Expressions.Portable.PortableExpressionException)
+        {
+            return [];
+        }
+    }
+}

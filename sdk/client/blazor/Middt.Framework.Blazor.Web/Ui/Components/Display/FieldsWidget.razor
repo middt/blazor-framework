@@ -1,0 +1,20 @@
+@inherits UiWidgetBase
+
+<dl class="middt-ui-fields">
+    @foreach (var item in (Node.ArrayProp("items") ?? []).OfType<JsonObject>())
+    {
+        if (!Context.IsVisible(Get(item, "visibleWhen")))
+        {
+            continue;
+        }
+
+        <div class="middt-ui-field">
+            <dt>@Get(item, "label")</dt>
+            <dd>@Context.Text(Get(item, "value"), Get(item, "format"))</dd>
+        </div>
+    }
+</dl>
+
+@code {
+    private static string? Get(JsonObject item, string name) => item[name] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+}

@@ -1,0 +1,7 @@
+{
+  "/api": { "target": "http://localhost:8081", "secure": false, "ws": false },
+  "/hubs": { "target": "http://localhost:8081", "secure": false, "ws": true },
+  "/bff": { "target": "http://localhost:8081", "secure": false },
+  "/Account": { "target": "http://localhost:8081", "secure": false },
+  "/_content": { "target": "http://localhost:8081", "secure": false }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@middt/ui-core",
+  "version": "10.0.0-preview",
+  "description": "Framework agnostic core of the Middt server driven UI: layout types, the portable expression language, render context, field validation and API clients.",
+  "type": "module",
+  "license": "GPL-2.0-only",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles/middt-ui.css": "./styles/middt-ui.css"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "styles",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --test test/",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

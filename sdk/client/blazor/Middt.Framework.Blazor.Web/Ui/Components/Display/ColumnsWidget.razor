@@ -1,0 +1,19 @@
+@inherits UiWidgetBase
+
+<div class="middt-ui-columns">
+    @for (var i = 0; i < (Node.Children?.Count ?? 0); i++)
+    {
+        var child = Node.Children![i];
+        <div class="middt-ui-column" style="flex: @Width(i) 1 0">
+            <UiNodeView Node="child" Context="Context" />
+        </div>
+    }
+</div>
+
+@code {
+    private string Width(int index) =>
+        Node.ArrayProp("widths") is { } widths && index < widths.Count && widths[index] is JsonValue v
+            && decimal.TryParse(v.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var width) && width > 0
+            ? width.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : "1";
+}

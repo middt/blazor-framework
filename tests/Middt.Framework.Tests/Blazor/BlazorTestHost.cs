@@ -14,13 +14,14 @@ using Microsoft.Extensions.Time.Testing;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Api.Security;
 using Middt.Framework.Blazor.Web.DependencyInjection;
-using Middt.Framework.Blazor.Web.Pages.Account;
+using Middt.Framework.Bff.Pages.Account;
 using Middt.Framework.Blazor.Web.Security;
-using Middt.Framework.Common.Security;
+using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
 using Middt.Framework.Tests.Api;
 using Middt.Framework.Tests.Client;
+using Middt.Framework.Bff.Security;
 
 namespace Middt.Framework.Tests.Blazor;
 
@@ -52,7 +53,7 @@ public sealed partial class BlazorTestHost : IAsyncDisposable
     /// UseMiddtBlazor calls MapStaticAssets, which needs the build's static web assets manifest. A Web SDK app has one;
     /// this (non-web) test assembly gets an empty manifest instead.
     /// </summary>
-    private static readonly Lazy<string> StaticAssetsManifest = new(() =>
+    internal static readonly Lazy<string> StaticAssetsManifest = new(() =>
     {
         var path = Path.Combine(AppContext.BaseDirectory, typeof(BlazorTestHost).Assembly.GetName().Name + ".staticwebassets.endpoints.json");
         if (!File.Exists(path))
@@ -94,19 +95,7 @@ public sealed partial class BlazorTestHost : IAsyncDisposable
             configure?.Invoke(o);
         });
 
-        // A Web SDK app gets [ApplicationPart] attributes for referenced Razor class libraries; this test assembly does not.
-        builder.Services.AddRazorPages().ConfigureApplicationPartManager(manager =>
-        {
-            var assembly = typeof(LoginModel).Assembly;
-            if (!manager.ApplicationParts.OfType<AssemblyPart>().Any(p => p.Assembly == assembly))
-            {
-                // Razor class library: AssemblyPart (page models) + CompiledRazorAssemblyPart (compiled .cshtml).
-                foreach (var part in ApplicationPartFactory.GetApplicationPartFactory(assembly).GetApplicationParts(assembly))
-                {
-                    manager.ApplicationParts.Add(part);
-                }
-            }
-        });
+        AddBffApplicationPart(builder.Services);
 
         var tokens = new FakeTokenService(_ => new TokenResponseModel { Result = ResultEnum.Error }) { Login = FakeLogin };
         if (api is null)
@@ -130,6 +119,21 @@ public sealed partial class BlazorTestHost : IAsyncDisposable
         await app.StartAsync();
         return new BlazorTestHost(app, time, tokens);
     }
+
+    /// <summary>A Web SDK app gets [ApplicationPart] attributes for referenced Razor class libraries; this test assembly does not.</summary>
+    internal static void AddBffApplicationPart(IServiceCollection services) =>
+        services.AddRazorPages().ConfigureApplicationPartManager(manager =>
+        {
+            var assembly = typeof(LoginModel).Assembly;
+            if (!manager.ApplicationParts.OfType<AssemblyPart>().Any(p => p.Assembly == assembly))
+            {
+                // Razor class library: AssemblyPart (page models) + CompiledRazorAssemblyPart (compiled .cshtml).
+                foreach (var part in ApplicationPartFactory.GetApplicationPartFactory(assembly).GetApplicationParts(assembly))
+                {
+                    manager.ApplicationParts.Add(part);
+                }
+            }
+        });
 
     public Browser CreateBrowser(string baseAddress = "http://localhost/") => new(App.GetTestClient(), new Uri(baseAddress));
 

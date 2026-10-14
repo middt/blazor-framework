@@ -1,0 +1,24 @@
+@page "/Bike/Category"
+@page "/Bike/Product"
+@page "/Bike/Order"
+@page "/Bike/CategoryProduct"
+
+@* The Bike screens are JSON layouts now; old links keep working. *@
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var target = uri.AbsolutePath.ToUpperInvariant() switch
+        {
+            "/BIKE/PRODUCT" => "/ui/bike-product",
+            "/BIKE/ORDER" => "/ui/bike-order",
+            "/BIKE/CATEGORYPRODUCT" => "/ui/bike-category-products" + uri.Query.Replace("ID=", "id=", StringComparison.Ordinal),
+            _ => "/ui/bike-category",
+        };
+        NavigationManager.NavigateTo(target, replace: true);
+    }
+}

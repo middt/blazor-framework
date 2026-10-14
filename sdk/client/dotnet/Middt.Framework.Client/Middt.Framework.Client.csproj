@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Client</Product>
+    <Description>.NET client SDK for Middt APIs, independent of the UI technology: typed CRUD/workflow/layout clients on IHttpClientFactory with resilience, token refresh, SignalR client.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- IHttpContextAccessor for ForwardedClientIpHandler (server hosted frontends such as Blazor Server). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\Middt.Framework.Model\Middt.Framework.Model.csproj" />
+    <ProjectReference Include="..\..\..\shared\Middt.Framework.Ui.Abstractions\Middt.Framework.Ui.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

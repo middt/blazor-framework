@@ -1,0 +1,15 @@
+@if (Nodes is not null)
+{
+    @foreach (var node in Nodes)
+    {
+        <UiNodeView Node="node" Context="Context" />
+    }
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<UiNode>? Nodes { get; set; }
+
+    [Parameter, EditorRequired]
+    public UiRenderContext Context { get; set; } = default!;
+}

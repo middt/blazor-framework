@@ -1,0 +1,10 @@
+@page "/ui/{Key}"
+@using Middt.Framework.Blazor.Web.Ui
+
+@* Every JSON layout of kind "page" is reachable here; the layouts live in the API (seeded from Sample/Middt.Sample.Api/Layouts, editable under /ui-admin). *@
+<UiPageHost Key="@Key" />
+
+@code {
+    [Parameter]
+    public string Key { get; set; } = string.Empty;
+}

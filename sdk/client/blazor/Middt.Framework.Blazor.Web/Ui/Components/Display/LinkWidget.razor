@@ -1,0 +1,11 @@
+@inherits UiWidgetBase
+
+@{ var href = Text("href"); }
+@if (UiUrl.IsSafe(href))
+{
+    <a class="@(Node.StringProp("style") == "button" ? "middt-ui-button" : "middt-ui-link")" href="@href">@Text("text")</a>
+}
+else
+{
+    <span class="middt-ui-link-disabled">@Text("text")</span>
+}

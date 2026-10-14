@@ -1,0 +1,40 @@
+@* Renders one node: visibility, lookup of the widget component, placeholder for interactive widgets in static rendering. *@
+@if (!Context.IsVisible(Node))
+{
+    return;
+}
+@if (Context.Catalog.Find(Node.Widget) is not { } spec)
+{
+    <div class="middt-ui-error" role="alert">Bilinmeyen bileşen: @Node.Widget</div>
+}
+else if (spec.Interactive && !Context.Interactive)
+{
+    <div class="middt-ui-placeholder">@(Node.StringProp("title") is { } title ? Context.Text(title) : spec.Description)</div>
+}
+else if (Widgets.Find(Node.Widget) is not { } component)
+{
+    <div class="middt-ui-error" role="alert">'@Node.Widget' bileşeni bu uygulamada kayıtlı değil.</div>
+}
+else
+{
+    <DynamicComponent Type="component" Parameters="@Parameters" />
+}
+
+@code {
+    [Inject]
+    private UiBlazorWidgets Widgets { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public UiNode Node { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public UiRenderContext Context { get; set; } = default!;
+
+    private Dictionary<string, object?>? parameters;
+
+    // Same dictionary while Node and Context are unchanged (UiWidgetBase then skips the update of the widget).
+    private Dictionary<string, object?> Parameters =>
+        parameters is not null && ReferenceEquals(parameters[nameof(UiWidgetBase.Node)], Node) && ReferenceEquals(parameters[nameof(UiWidgetBase.Context)], Context)
+            ? parameters
+            : parameters = new() { [nameof(UiWidgetBase.Node)] = Node, [nameof(UiWidgetBase.Context)] = Context };
+}

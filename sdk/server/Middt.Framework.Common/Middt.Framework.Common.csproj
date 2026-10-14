@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Common</Product>
+    <Description>Shared server side services for Middt hosts (API and server hosted frontends): security headers, forwarded headers, SignalR hub base, e-mail, document export, helpers.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Syncfusion.Licensing" />
+    <PackageReference Include="Syncfusion.DocIO.Net.Core" />
+    <PackageReference Include="Syncfusion.DocIORenderer.Net.Core" />
+    <PackageReference Include="Syncfusion.XlsIO.Net.Core" />
+    <PackageReference Include="Syncfusion.XlsIORenderer.Net.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\Middt.Framework.Model\Middt.Framework.Model.csproj" />
+  </ItemGroup>
+
+</Project>

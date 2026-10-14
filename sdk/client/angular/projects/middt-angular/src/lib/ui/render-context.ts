@@ -1,0 +1,27 @@
+import { inject, Injectable } from '@angular/core';
+import { UiRenderContext } from '@middt/ui-core';
+import { AuthService } from '../core/auth.service';
+import { MIDDT_CONFIG } from '../core/config';
+
+/** Creates interactive render contexts for the signed-in user (ExpressionUser.FromPrincipal of the Blazor hosts). */
+@Injectable({ providedIn: 'root' })
+export class UiRenderContextFactory {
+  readonly #auth = inject(AuthService);
+  readonly #config = inject(MIDDT_CONFIG);
+
+  /** Loads the user once (the auth guard usually did already). */
+  ready(): Promise<unknown> {
+    return this.#auth.load();
+  }
+
+  create(variables: Record<string, unknown>, idPrefix: string): UiRenderContext {
+    const user = this.#auth.user();
+    return new UiRenderContext({
+      user: { id: user.id ?? null, name: user.name ?? null, roles: user.roles },
+      variables,
+      interactive: true,
+      idPrefix,
+      locale: this.#config.locale,
+    });
+  }
+}

@@ -1,7 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Api.Configuration.Model;
-using Middt.Framework.Common.Security;
+using Middt.Framework.Client.Security;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Model.Enumerations;
 using Middt.Framework.Tests.Api;
