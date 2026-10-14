@@ -37,6 +37,8 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.4" />
+    <!-- Workflow rule/mapping expressions (MIT, reflection disabled by default) -->
+    <PackageVersion Include="DynamicExpresso.Core" Version="2.19.6" />
   </ItemGroup>
 
   <!-- UI / Export -->
@@ -56,11 +58,11 @@
     <!-- StackExchange.Redis 2.x: RedLock.net and Microsoft caching packages are built against the 2.x line -->
     <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
     <PackageVersion Include="RedLock.net" Version="2.3.2" />
+    <!-- Rebus (MIT): messaging over RabbitMQ; RabbitMQ.Client is pinned to the latest 7.x patch for the transport. -->
+    <PackageVersion Include="Rebus" Version="8.9.5" />
+    <PackageVersion Include="Rebus.RabbitMq" Version="10.1.2" />
+    <PackageVersion Include="Rebus.ServiceProvider" Version="10.7.2" />
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />
-    <!-- MassTransit 8.x is the last Apache-2.0 licensed line (v9+ is commercial) -->
-    <PackageVersion Include="MassTransit" Version="8.5.11" />
-    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.5.11" />
-    <PackageVersion Include="Consul" Version="1.8.0" />
   </ItemGroup>
 
   <!-- Aspire / Observability -->

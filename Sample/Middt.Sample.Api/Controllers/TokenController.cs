@@ -25,7 +25,10 @@ public class TokenController(IJwtTokenGenerator tokenGenerator) : BaseTokenContr
         Task.FromResult(userId == DemoUserId ? DemoLogin() : new LoginResponseModel());
 
     protected override IEnumerable<System.Security.Claims.Claim> CreateClaims(LoginResponseModel login) =>
-        base.CreateClaims(login).Append(new System.Security.Claims.Claim("FirmaId", login.FirmaID?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"));
+        base.CreateClaims(login)
+            .Append(new System.Security.Claims.Claim("FirmaId", login.FirmaID?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0"))
+            // Demo user may approve orders in the order-approval workflow.
+            .Append(new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "manager"));
 
     private static LoginResponseModel DemoLogin() => new()
     {

@@ -10,6 +10,7 @@ public sealed class MenuService
         new() { Name = "Category", Path = "/Bike/Category", Icon = "category", Title = "Categories" },
         new() { Name = "Product", Path = "/Bike/Product", Icon = "pedal_bike", Title = "Products" },
         new() { Name = "Order", Path = "/Bike/Order", Icon = "receipt_long", Title = "Orders" },
+        new() { Name = "Sipariş Onayı", Path = "/Workflow/OrderApproval", Icon = "account_tree", Title = "Sipariş Onayı" },
     ];
 
     public MenuItem? FindCurrent(Uri uri) =>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Product>Middt Framework Plugin Rebus</Product>
+    <Description>Messaging for Middt applications on Rebus (RabbitMQ or in-memory transport): send/publish, handlers, retries and error queue.</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Rebus" />
+    <PackageReference Include="Rebus.RabbitMq" />
+    <PackageReference Include="Rebus.ServiceProvider" />
+  </ItemGroup>
+
+</Project>

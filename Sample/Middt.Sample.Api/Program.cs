@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Api.DependencyInjection;
-using Middt.Framework.Plugin.MassTransit;
+using Middt.Framework.Plugin.Rebus;
+using Middt.Framework.Workflow.DependencyInjection;
+using Middt.Framework.Workflow.Endpoints;
+using Middt.Framework.Workflow.Tasks;
 using Middt.Framework.Plugin.Redis;
 using Middt.Sample.Api;
+using Middt.Sample.Api.Handlers;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
+using Middt.Sample.Common.Messages;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,15 +36,32 @@ if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
     builder.Services.AddMiddtRedisCache(o => o.ConnectionString = redis);       // distributed lock + cache plugin
 }
 
-if (builder.Configuration.GetConnectionString("messaging") is { Length: > 0 } messaging)
+// Messaging (Rebus): RabbitMQ when a connection string is configured, otherwise the in-memory transport for local runs.
+var messaging = builder.Configuration.GetConnectionString("messaging");
+builder.Services.AddMiddtRebus(
+    settings =>
+    {
+        builder.Configuration.GetSection(RebusSettings.SectionName).Bind(settings);
+        settings.ConnectionString = messaging;
+        settings.UseInMemoryTransport = string.IsNullOrEmpty(messaging);
+    },
+    rebus => rebus.Subscribe<CategoryCreated>().Subscribe<WorkflowNotification>());
+builder.Services.AddMiddtRebusHandlersFromAssemblyOf<CategoryCreatedHandler>();
+
+// Workflow engine: JSON definitions from ./Workflows, tables in the "wf" schema of the BikeStores database.
+builder.Services.AddMiddtWorkflow(workflow =>
 {
-    builder.Services.AddMiddtMassTransit(o => o.ConnectionString = messaging);
-}
+    workflow.UseDbContext(db => db.UseSqlServer(builder.Configuration.GetConnectionString("BikeStores")));
+    workflow.AutoCreateSchema = true;
+    workflow.AddDefinitionsFromDirectory("Workflows");
+});
+builder.Services.AddSingleton<IWorkflowMessagePublisher, RebusWorkflowMessagePublisher>();
 
 var app = builder.Build();
 
 app.UseMiddtApi();
 app.MapHub<TestHub>("/hubs/testhub");
+app.MapMiddtWorkflows("api/workflows");
 
 app.Run();
 

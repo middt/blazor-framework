@@ -15,10 +15,9 @@ Targets **.NET 10 (LTS)**.
 | `Middt.Framework.Common` | Typed API clients (`BaseCrudApiClient<T>`) on `IHttpClientFactory` + resilience, token client, SignalR hub/client, e-mail, Syncfusion document export. |
 | `Middt.Framework.Api` | `AddMiddtApi()` / `UseMiddtApi()`, CRUD + token controllers, ProblemDetails, versioning, OpenAPI + Scalar, JWT, rate limiting, HybridCache. |
 | `Middt.Framework.Blazor.Web` | `AddMiddtBlazor()` / `UseMiddtBlazor()`, Radzen based list/detail/CRUD pages, modals, authorization view, SignalR component, file upload, captcha. |
+| `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions, tasks, retries, timers, subflows, history – on EF Core, no Dapr. |
 | `Middt.Framework.Plugin.Redis` | Redis connection, RedLock distributed lock, lock-protected read-through cache. |
-| `Middt.Framework.Plugin.RabbitMQ` | Async (RabbitMQ.Client 7) producer/consumer base classes. |
-| `Middt.Framework.Plugin.MassTransit` | `AddMiddtMassTransit()` on RabbitMQ, producer/consumer bases (MassTransit 8, Apache-2.0). |
-| `Middt.Framework.Plugin.Consul` | Service registration as a hosted service with HTTP health check. |
+| `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
 
 ## Architecture
 
@@ -128,6 +127,103 @@ public sealed class ProductService(HttpClient http, IBaseSessionState session, I
 </BaseRadzenListCrudPage>
 ```
 
+## Workflows
+
+`Middt.Framework.Workflow` runs long-lived business processes defined in JSON (inspired by vNext, deliberately smaller and
+without Dapr): one process, your database, a background job processor.
+
+```csharp
+builder.Services.AddMiddtWorkflow(o =>
+{
+    o.UseDbContext(db => db.UseSqlServer(connectionString)); // any EF Core relational provider
+    o.AutoCreateSchema = true;                               // creates the "wf" tables (use migrations in production)
+    o.AddDefinitionsFromDirectory("Workflows");              // *.json, validated at startup
+    o.AddTask<NotifyCustomerTask>("notify-customer");        // application tasks (IWorkflowTask)
+});
+app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
+```
+
+A definition ([full example](Sample/Middt.Sample.Api/Workflows/order-approval.json)):
+
+```jsonc
+{
+  "key": "order-approval", "version": 1,
+  "timeout": { "after": "P7D", "target": "expired" },
+  "start": { "target": "routing",
+             "input": { "schema": { "type": "object", "additionalProperties": false, "required": ["amount"],
+                                    "properties": { "amount": { "type": "number", "minimum": 0 } } },
+                        "set": { "requestedBy": "user.Name" } } },
+  "states": [
+    { "key": "routing", "transitions": [
+        { "key": "needs-review", "target": "review", "trigger": "Automatic", "rule": "data.amount > 5000" },
+        { "key": "auto-approve", "target": "approved", "trigger": "Automatic", "default": true } ] },
+    { "key": "review", "subType": "Human", "transitions": [
+        { "key": "approve", "target": "approved", "roles": ["manager"] },
+        { "key": "escalate", "target": "escalated", "trigger": "Scheduled", "after": "PT24H" } ] },
+    { "key": "escalated", "subType": "Human", "transitions": [ { "key": "approve", "target": "approved", "roles": ["director"] } ] },
+    { "key": "approved", "type": "Finish", "subType": "Success",
+      "onEntry": [ { "task": "publish", "config": { "type": "OrderApproved", "payload": { "id": "{{ instance.id }}" } } } ] },
+    { "key": "expired", "type": "Finish", "subType": "Timeout" }
+  ]
+}
+```
+
+| Concept | Supported |
+|---|---|
+| States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
+| Transitions | `Manual` (API, `roles`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when a transition declares `input` (`into` path, computed `set` values) |
+| Tasks | `onEntry`, `onExit`, `onExecute`; built-ins `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`; custom `IWorkflowTask`; `when` condition |
+| Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
+| Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
+| Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
+| Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), one transaction per command, data snapshot + history per transition, incidents, idempotent start by business key, async transitions (202), durable timers with leases (multi-instance safe), crash recovery of Busy instances, `IWorkflowEventHandler` notifications after commit |
+
+REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are ProblemDetails):
+`GET /api/workflows`, `GET /{workflow}`, `POST /{workflow}/instances`, `GET /{workflow}/instances`,
+`GET /{workflow}/instances/{id}` (includes the caller's available transitions and their input schemas),
+`POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`.
+
+Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
+`Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, start dialog generated from the
+start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
+with a form generated from its input schema) and `JsonSchemaForm`. See `Sample/Middt.Sample.BlazorServer/Pages/Workflow/OrderApprovalPage.razor`
+(menu "Sipariş Onayı").
+
+Compared to vNext this engine intentionally leaves out the separate execution host, Dapr (jobs, locks, pub/sub, state),
+inbox/outbox relays, Roslyn C# scripts, schema-per-flow storage, views/functions/extensions and long polling; tasks run
+in-process and side effects should be idempotent (at-least-once on retries).
+
+## Messaging (Rebus)
+
+```csharp
+builder.Services.AddMiddtRebus(builder.Configuration, rebus => rebus
+    .Subscribe<CategoryCreated>()          // pub/sub (RabbitMQ topic exchange)
+    .Map<CreateInvoice>("billing"));       // bus.Send(...) routes
+builder.Services.AddMiddtRebusHandlersFromAssemblyOf<CategoryCreatedHandler>();
+
+public sealed class CategoryCreatedHandler : IHandleMessages<CategoryCreated>
+{
+    public Task Handle(CategoryCreated message) => ...;
+}
+
+await bus.Publish(new CategoryCreated(id, name, now));   // inject Rebus.Bus.IBus
+```
+
+```jsonc
+"RebusSettings": {
+  "ConnectionString": "amqp://user:password@rabbitmq:5672", // or "UseInMemoryTransport": true for local runs/tests
+  "InputQueueName": "my-service",
+  "MaxDeliveryAttempts": 5,                                 // then moved to "ErrorQueueName"
+  "ErrorQueueName": "error",
+  "Routes": { "MyApp.Messages.CreateInvoice, MyApp.Messages": "billing" }
+}
+```
+
+Messages are serialized with System.Text.Json (no type-name driven polymorphic deserialization). Any other Rebus feature
+(sagas, timeouts, transactional outbox, second-level retries) can be enabled through `rebus.Configure(c => ...)`.
+Publishing after `SaveChanges` is not atomic with the database write; use Rebus' outbox when that guarantee is required.
+
 ## Security
 
 The framework follows the OWASP Top 10 / ASVS recommendations by default.
@@ -173,7 +269,7 @@ token reuse; personal data is kept out of logs; vulnerable transitive packages a
 
 ## Running the sample
 
-The sample (`Sample/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ, the API and the Blazor UI.
+The sample (`Sample/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the API and the Blazor UI. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
 
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
@@ -234,8 +330,7 @@ Version 10 is a breaking release. The main changes for consumers:
 | Swashbuckle (`/swagger`) | built-in OpenAPI (`/openapi/v1.json`) + Scalar (`/scalar`) |
 | `IBaseCache.GetSetValue` | `IBaseCache.GetOrCreateAsync` (HybridCache; uses Redis as L2 when an `IDistributedCache` is registered) |
 | `RedisSettings.RedisModelList` | `RedisSettings.ConnectionString` |
-| `BaseMassTransitConnection` | `AddMiddtMassTransit(...)` (hosted bus) |
-| `UseConsul(...)` | `AddMiddtConsul(configuration)` (hosted service) |
+| `Middt.Framework.Plugin.RabbitMQ` / `Middt.Framework.Plugin.MassTransit` (`BaseMassTransitConnection`, producer/consumer bases) | `Middt.Framework.Plugin.Rebus`: `AddMiddtRebus(...)`, `IBus.Send/Publish`, `IHandleMessages<T>` handlers |
 | `StringSearchType.Any` | `StringSearchType.Equal` |
 | `ArrayMaxLength` / `ArrayMinLength` were exclusive and rejected `null` | inclusive bounds, `null` is valid (combine with `[Required]`) |
 

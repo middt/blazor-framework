@@ -1,0 +1,20 @@
+{
+  // Simple scoring subflow used by order-approval (demo rule: large amounts score low).
+  "key": "credit-check",
+  "version": 1,
+  "title": "Kredi kontrolü",
+  "start": { "key": "start", "target": "scoring" },
+  "states": [
+    {
+      "key": "scoring",
+      "title": "Skorlama",
+      "onEntry": [ { "task": "set", "config": { "values": { "score": "data.amount > 20000 ? 40 : 85", "checkedAt": "now" } } } ],
+      "transitions": [
+        { "key": "pass", "target": "passed", "trigger": "Automatic", "rule": "data.score >= 50" },
+        { "key": "fail", "target": "declined", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "passed", "title": "Uygun", "type": "Finish", "subType": "Success" },
+    { "key": "declined", "title": "Uygun değil", "type": "Finish", "subType": "Error" }
+  ]
+}

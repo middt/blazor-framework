@@ -17,7 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Middt.Framework.Api\Middt.Framework.Api.csproj" />
-    <ProjectReference Include="..\..\Middt.Framework.Plugin.MassTransit\Middt.Framework.Plugin.MassTransit.csproj" />
+    <ProjectReference Include="..\..\Middt.Framework.Plugin.Rebus\Middt.Framework.Plugin.Rebus.csproj" />
+    <ProjectReference Include="..\..\Middt.Framework.Workflow\Middt.Framework.Workflow.csproj" />
     <ProjectReference Include="..\..\Middt.Framework.Plugin.Redis\Middt.Framework.Plugin.Redis.csproj" />
     <ProjectReference Include="..\Middt.Sample.Common\Middt.Sample.Common.csproj" />
     <ProjectReference Include="..\Middt.Sample.ServiceDefaults\Middt.Sample.ServiceDefaults.csproj" />
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <Content Update="Files\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="Workflows\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

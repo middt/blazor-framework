@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Middt.Framework.Blazor.Web.DependencyInjection;
 using Middt.Framework.Common.DependencyInjection;
+using Middt.Framework.Common.Http;
 using Middt.Sample.BlazorServer.Service;
 using Middt.Sample.BlazorServer.SignalR;
 using Middt.Sample.Common.Service;
@@ -25,6 +26,7 @@ builder.Services.AddMiddtApiClient<ProductService>();
 builder.Services.AddMiddtApiClient<StaffService>();
 builder.Services.AddMiddtApiClient<StoreService>();
 builder.Services.AddMiddtApiClient<ViewOrderService>();
+builder.Services.AddMiddtApiClient<WorkflowApiClient>();
 
 builder.Services.AddScoped<MenuService>();
 builder.Services.AddScoped<TestSignalRClient>();

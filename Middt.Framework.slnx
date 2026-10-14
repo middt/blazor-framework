@@ -1,8 +1,6 @@
 <Solution>
   <Folder Name="/plugins/">
-    <Project Path="Middt.Framework.Plugin.Consul/Middt.Framework.Plugin.Consul.csproj" />
-    <Project Path="Middt.Framework.Plugin.MassTransit/Middt.Framework.Plugin.MassTransit.csproj" />
-    <Project Path="Middt.Framework.Plugin.RabbitMQ/Middt.Framework.Plugin.RabbitMQ.csproj" />
+    <Project Path="Middt.Framework.Plugin.Rebus/Middt.Framework.Plugin.Rebus.csproj" />
     <Project Path="Middt.Framework.Plugin.Redis/Middt.Framework.Plugin.Redis.csproj" />
   </Folder>
   <Folder Name="/samples/">
@@ -18,6 +16,7 @@
     <Project Path="Middt.Framework.Common/Middt.Framework.Common.csproj" />
     <Project Path="Middt.Framework.Data/Middt.Framework.Data.csproj" />
     <Project Path="Middt.Framework.Model/Middt.Framework.Model.csproj" />
+    <Project Path="Middt.Framework.Workflow/Middt.Framework.Workflow.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Middt.Framework.Tests/Middt.Framework.Tests.csproj" />
