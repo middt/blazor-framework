@@ -1,48 +1,26 @@
-﻿using Middt.Framework.Common.Model.Data;
+using Middt.Framework.Common.Model.Data;
 using Syncfusion.DocIO;
 using Syncfusion.DocIO.DLS;
 using Syncfusion.DocIORenderer;
-using Syncfusion.Pdf;
-using System;
-using System.IO;
 
+namespace Middt.Framework.Common.Export;
 
-namespace Middt.Framework.Common.Export
+public abstract class BaseWordToPdfExport : BaseWordExport
 {
-    public abstract class BaseWordToPdfExport : BaseWordExport
+    public override BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel)
     {
-        public override BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel)
+        var word = ConvertToWord(baseExportModel);
+        if (!word.IsSuccess || word.Data is null)
         {
-            BaseResponseDataModel<byte[]> response = new BaseResponseDataModel<byte[]>();
-
-            try
-            {
-                BaseResponseDataModel<byte[]> baseResponseDataModel = ConvertToWord(baseExportModel);
-                using (MemoryStream wordStream = new MemoryStream(baseResponseDataModel.Data))
-                {
-                    using (WordDocument wordDocument = new WordDocument(wordStream, FormatType.Docx))
-                    {
-                        using (DocIORenderer renderer = new DocIORenderer())
-                        {
-                            PdfDocument pdfDocument = renderer.ConvertToPDF(wordDocument);
-
-                            using (MemoryStream pdfStream = new MemoryStream())
-                            {
-                                pdfDocument.Save(pdfStream);
-                                response.Data = pdfStream.ToArray();
-                            }
-                        }
-                    }
-                }
-
-            }
-            catch (Exception ex)
-            {
-                response.Result = Framework.Model.Model.Enumerations.ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
-            }
-
-            return response;
+            return word;
         }
+
+        using var wordStream = new MemoryStream(word.Data);
+        using var wordDocument = new WordDocument(wordStream, FormatType.Docx);
+        using var renderer = new DocIORenderer();
+        using var pdfDocument = renderer.ConvertToPDF(wordDocument);
+        using var pdfStream = new MemoryStream();
+        pdfDocument.Save(pdfStream);
+        return BaseResponseDataModel<byte[]>.Success(pdfStream.ToArray());
     }
 }

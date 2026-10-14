@@ -1,21 +1,9 @@
-﻿using System.Threading.Tasks;
+namespace Middt.Framework.Blazor.Web.Base.Component.Modal;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Modal
+/// <summary>Full screen loading overlay used by <see cref="BaseComponent.ExecuteMethod"/>.</summary>
+public partial class BaseLoadingModal : BaseModalCode
 {
-    public partial class BaseLoadingModal : BaseModalCode
-    {
-        public BaseModal baseModal { get; set; }
+    protected override Task OpenModal() => InvokeAsync(StateHasChanged);
 
-        public override async Task Open()
-        {
-            await baseModal.Open();
-        }
-
-        public override async Task Close()
-        {
-            await baseModal.Close();
-        }
-
-
-    }
+    protected override Task CloseModal() => InvokeAsync(StateHasChanged);
 }

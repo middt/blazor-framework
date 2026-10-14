@@ -1,211 +1,96 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Middt.Framework.Blazor.Web.Model;
-using Middt.Framework.Common.Log;
-using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Common.Notification;
 using Middt.Framework.Model.Model.Enumerations;
 using Syncfusion.Blazor.Inputs;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.FileUpload
+namespace Middt.Framework.Blazor.Web.Base.Component.FileUpload;
+
+/// <summary>Collects uploaded files (in memory) into <see cref="FileUploadModelList"/> with count/extension/size checks.</summary>
+public partial class BaseFileUploadComponent : BaseComponent
 {
-    public partial class BaseFileUploadComponent : BaseComponent
+    [Parameter]
+    public string AcceptedFileTypes { get; set; } = ".csv,.xlsx";
+
+    [Parameter]
+    public int MaxFileSize { get; set; } = 5 * 1024 * 1024;
+
+    [Parameter]
+    public int MaxFileCount { get; set; } = 1;
+
+    [Parameter]
+    public List<FileUploadModel> FileUploadModelList { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<List<FileUploadModel>> FileUploadModelListChanged { get; set; }
+
+    public List<FileUploadModel> ActiveFileUploadModelList =>
+        FileUploadModelList.Where(x => x.IsDeleted == YesNoEnum.No).ToList();
+
+    public async Task HandleSelection(UploadChangeEventArgs args)
     {
-        [Parameter]
-        public string acceptedFileTypes { get; set; }
+        var errors = new List<string>();
 
-
-        [Parameter]
-        public int MaxFileSize { get; set; }
-
-        [Parameter]
-        public int MaxFileCount { get; set; }
-
-
-        [Parameter]
-        public List<FileUploadModel> fileUploadModelList { get; set; }
-
-        public BaseFileUploadComponent()
+        foreach (var upload in args.Files)
         {
-            if (string.IsNullOrEmpty(acceptedFileTypes))
+            var name = upload.FileInfo.Name;
+            var error =
+                ActiveFileUploadModelList.Count >= MaxFileCount ? "Dosya sayısı için izin verilen sayıyı aştınız." :
+                !IsAllowedExtension(name) ? $"{name} dosyasının uzantısına izin verilmiyor." :
+                FileUploadModelList.Any(x => x.Name == name && x.IsDeleted == YesNoEnum.No) ? $"{name} dosyası sisteme daha önce eklenmiş." :
+                upload.FileInfo.Size > MaxFileSize ? $"{name} dosyası için izin verilen en büyük boyut: {MaxFileSize / (1024 * 1024)} MB." :
+                null;
+
+            if (error is not null)
             {
-                acceptedFileTypes = ".csv,.xlsx";
+                errors.Add(error);
+                continue;
             }
-            MaxFileCount = 1;
-            MaxFileSize = 5 * 1024 * 1024; // 5MB
+
+            await using var source = upload.File.OpenReadStream(MaxFileSize, ComponentCancellation);
+            using var buffer = new MemoryStream();
+            await source.CopyToAsync(buffer, ComponentCancellation);
+
+            FileUploadModelList.Add(new FileUploadModel { Name = name, IsDeleted = YesNoEnum.No, File = buffer.ToArray() });
         }
 
-        public List<FileUploadModel> ActiveFileUploadModelList
+        if (errors.Count == 0)
         {
-            get
-            {
-                if (fileUploadModelList != null)
-                {
-                    return fileUploadModelList.Where(x => x.IsDeleted == YesNoEnum.No).ToList();
-                }
-                else
-                {
-                    return new List<FileUploadModel>();
-                }
-            }
+            Notification.ShowSuccessMessage("Dosya başarı ile yüklendi.", null);
+        }
+        else
+        {
+            Logger.LogWarning("File upload rejected: {Errors}", string.Join(" ", errors));
+            Notification.ShowErrorMessage("Dosya yüklenirken bir hata oluştu.", errors[0]);
         }
 
-        public async Task HandleSelection(UploadChangeEventArgs args)
+        await FileUploadModelListChanged.InvokeAsync(FileUploadModelList);
+    }
+
+    public async Task Delete(FileUploadModel fileUploadModel)
+    {
+        if (fileUploadModel.FileUploadModelID < 1)
         {
-
-            BaseResponseModel result = new BaseResponseModel();
-            result.Result = ResultEnum.Success;
-
-
-            BaseResponseModel checkResult;
-            foreach (UploadFiles fileListEntry in args.Files)
-            {
-
-                checkResult = CheckFileCount();
-                if (checkResult.Result != ResultEnum.Success)
-                {
-                    result.Result = ResultEnum.Error;
-                    result.MessageList.AddRange(checkResult.MessageList);
-
-                    break;
-                }
-
-
-                checkResult = CheckFileExtension(fileListEntry);
-                if (checkResult.Result != ResultEnum.Success)
-                {
-                    result.Result = ResultEnum.Error;
-                    result.MessageList.AddRange(checkResult.MessageList);
-
-                    continue;
-                }
-
-                checkResult = CheckFileExist(fileListEntry);
-                if (checkResult.Result != ResultEnum.Success)
-                {
-                    result.Result = ResultEnum.Error;
-                    result.MessageList.AddRange(checkResult.MessageList);
-
-                    continue;
-                }
-
-                checkResult = CheckFileSize(fileListEntry);
-                if (checkResult.Result != ResultEnum.Success)
-                {
-                    result.Result = ResultEnum.Error;
-                    result.MessageList.AddRange(checkResult.MessageList);
-
-                    continue;
-                }
-
-
-                FileUploadModel fileUploadModel = new FileUploadModel();
-                fileUploadModel.IsDeleted = YesNoEnum.No;
-                fileUploadModel.Name = fileListEntry.FileInfo.Name;
-
-                fileUploadModel.File = fileListEntry.Stream.ToArray();
-                fileUploadModelList.Add(fileUploadModel);
-            }
-
-            if (result.Result == ResultEnum.Success)
-            {
-                Notification.ShowSuccessMessage("Dosya başarı ile yüklendi.", string.Empty);
-            }
-            else
-            {
-                Log.Error(result.ErrorText);
-                Notification.ShowErrorMessage("Dosya yüklenirken bir hata oluştu.", result.MessageList.FirstOrDefault());
-            }
+            FileUploadModelList.Remove(fileUploadModel);
+        }
+        else
+        {
+            fileUploadModel.IsDeleted = YesNoEnum.Yes;
         }
 
-        public void Delete(FileUploadModel fileUploadModel)
+        await FileUploadModelListChanged.InvokeAsync(FileUploadModelList);
+    }
+
+    private bool IsAllowedExtension(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(AcceptedFileTypes))
         {
-            if (fileUploadModel.FileUploadModelID < 1)
-            {
-                fileUploadModelList.Remove(fileUploadModel);
-            }
-            else
-            {
-                fileUploadModel.IsDeleted = YesNoEnum.Yes;
-            }
-            StateHasChanged();
+            return true;
         }
 
-        private BaseResponseModel CheckFileExist(UploadFiles fileListEntry)
-        {
-
-            BaseResponseModel baseResponseModel = new BaseResponseModel();
-            if (fileUploadModelList.Any(x => x.Name == fileListEntry.FileInfo.Name))
-            {
-                baseResponseModel.Result = ResultEnum.Error;
-                baseResponseModel.MessageList.Add($"{fileListEntry.FileInfo.Name} dosyası sisteme daha önce eklenmiş");
-            }
-            else
-            {
-                baseResponseModel.Result = ResultEnum.Success;
-
-            }
-            return baseResponseModel;
-        }
-        private BaseResponseModel CheckFileSize(UploadFiles fileListEntry)
-        {
-            BaseResponseModel baseResponseModel = new BaseResponseModel();
-            if (fileListEntry.FileInfo.Size > MaxFileSize)
-            {
-                baseResponseModel.Result = ResultEnum.Error;
-                baseResponseModel.MessageList.Add($"{fileListEntry.FileInfo.Name} dosyası için izin verilen max boyut: {MaxFileSize / 1024 * 1024} MB");
-            }
-            else
-            {
-                baseResponseModel.Result = ResultEnum.Success;
-
-            }
-            return baseResponseModel;
-        }
-        private BaseResponseModel CheckFileExtension(UploadFiles fileListEntry)
-        {
-            BaseResponseModel baseResponseModel = new BaseResponseModel();
-            bool isExist = false;
-
-
-
-
-            //foreach (string extension in acceptedFileTypes)
-            //{
-            //    if (fileListEntry.FileInfo.Name.EndsWith(extension))
-            //    {
-            //        isExist = true;
-            //        break;
-            //    }
-            //}
-            //if (!isExist)
-            //{
-            //    baseResponseModel.Result = ResultEnum.Error;
-            //    baseResponseModel.MessageList.Add($"{fileListEntry.FileInfo.Name} dosyası için izin verilen uzantıda değil.");
-            //}
-            //else
-            //{
-            //    baseResponseModel.Result = ResultEnum.Success;
-
-            //}
-            return baseResponseModel;
-        }
-        private BaseResponseModel CheckFileCount()
-        {
-            BaseResponseModel baseResponseModel = new BaseResponseModel();
-            if (fileUploadModelList.Count >= MaxFileCount)
-            {
-                baseResponseModel.Result = ResultEnum.Error;
-                baseResponseModel.MessageList.Add($"Dosya sayısı için izin verilen sayıyı aştınız.");
-            }
-            else
-            {
-                baseResponseModel.Result = ResultEnum.Success;
-
-            }
-            return baseResponseModel;
-        }
+        var extension = Path.GetExtension(fileName);
+        return AcceptedFileTypes
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(allowed => string.Equals(allowed, extension, StringComparison.OrdinalIgnoreCase));
     }
 }

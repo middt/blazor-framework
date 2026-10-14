@@ -1,57 +1,50 @@
-﻿using Microsoft.AspNetCore.Components;
+using Middt.Framework.Common.Http;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Common.Service;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base.Page
+namespace Middt.Framework.Blazor.Web.Base.Page;
+
+/// <summary>
+/// Code-behind base for a routable page that hosts a <c>BaseListPage</c>/<c>BaseRadzenListPage</c>
+/// referenced as <c>@ref="baseListPage"</c>; override <see cref="OnBeforeSearch"/>/<see cref="OnAfterSearch"/> to customise.
+/// </summary>
+public class BaseListPageCode<TService, TModel> : BasePageComponent, IPageHooks
+    where TModel : BaseRequestModel, new()
+    where TService : IListApiClient<TModel>
 {
-    public class BaseListPageCode<TService, TInterface, TModel> : BasePageComponent
-        where TModel : BaseRequestModel, new()
-        where TInterface : IBaseListRefit<TModel>
-        where TService : BaseListRefit<TInterface, TModel>
+#pragma warning disable IDE1006 // referenced from page markup with this name
+    public BaseListPageComponentClass<TService, TModel> baseListPage { get; set; } = default!;
+#pragma warning restore IDE1006
+
+    public BaseSearchRequestModel<TModel> SearchRequestModel
     {
-
-        public BaseListPageComponentClass<TService, TInterface, TModel> baseListPage { get; set; }
-
-        public BaseSearchRequestModel<TModel> SearchRequestModel { get { return baseListPage.SearchRequestModel; } set { baseListPage.SearchRequestModel = value; } }
-
-        public BaseResponseDataModel<List<TModel>> SearchResultModel { get { return baseListPage.SearchResultModel; } set { baseListPage.SearchResultModel = value; } }
-
-        public TService Service { get { return baseListPage.Service; } }
-
-        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
-        {
-            await base.CustomOnAfterRenderAsync(firstRender);
-
-            if (firstRender)
-            {
-                if (baseListPage != null)
-                {
-                    baseListPage.OnBeforeSearch = EventCallback.Factory.Create(this, OnBeforeSearch);
-                    baseListPage.OnAfterSearch = EventCallback.Factory.Create(this, OnAfterSearch);
-                }
-            }
-        }
-
-        public virtual async Task Search()
-        {
-            await baseListPage.Search();
-        }
-
-        public override async Task ExecuteMethod(Action action)
-        {
-            await baseListPage.ExecuteMethod(action);
-        }
-
-        public virtual async Task OnAfterSearch()
-        {
-
-        }
-        public virtual async Task OnBeforeSearch()
-        {
-
-        }
+        get => baseListPage?.SearchRequestModel ?? new();
+        set => baseListPage.SearchRequestModel = value;
     }
+
+    public BaseResponseDataModel<List<TModel>> SearchResultModel
+    {
+        get => baseListPage.SearchResultModel;
+        set => baseListPage.SearchResultModel = value;
+    }
+
+    public TService Service => baseListPage.Service;
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Registered synchronously so the hooks are in place before the child page's first search completes.
+        if (firstRender && baseListPage is not null)
+        {
+            baseListPage.Hooks = this;
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    public virtual Task Search() => baseListPage.Search();
+
+    public override Task ExecuteMethod(Func<Task> action) => baseListPage.ExecuteMethod(action);
+
+    public virtual Task OnBeforeSearch() => Task.CompletedTask;
+
+    public virtual Task OnAfterSearch() => Task.CompletedTask;
 }

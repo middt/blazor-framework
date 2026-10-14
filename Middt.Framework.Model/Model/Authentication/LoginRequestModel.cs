@@ -1,12 +1,12 @@
-﻿using Swashbuckle.AspNetCore.Annotations;
+using System.ComponentModel;
 
-namespace Middt.Framework.Model.Authentication
+namespace Middt.Framework.Model.Authentication;
+
+public class LoginRequestModel : BaseTokenRequestModel
 {
-    public class LoginRequestModel : BaseTokenRequestModel
-    {
-        [SwaggerSchema("Kullanıcı Adınız")]
-        public string username { get; set; }
-        [SwaggerSchema("Şifreniz")]
-        public string password { get; set; }
-    }
+    [Description("Kullanıcı adınız")]
+    public string? username { get; set; }
+
+    [Description("Şifreniz")]
+    public string? password { get; set; }
 }

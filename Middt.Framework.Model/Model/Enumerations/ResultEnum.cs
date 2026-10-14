@@ -1,9 +1,8 @@
-﻿namespace Middt.Framework.Model.Model.Enumerations
+namespace Middt.Framework.Model.Model.Enumerations;
+
+public enum ResultEnum
 {
-    public enum ResultEnum
-    {
-        Success = 0,
-        Info = 1,
-        Error = -1
-    }
+    Success = 0,
+    Info = 1,
+    Error = -1,
 }

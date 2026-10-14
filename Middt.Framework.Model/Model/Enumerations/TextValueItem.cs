@@ -1,8 +1,7 @@
-﻿namespace Middt.Framework.Model
+namespace Middt.Framework.Model;
+
+public class TextValueItem
 {
-    public class TextValueItem
-    {
-        public string Text { get; set; }
-        public int Value { get; set; }
-    }
+    public string Text { get; set; } = string.Empty;
+    public int Value { get; set; }
 }

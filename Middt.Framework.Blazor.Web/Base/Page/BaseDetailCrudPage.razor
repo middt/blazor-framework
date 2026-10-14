@@ -1,28 +1,12 @@
-﻿@inherits BaseDetailCrudPageComponentClass<TService, TInterface, TModel>
-
-@using Middt.Framework.Blazor.Web.Base
-@using Middt.Framework.Blazor.Web.Base.Page
-@using Middt.Framework.Blazor.Web.Base.Component.Modal
-
-
-@using Middt.Framework.Common.Model.Data
-@using Middt.Framework.Common.Service
-@using Middt.Framework.Model.Model.Enumerations
-
-@typeparam TService where TService : BaseCrudRefit<TInterface, TModel>
-@typeparam TInterface where TInterface : IBaseCrudRefit<TModel>
+@typeparam TService where TService : ICrudApiClient<TModel>
 @typeparam TModel where TModel : BaseRequestModel, new()
+@inherits BaseDetailCrudPageComponentClass<TService, TModel>
 
-@if (Model != null)
+@if (Model is not null)
 {
     <EditForm Model="@Model" OnValidSubmit="@SaveButtonClick">
         <DataAnnotationsValidator />
         @DetailContent
     </EditForm>
-
 }
-<BaseLoadingModal @ref="LoadingModal">
-</BaseLoadingModal>
-@code{
-
-}
+<BaseLoadingModal @ref="LoadingModal" />

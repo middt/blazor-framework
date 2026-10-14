@@ -1,13 +1,7 @@
-﻿namespace Middt.Framework.Common.Model.Data
-{
-    public class BaseRequestDataModel<T> : BaseRequestModel
-        where T : new()
-    {
-        public T RequestModel { get; set; }
+namespace Middt.Framework.Common.Model.Data;
 
-        public BaseRequestDataModel()
-        {
-            RequestModel = new T();
-        }
-    }
+public class BaseRequestDataModel<T> : BaseRequestModel
+    where T : new()
+{
+    public T RequestModel { get; set; } = new();
 }

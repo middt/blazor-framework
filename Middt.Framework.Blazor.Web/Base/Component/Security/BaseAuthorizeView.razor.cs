@@ -1,28 +1,13 @@
-﻿using Microsoft.AspNetCore.Components;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Security
+namespace Middt.Framework.Blazor.Web.Base.Component.Security;
+
+/// <summary>Renders <see cref="Authorized"/> or <see cref="NotAuthorized"/> once the client token has been loaded.</summary>
+public partial class BaseAuthorizeView : BaseAuthorizeComponent
 {
-    public partial class BaseAuthorizeView: Middt.Framework.Blazor.Web.Base.BaseAuthorizeComponent
-    {
-        [Parameter]
-        public RenderFragment Authorized { get; set; }
-        [Parameter]
-        public RenderFragment NotAuthorized { get; set; }
+    [Parameter]
+    public RenderFragment? Authorized { get; set; }
 
-        public RenderFragment Display { get; set; }
-
-        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
-        {
-            await base.CustomOnAfterRenderAsync(firstRender);
-
-            //if(firstRender)
-            //{
-            if (IsAuthenticated)
-                Display = Authorized;
-            else
-                Display = NotAuthorized;
-            //}
-        }
-    }
+    [Parameter]
+    public RenderFragment? NotAuthorized { get; set; }
 }

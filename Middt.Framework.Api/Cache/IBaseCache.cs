@@ -1,9 +1,13 @@
-﻿using System;
+namespace Middt.Framework.Api.Cache;
 
-namespace Middt.Framework.Api.Cache
+/// <summary>Read-through cache abstraction (stampede protected, L1 memory + optional L2 distributed).</summary>
+public interface IBaseCache
 {
-    public interface IBaseCache
-    {
-        Task<T> GetSetValue<T>(string cacheKey, int SlidingExpiration, int AbsoluteExpiration, Func<T> func);
-    }
+    ValueTask<T> GetOrCreateAsync<T>(
+        string key,
+        Func<CancellationToken, ValueTask<T>> factory,
+        TimeSpan? expiration = null,
+        CancellationToken cancellationToken = default);
+
+    ValueTask RemoveAsync(string key, CancellationToken cancellationToken = default);
 }

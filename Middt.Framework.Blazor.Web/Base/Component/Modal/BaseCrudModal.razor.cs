@@ -1,35 +1,31 @@
-﻿using Microsoft.AspNetCore.Components;
-using Middt.Framework.Common.Model.Data;
-using System;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Modal
+namespace Middt.Framework.Blazor.Web.Base.Component.Modal;
+
+/// <summary>Dialog with an <c>EditForm</c> (data annotations validation) and Save/Cancel buttons.</summary>
+public partial class BaseCrudModal : BaseModalCode
 {
-    public partial class BaseCrudModal : BaseModalCode
+    protected BaseModal? BaseModalRef { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    public object? Model { get; private set; }
+
+    public async Task Open(object model)
     {
-        public BaseModal baseModal { get; set; }
-        public EventCallback? OnSave { get; set; }
+        Model = model;
+        IsModalOpen = true;
+        await BaseModalRef!.Open();
+    }
 
-        public async Task Save()
-        {
-            if (OnSave != null)
-                await OnSave?.InvokeAsync();
-        }
+    public override Task Close() => BaseModalRef?.Close() ?? Task.CompletedTask;
 
-        public BaseRequestModel Model { get; set; }
+    private Task Save() => OnSave.InvokeAsync();
 
-        public async Task Open(BaseRequestModel model)
-        {
-            Model = model;
-
-            await baseModal.Open();
-        }
-
-        public override async Task Close()
-        {
-            await baseModal.Close();
-            if (OnClose != null)
-                await OnClose?.InvokeAsync(string.Empty);
-        }
+    private Task HandleClosed(string _)
+    {
+        IsModalOpen = false;
+        return OnClose.InvokeAsync(ModalName);
     }
 }

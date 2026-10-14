@@ -1,20 +1,8 @@
-﻿@page "/"
-@*@layout LayoutWithoutAuth*@
+@page "/"
 @inherits BasePageComponent
-
-@using Middt.Framework.Blazor.Web.Base.Page;
-@using Middt.Framework.Blazor.Web.Base.Component.Captcha
-@using Middt.Framework.Blazor.Web.Base.Component.Security
 @using Middt.Sample.BlazorServer.Pages.Sample.SignalR.Component
-@*
-<button style="color:deepskyblue" @onclick="(async()=> { WordTemplate(); })">Word Template</button>
-<button style="color:deepskyblue" @onclick="(async()=> { WordToPdfTemplate(); })">Word to PDF Template</button>
 
-<br/>
-<br/>
-<br/>
-<button style="color:deepskyblue" @onclick="(async()=> { ExcelTemplate(); })">Excel Template</button>
-<button style="color:deepskyblue" @onclick="(async()=> { ExcelToPdfTemplate(); })">Excel to PDF Template</button>
-<br/>
-<br/>*@
+<RadzenText TextStyle="TextStyle.H4">Middt Framework Sample</RadzenText>
+<RadzenText>Sol menüden Category, Product veya Order sayfalarını açabilirsiniz.</RadzenText>
 
+<TestSignalRComponent />

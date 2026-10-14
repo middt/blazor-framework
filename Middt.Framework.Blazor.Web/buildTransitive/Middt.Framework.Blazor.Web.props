@@ -1,0 +1,6 @@
+<Project>
+  <!-- .NET 10 serves _framework/blazor.server.js from Microsoft.AspNetCore.App.Internal.Assets; ensure consuming hosts restore and publish it. -->
+  <PropertyGroup>
+    <RequiresAspNetWebAssets Condition="'$(RequiresAspNetWebAssets)' == ''">true</RequiresAspNetWebAssets>
+  </PropertyGroup>
+</Project>

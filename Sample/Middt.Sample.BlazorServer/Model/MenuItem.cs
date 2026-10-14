@@ -1,16 +1,11 @@
-﻿using System.Collections.Generic;
+namespace Middt.Sample.BlazorServer.Model;
 
-namespace Middt.Sample.BlazorServer.Model
+public sealed class MenuItem
 {
-    public class MenuItem
-    {
-        public string Name { get; set; }
-        public string Icon { get; set; }
-        public string Path { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public bool Expanded { get; set; }
-        public IEnumerable<MenuItem> Children { get; set; }
-        public IEnumerable<string> Tags { get; set; }
-    }
+    public required string Name { get; init; }
+    public string? Icon { get; init; }
+    public required string Path { get; init; }
+    public string? Title { get; init; }
+    public bool Expanded { get; set; }
+    public IReadOnlyList<MenuItem>? Children { get; init; }
 }

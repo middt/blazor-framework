@@ -1,21 +1,19 @@
-﻿using Middt.Framework.Common.Configuration;
-using Middt.Framework.Common.Log;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Middt.Framework.Api.Configuration.Model;
+using Middt.Framework.Common.Http;
 using Middt.Framework.Common.Security;
-using Middt.Framework.Common.Service;
 using Middt.Sample.Api.Model.Database;
 
-namespace Middt.Sample.Common.Service
-{
-    public class CategoryService : BaseCrudRefit<ICategoryService, Category>
-    {
-        public override string controllerName => "Category";
-        public CategoryService(
-            IBaseConfiguration _baseConfiguration,
-            IBaseLog _baseLog,
-            IBaseSessionState _baseSessionState)
-            : base(_baseConfiguration, _baseLog, _baseSessionState)
-        {
+namespace Middt.Sample.Common.Service;
 
-        }
-    }
+public sealed class CategoryService(
+    HttpClient httpClient,
+    IBaseSessionState sessionState,
+    ITokenService tokenService,
+    IOptions<ApiSettings> apiSettings,
+    ILogger<CategoryService> logger)
+    : BaseCrudApiClient<Category>(httpClient, sessionState, tokenService, apiSettings, logger)
+{
+    protected override string ControllerName => "Category";
 }

@@ -1,37 +1,18 @@
-﻿@page "/Bike/CategoryProduct"
+@page "/Bike/CategoryProduct"
+@inherits BaseDetailPageCode<CategoryService, Category>
 
-@inherits BaseDetailPageCode<CategoryService, ICategoryService, Category>
-
-
-@using Middt.Framework.Blazor.Web.Base
-@using Middt.Framework.Blazor.Web.Base.Page;
-@using Middt.Sample.Common.Service
-@using Middt.Sample.Api.Model.Database;
-
-
-
-
-<BaseDetailPage TService="CategoryService"
-                TInterface="ICategoryService"
-                TModel="Category"
-                QueryStringID="ID"
-                @ref="baseDetailPage">
+<BaseDetailPage TService="CategoryService" TModel="Category" QueryStringID="ID" @ref="baseDetailPage">
     <DetailContent>
-        <RadzenCard>
-            <div class="row" style="margin-top:10px;">
-                <h3>@Model.CategoryName</h3>
-            </div>
+        <RadzenCard class="rz-mb-4">
+            <RadzenText TextStyle="TextStyle.H5">@Model.CategoryName</RadzenText>
         </RadzenCard>
     </DetailContent>
 </BaseDetailPage>
-<BaseRadzenListPage TService="ProductService"
-                    TInterface="IProductService"
-                    TModel="Product"
-                    IsFirstLoad="false"
-                    @ref="baseRadzenListPage">
+
+<BaseRadzenListPage TService="ProductService" TModel="Product" IsFirstLoad="false" @ref="productListPage">
     <ListContent>
-        <RadzenGridColumn TItem="Product" Property="ProductName" Title="Name" />
-        <RadzenGridColumn TItem="Product" Property="ModelYear" Title="Year" />
-        <RadzenGridColumn TItem="Product" Property="ListPrice" Title="Price" />
+        <RadzenDataGridColumn TItem="Product" Property="ProductName" Title="Name" />
+        <RadzenDataGridColumn TItem="Product" Property="ModelYear" Title="Year" />
+        <RadzenDataGridColumn TItem="Product" Property="ListPrice" Title="Price" FormatString="{0:N2}" />
     </ListContent>
 </BaseRadzenListPage>

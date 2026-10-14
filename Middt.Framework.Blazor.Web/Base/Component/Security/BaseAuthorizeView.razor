@@ -1,3 +1,6 @@
-﻿@inherits Middt.Framework.Blazor.Web.Base.BaseAuthorizeComponent
+@inherits Middt.Framework.Blazor.Web.Base.BaseAuthorizeComponent
 
-@Display
+@if (IsUserLoaded)
+{
+    @(IsAuthenticated ? Authorized : NotAuthorized)
+}

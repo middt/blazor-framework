@@ -1,17 +1,6 @@
-﻿using Middt.Framework.Common.Database;
+using Middt.Framework.Common.Database;
 using Middt.Sample.Api.Model.Database;
 
-namespace Middt.Sample.Api.Repository.Bike
-{
-    public class StoreRepository : BaseCrudRepository<Store, BikeStoresContext>
-    {
-        public StoreRepository() : base()
-        {
+namespace Middt.Sample.Api.Repository.Bike;
 
-        }
-        public StoreRepository(BikeStoresContext context) : base(context)
-        {
-
-        }
-    }
-}
+public class StoreRepository(BikeStoresContext context) : BaseCrudRepository<Store, BikeStoresContext>(context);

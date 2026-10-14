@@ -1,68 +1,46 @@
-﻿using Microsoft.AspNetCore.Components;
-using Middt.Framework.Blazor.Web.Base.Page;
+using Middt.Framework.Common.Http;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Common.Service;
-using System;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base.Page
+namespace Middt.Framework.Blazor.Web.Base.Page;
+
+/// <summary>Code-behind base for a page hosting a <c>BaseDetailCrudPage</c> referenced as <c>@ref="baseDetailCrudPage"</c>.</summary>
+public class BaseDetailCrudPageCode<TService, TModel> : BasePageComponent, IPageHooks
+    where TModel : BaseRequestModel, new()
+    where TService : ICrudApiClient<TModel>
 {
-    public class BaseDetailCrudPageCode<TService, TInterface, TModel> : BasePageComponent
-        where TModel : BaseRequestModel, new()
-        where TInterface : IBaseCrudRefit<TModel>
-        where TService : BaseCrudRefit<TInterface, TModel>
+#pragma warning disable IDE1006 // referenced from page markup with this name
+    public BaseDetailCrudPageComponentClass<TService, TModel> baseDetailCrudPage { get; set; } = default!;
+#pragma warning restore IDE1006
+
+    public TModel Model
     {
-
-        public TModel Model { get { return baseDetailCrudPage.Model; } set { baseDetailCrudPage.Model = value; } }
-
-        public BaseDetailCrudPage<TService, TInterface, TModel> baseDetailCrudPage { get; set; }
-
-        public TService Service { get { return baseDetailCrudPage.Service; } }
-
-        protected override async Task CustomOnAfterRenderAsync(bool firstRender)
-        {
-            await base.CustomOnAfterRenderAsync(firstRender);
-
-            if (firstRender)
-            {
-                if (baseDetailCrudPage != null)
-                {
-                    baseDetailCrudPage.OnBeforeSearch = EventCallback.Factory.Create(this, OnBeforeSearch);
-                    baseDetailCrudPage.OnAfterSearch = EventCallback.Factory.Create(this, OnAfterSearch);
-                }
-            }
-        }
-        public override async Task ExecuteMethod(Action action)
-        {
-           await baseDetailCrudPage.ExecuteMethod(action);
-        }
-
-
-        public virtual async Task Search()
-        {
-            await baseDetailCrudPage.Search();
-        }
-
-        public virtual async Task SaveButtonClick()
-        {
-            await baseDetailCrudPage.SaveButtonClick();
-        }
-
-        public virtual async Task Edit(TModel model)
-        {
-            await baseDetailCrudPage.Edit(model);
-        }
-        public virtual async Task New()
-        {
-            await baseDetailCrudPage.New();
-        }
-        public virtual async Task OnAfterSearch()
-        {
-
-        }
-        public virtual async Task OnBeforeSearch()
-        {
-
-        }
+        get => baseDetailCrudPage?.Model ?? new();
+        set => baseDetailCrudPage.Model = value;
     }
+
+    public TService Service => baseDetailCrudPage.Service;
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && baseDetailCrudPage is not null)
+        {
+            baseDetailCrudPage.Hooks = this;
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+
+    public override Task ExecuteMethod(Func<Task> action) => baseDetailCrudPage.ExecuteMethod(action);
+
+    public virtual Task Search() => baseDetailCrudPage.Search();
+
+    public virtual Task SaveButtonClick() => baseDetailCrudPage.SaveButtonClick();
+
+    public virtual Task Edit(TModel model) => baseDetailCrudPage.Edit(model);
+
+    public virtual Task New() => baseDetailCrudPage.New();
+
+    public virtual Task OnBeforeSearch() => Task.CompletedTask;
+
+    public virtual Task OnAfterSearch() => Task.CompletedTask;
 }

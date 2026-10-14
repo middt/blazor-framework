@@ -1,105 +1,52 @@
-﻿using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using Radzen.Blazor;
+using Microsoft.Extensions.Options;
 using Middt.Framework.Common.Security;
-using Middt.Sample.BlazorServer.Model;
+using Middt.Framework.Model.Model.Configuration;
 using Middt.Sample.BlazorServer.Service;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Radzen;
+using Radzen.Blazor;
 
-namespace Middt.Sample.BlazorServer.Shared
+namespace Middt.Sample.BlazorServer.Shared;
+
+public partial class MainLayout : LayoutComponentBase
 {
-    public partial class MainLayout : LayoutComponentBase
+    private static readonly string[] themes = ["material", "standard", "default", "humanistic", "software", "fluent"];
+
+    private bool sidebarExpanded = true;
+
+    [Inject]
+    private ThemeService ThemeService { get; set; } = default!;
+
+    [Inject]
+    private MenuService MenuService { get; set; } = default!;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = default!;
+
+    [Inject]
+    private BaseTokenHelper BaseTokenHelper { get; set; } = default!;
+
+    [Inject]
+    private IOptions<SecuritySettings> SecuritySettings { get; set; } = default!;
+
+    protected override Task OnInitializedAsync() => BaseTokenHelper.LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        var current = MenuService.FindCurrent(NavigationManager.ToAbsoluteUri(NavigationManager.Uri));
+        await JsRuntime.InvokeVoidAsync("middt.setTitle", MenuService.TitleFor(current));
+    }
 
-        [Inject]
-        ThemeState ThemeState { get; set; }
-        [Inject]
-        MenuService MenuService { get; set; }
-        [Inject]
-        NavigationManager UriHelper { get; set; }
-        [Inject]
-        IJSRuntime JSRuntime { get; set; }
-        [Inject]
-        IHttpContextAccessor httpContextAccessor { get; set; }
-        [Inject]
-        protected IBaseSessionState baseSessionState { get; set; }
-
-        [Inject]
-        protected BaseTokenHelper baseTokenHelper { get; set; }
-
-        RadzenSidebar sidebar0;
-        RadzenBody body0;
-
-        bool sidebarExpanded = true;
-        bool bodyExpanded = false;
-
-        dynamic themes = new[]
+    private void OnUserButtonClick(RadzenSplitButtonItem? item)
+    {
+        if (item?.Value == "logout")
         {
-    new { Text = "Default", Value = "default"},
-    new { Text = "Dark", Value="dark" },
-    new { Text = "Software", Value = "software"},
-    new { Text = "Humanistic", Value = "humanistic" }
-    };
-
-        IEnumerable<MenuItem> examples;
-
-        string Theme
-        {
-            get
-            {
-                return $"{ThemeState.CurrentTheme}.css";
-            }
-        }
-
-        protected override void OnInitialized()
-        {
-            if (httpContextAccessor != null && httpContextAccessor.HttpContext != null &&
-                 httpContextAccessor.HttpContext.Request != null && httpContextAccessor.HttpContext.Request.Headers.ContainsKey("User-Agent"))
-            {
-                var userAgent = httpContextAccessor.HttpContext.Request.Headers["User-Agent"].FirstOrDefault();
-                if (!string.IsNullOrEmpty(userAgent))
-                {
-                    if (userAgent.Contains("iPhone") || userAgent.Contains("Android") || userAgent.Contains("Googlebot"))
-                    {
-                        sidebarExpanded = false;
-                        bodyExpanded = true;
-                    }
-                }
-            }
-
-            examples = MenuService.MenuItems;
-
-            System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("en-US");
-        }
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!firstRender)
-            {
-                MenuItem menuItem = MenuService.FindCurrent(UriHelper.ToAbsoluteUri(UriHelper.Uri));
-
-                await JSRuntime.InvokeVoidAsync("setTitle", MenuService.TitleFor(menuItem));
-            }
-        }
-
-        void ChangeTheme(object value)
-        {
-            ThemeState.CurrentTheme = value.ToString();
-            UriHelper.NavigateTo(UriHelper.ToAbsoluteUri(UriHelper.Uri).ToString());
-        }
-
-        void OnUserButtonClick(RadzenSplitButtonItem item, string buttonName)
-        {
-            if (item != null)
-            {
-                if (item.Value == "2")
-                {
-                    baseSessionState.ClearToken();
-                }
-            }
+            // Logout is a server rendered page (POST + antiforgery) that deletes the HttpOnly cookie.
+            NavigationManager.NavigateTo(SecuritySettings.Value.LogoutPageURL, forceLoad: true);
         }
     }
 }

@@ -1,48 +1,52 @@
-﻿using Middt.Framework.Common.Log;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Middt.Framework.Common.Helper;
 using Middt.Framework.Common.Model.Data;
-using Newtonsoft.Json;
 using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Plugin.RabbitMQ
+namespace Middt.Framework.Plugin.RabbitMQ;
+
+/// <summary>Publishes JSON messages of type <typeparamref name="T"/> to the configured exchange.</summary>
+public abstract class MiddRabbitMqProducerBase<T>(IConnectionFactory connectionFactory, ExchangeTypes exchangeType, ILogger logger)
+    : MiddtRabbitMqConnection(connectionFactory, exchangeType, logger)
 {
+    private const string PublishFailedMessage = "Message could not be published.";
 
-    public abstract class MiddRabbitMqProducerBase<T> : MiddtRabbitMqConnection
+    public async Task<BaseResponseModel> PublishAsync(T message, CancellationToken cancellationToken = default)
     {
-
-        protected MiddRabbitMqProducerBase(IBaseLog baselog, ConnectionFactory connectionFactory, ExchangeTypes exchangeType)
-            : base(baselog,connectionFactory, exchangeType, true) { }
-
-        public BaseResponseModel Publish(T @event)
+        try
         {
-            BaseResponseModel result = new BaseResponseModel();
-            try
+            await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+
+            var body = JsonSerializer.SerializeToUtf8Bytes(message, JsonHelper.Options);
+            var properties = new BasicProperties
             {
-                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(@event));
+                AppId = AppId,
+                ContentType = "application/json",
+                DeliveryMode = DeliveryModes.Persistent,
+                Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+            };
 
-                var properties = Channel.CreateBasicProperties();
-                properties.AppId = AppId;
-                properties.ContentType = "application/json";
-                properties.DeliveryMode = 2; //persist mode
-                properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            await Channel.BasicPublishAsync(
+                exchange: RefinedExchangeName,
+                routingKey: RefinedRoutingKey,
+                mandatory: false,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                Channel.BasicPublish(exchange: RefinedExchangeName, routingKey: RefinedRoutingKey, basicProperties: properties, body: body);
-
-                result.Result = Model.Model.Enumerations.ResultEnum.Success;
-            }
-            catch (Exception ex)
-            {
-                _baselog.Error($"Error occurred in Publish. Message: {ex?.Message}");
-
-                result.Result = Model.Model.Enumerations.ResultEnum.Error;
-                result.MessageList.Add(ex.ToString());
-            }
-            return result;
+            return BaseResponseModel.Success();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // Publishing failures are reported through the response envelope.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            Logger.LogError(ex, "Error publishing message to exchange {Exchange} with routing key {RoutingKey}", RefinedExchangeName, RefinedRoutingKey);
+            return BaseResponseModel.Failure(PublishFailedMessage);
         }
     }
 }

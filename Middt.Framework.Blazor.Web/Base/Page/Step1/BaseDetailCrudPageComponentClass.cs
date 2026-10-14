@@ -1,75 +1,69 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
+using Middt.Framework.Common.Http;
 using Middt.Framework.Common.Model.Data;
-using Middt.Framework.Common.Service;
-using Middt.Framework.Model.Model.Enumerations;
-using System.Linq;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base
+namespace Middt.Framework.Blazor.Web.Base.Page;
+
+/// <summary>Detail page with an edit form: updates an existing record or inserts a new one when no id is given.</summary>
+public class BaseDetailCrudPageComponentClass<TService, TModel> : BaseDetailPageComponentClass<TService, TModel>
+    where TModel : BaseRequestModel, new()
+    where TService : ICrudApiClient<TModel>
 {
-    public abstract partial class BaseDetailCrudPageComponentClass<TService, TInterface, TModel> : BaseDetailPageComponentClass<TService, TInterface, TModel>
-        where TModel : BaseRequestModel, new()
-        where TInterface : IBaseCrudRefit<TModel>
-         where TService : BaseCrudRefit<TInterface, TModel>
+    /// <summary>Navigates here after a successful save (otherwise a notification is shown).</summary>
+    [Parameter]
+    public string? SaveAfterURL { get; set; }
+
+    protected bool IsUpdate { get; set; }
+
+    protected override async Task CustomOnAfterRenderAsync(bool firstRender)
     {
-        public BaseDetailCrudPageComponentClass() : base()
-        {
+        await base.CustomOnAfterRenderAsync(firstRender);
 
-        }
-
-        protected bool IsUpdate { get; set; }
-
-        public async Task New()
+        if (firstRender)
         {
-            await Open(new TModel(), false);
-        }
-
-        public async Task Edit(TModel model)
-        {
-            await Open(model, true);
-        }
-        private async Task Open(TModel model, bool isUpdate)
-        {
-            IsUpdate = isUpdate;
-            Model = model.Clone() as TModel;
-
-            StateHasChanged();
-        }
-        public async Task SaveButtonClick()
-        {
-            await ExecuteMethod(async () =>
+            IsUpdate = Model is not null;
+            if (Model is null)
             {
-                BaseResponseDataModel<TModel> result;
-                if (IsUpdate)
-                {
-                    result = await Service.Update(Model);
-                }
-                else
-                {
-                    result = await Service.Insert(Model);
-                }
+                await New();
+            }
+        }
+    }
 
-                if (result.Result == ResultEnum.Success)
-                {
-                    if (!string.IsNullOrEmpty(SaveAfterURL))
-                    {
-                        NavigationManager.NavigateTo(SaveAfterURL);
-                    }
-                    else
-                    {
-                        Notification.ShowSuccessMessage("Bilgiler başarı ile kaydedildi.", string.Empty);
-                    }
-                }
-                else
-                {
-                    Log.Error(result.ErrorText);
-                    Notification.ShowErrorMessage("Bilgiler Kaydedilirken bir hata oluştu.", result.MessageList.FirstOrDefault());
-                }
-            });
+    public Task New() => Open(new TModel(), isUpdate: false);
+
+    public Task Edit(TModel model) => Open(model, isUpdate: true);
+
+    private Task Open(TModel model, bool isUpdate)
+    {
+        IsUpdate = isUpdate;
+        Model = (TModel)model.Clone();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task SaveButtonClick() => ExecuteMethod(async () =>
+    {
+        var result = IsUpdate
+            ? await Service.UpdateAsync(Model!, ComponentCancellation)
+            : await Service.InsertAsync(Model!, ComponentCancellation);
+
+        if (!result.IsSuccess)
+        {
+            Logger.LogWarning("Save failed: {Error}", result.ErrorText);
+            Notification.ShowErrorMessage("Bilgiler kaydedilirken bir hata oluştu.", result.MessageList.FirstOrDefault());
+            return;
         }
 
-
-        [Parameter]
-        public string SaveAfterURL { get; set; }
-    }
+        if (!string.IsNullOrEmpty(SaveAfterURL))
+        {
+            NavigationManager.NavigateTo(SaveAfterURL);
+        }
+        else
+        {
+            Model = result.Data ?? Model;
+            IsUpdate = true;
+            Notification.ShowSuccessMessage("Bilgiler başarı ile kaydedildi.", null);
+        }
+    });
 }

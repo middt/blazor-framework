@@ -1,19 +1,12 @@
-﻿using Middt.Framework.Common.Configuration;
-using Middt.Framework.Common.Log;
+using Microsoft.Extensions.Options;
+using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Common.Security;
 using Middt.Framework.Common.SignalR;
 
-namespace Middt.Sample.BlazorServer.SignalR
+namespace Middt.Sample.BlazorServer.SignalR;
+
+public sealed class TestSignalRClient(IOptions<ApiSettings> apiSettings, IBaseSessionState sessionState, ILogger<TestSignalRClient> logger)
+    : BaseSignalRClient<string>(apiSettings, sessionState, logger)
 {
-    public class TestSignalRClient : BaseSignalRClient<string>
-    {
-        public TestSignalRClient(
-            IBaseConfiguration _baseConfiguration,
-            IBaseLog _baseLog,
-            IBaseSessionState _baseSessionState)
-            : base(_baseConfiguration, _baseLog, _baseSessionState)
-        {
-        }
-        public override string hubName => "/hubs/testhub";
-    }
+    public override string HubName => "/hubs/testhub";
 }

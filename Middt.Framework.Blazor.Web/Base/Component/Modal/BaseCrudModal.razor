@@ -1,26 +1,21 @@
-﻿
 @inherits Middt.Framework.Blazor.Web.Base.Component.Modal.BaseModalCode
-@using Middt.Framework.Common.Model.Data
 
-<BaseModal Title="@Title" @ref="baseModal" IsFullScreen="@IsFullScreen" Width="@Width" Height="@Height" ModalName="Crud" ShowClose="@ShowClose">
+<BaseModal Title="@Title" @ref="BaseModalRef" IsFullScreen="@IsFullScreen" Width="@Width" Height="@Height" ModalName="Crud" ShowClose="@ShowClose" OnClose="HandleClosed">
     <ChildContent>
-        @if (Model != null)
+        @if (Model is not null)
         {
-        <EditForm Model="@Model" OnValidSubmit="@Save">
-            <DataAnnotationsValidator />
-            @ChildContent
+            <EditForm Model="@Model" OnValidSubmit="@Save">
+                <DataAnnotationsValidator />
+                @ChildContent
 
-
-            <div class="row top-space">
-                <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary">Kaydet</button>
-                    <button type="reset" class="btn btn-secondary" data-dismiss="modal" @onclick="() => Close()">İptal</button>
+                <div class="row top-space">
+                    <div class="col-md-12">
+                        <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Kaydet" />
+                        <RadzenButton ButtonStyle="ButtonStyle.Secondary" Text="İptal" Click="Close" />
+                    </div>
                 </div>
-            </div>
-        </EditForm>
+            </EditForm>
         }
-    </ChildContent>
-    <FooterContent>
         @FooterContent
-    </FooterContent>
+    </ChildContent>
 </BaseModal>

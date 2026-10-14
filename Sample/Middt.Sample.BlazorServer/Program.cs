@@ -1,26 +1,36 @@
-
-using Microsoft.AspNetCore.Builder;
-using Middt.Framework.Common.Licence;
-using Middt.Sample.BlazorServer;
-using System;
+using Microsoft.AspNetCore.DataProtection;
+using Middt.Framework.Blazor.Web.DependencyInjection;
+using Middt.Framework.Common.DependencyInjection;
+using Middt.Sample.BlazorServer.Service;
+using Middt.Sample.BlazorServer.SignalR;
+using Middt.Sample.Common.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
-#if DEBUG
-Environment.SetEnvironmentVariable("ENVIRONMENT", "debug");
-#elif RELEASE
-      Environment.SetEnvironmentVariable("ENVIRONMENT","release");
-#elif BUILD1
-      Environment.SetEnvironmentVariable("ENVIRONMENT","build1");
-#endif
+builder.AddServiceDefaults();
+builder.AddMiddtBlazor();
 
-Startup startup = new Startup();
-// Add services to the container.
-startup.ConfigureServices(builder.Services);
+// With Redis (Aspire / compose) sessions and Data Protection keys are shared and survive restarts.
+if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
+{
+    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis);
+    builder.Services.AddDataProtection()
+        .PersistKeysToStackExchangeRedis(StackExchange.Redis.ConnectionMultiplexer.Connect(redis), "middt-sample:dataprotection-keys");
+}
+
+// Typed API clients (IHttpClientFactory + standard resilience pipeline).
+builder.Services.AddMiddtApiClient<CategoryService>();
+builder.Services.AddMiddtApiClient<CustomerService>();
+builder.Services.AddMiddtApiClient<ProductService>();
+builder.Services.AddMiddtApiClient<StaffService>();
+builder.Services.AddMiddtApiClient<StoreService>();
+builder.Services.AddMiddtApiClient<ViewOrderService>();
+
+builder.Services.AddScoped<MenuService>();
+builder.Services.AddScoped<TestSignalRClient>();
 
 var app = builder.Build();
 
-startup.ConfigureApplication(app);
-
+app.UseMiddtBlazor();
 
 app.Run();

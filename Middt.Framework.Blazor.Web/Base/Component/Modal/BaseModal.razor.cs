@@ -1,56 +1,52 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using Radzen;
-using System.Threading.Tasks;
 
-namespace Middt.Framework.Blazor.Web.Base.Component.Modal
+namespace Middt.Framework.Blazor.Web.Base.Component.Modal;
+
+/// <summary>
+/// Shows <see cref="BaseModalCode.ChildContent"/> in a Radzen dialog. <see cref="BaseModalCode.Open"/> returns as soon
+/// as the dialog is shown; <see cref="BaseModalCode.OnClose"/> fires when it is closed (by code or by the user).
+/// </summary>
+public partial class BaseModal : BaseModalCode
 {
-    public partial class BaseModal : BaseModalCode
+    [Inject]
+    private DialogService DialogService { get; set; } = default!;
+
+    protected override Task OpenModal()
     {
-        [Inject]
-        DialogService DialogService { get; set; }
-
-        protected override async Task OpenModal()
+        var options = new DialogOptions
         {
-            DialogOptions dialogOptions = new DialogOptions();
-            dialogOptions.ShowClose = ShowClose;
-            dialogOptions.ShowTitle = ShowTitle;
+            ShowClose = ShowClose,
+            ShowTitle = ShowTitle,
+            Style = Style,
+            Width = IsFullScreen ? "90%" : Width,
+            Height = IsFullScreen ? "90%" : Height,
+        };
 
+        // OpenAsync completes when the dialog closes; observe it without blocking the caller.
+        _ = WaitForCloseAsync(DialogService.OpenAsync(Title ?? string.Empty, _ => ChildContent ?? (_ => { }), options));
+        return Task.CompletedTask;
+    }
 
-            if (IsFullScreen)
-            {
-                dialogOptions.Width = "90%";
-                dialogOptions.Height = "90%";
-            }
-            else
-            {
-                if (!string.IsNullOrEmpty(Width))
-                    dialogOptions.Width = Width;
+    protected override Task CloseModal()
+    {
+        DialogService.Close();
+        return Task.CompletedTask;
+    }
 
-                if (!string.IsNullOrEmpty(Height))
-                    dialogOptions.Width = Height;
+    /// <summary>Re-renders the dialog content after the model behind it changed.</summary>
+    public void Refresh() => DialogService.Refresh();
 
-                if (!string.IsNullOrEmpty(Style))
-                    dialogOptions.Style = Style;
-            }
-
-            await DialogService.OpenAsync(Title, ds => ChildContent, dialogOptions);
-            //DialogService.OnClose += DialogService_OnClose;
+    private async Task WaitForCloseAsync(Task<dynamic?> dialog)
+    {
+        try
+        {
+            await dialog;
         }
-
-        //private void DialogService_OnClose(dynamic obj)
-        //{
-        //    OnClose?.Invoke(ModalName);
-        //    DialogService.OnClose -= DialogService_OnClose;
-
-        //}
-
-        protected override async Task CloseModal()
+        finally
         {
-            DialogService.Close();
-
-            if (OnClose != null)
-                await OnClose?.InvokeAsync(ModalName);
-
+            IsModalOpen = false;
+            await OnClose.InvokeAsync(ModalName);
         }
     }
 }

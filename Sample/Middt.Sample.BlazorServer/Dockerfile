@@ -1,26 +1,24 @@
-#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-EXPOSE 80
-EXPOSE 443
+EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["Sample/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj", "Sample/Middt.Sample.BlazorServer/"]
-COPY ["Sample/Middt.Sample.Common/Middt.Sample.Common.csproj", "Sample/Middt.Sample.Common/"]
-COPY ["Middt.Framework.Common/Middt.Framework.Common.csproj", "Middt.Framework.Common/"]
-COPY ["Middt.Framework.Model/Middt.Framework.Model.csproj", "Middt.Framework.Model/"]
-COPY ["Middt.Framework.Blazor.Web/Middt.Framework.Blazor.Web.csproj", "Middt.Framework.Blazor.Web/"]
-RUN dotnet restore "Sample/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj"
+COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
+COPY Middt.Framework.Model/*.csproj Middt.Framework.Model/
+COPY Middt.Framework.Common/*.csproj Middt.Framework.Common/
+COPY Middt.Framework.Blazor.Web/*.csproj Middt.Framework.Blazor.Web/
+COPY Sample/Middt.Sample.Common/*.csproj Sample/Middt.Sample.Common/
+COPY Sample/Middt.Sample.ServiceDefaults/*.csproj Sample/Middt.Sample.ServiceDefaults/
+COPY Sample/Middt.Sample.BlazorServer/*.csproj Sample/Middt.Sample.BlazorServer/
+RUN dotnet restore Sample/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj
 COPY . .
-WORKDIR "/src/Sample/Middt.Sample.BlazorServer"
-RUN dotnet build "Middt.Sample.BlazorServer.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "Middt.Sample.BlazorServer.csproj" -c Release -o /app/publish
+RUN dotnet publish Sample/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj -c $BUILD_CONFIGURATION -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
+USER $APP_UID
 ENTRYPOINT ["dotnet", "Middt.Sample.BlazorServer.dll"]

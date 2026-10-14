@@ -1,51 +1,26 @@
-﻿using Middt.Framework.Common.Model.Data;
-using Syncfusion.Pdf;
+using Middt.Framework.Common.Model.Data;
 using Syncfusion.XlsIO;
 using Syncfusion.XlsIORenderer;
-using System;
-using System.IO;
 
+namespace Middt.Framework.Common.Export;
 
-namespace Middt.Framework.Common.Export
+public abstract class BaseExcelToPdfExport : BaseExcelExport
 {
-    public abstract class BaseExcelToPdfExport : BaseExcelExport
+    public override BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel)
     {
-
-        public override BaseResponseDataModel<byte[]> Convert(BaseExportModel baseExportModel)
+        var excel = ConvertToExcel(baseExportModel);
+        if (!excel.IsSuccess || excel.Data is null)
         {
-            BaseResponseDataModel<byte[]> response = new BaseResponseDataModel<byte[]>();
-
-            try
-            {
-                BaseResponseDataModel<byte[]> baseResponseDataModel = ConvertToExcel(baseExportModel);
-                using (MemoryStream ms = new MemoryStream(baseResponseDataModel.Data))
-                {
-                    using (ExcelEngine excelEngine = new ExcelEngine())
-                    {
-                        IApplication application = excelEngine.Excel;
-                        IWorkbook workbook = application.Workbooks.Open(ms);
-
-                        //Initialize XlsIO renderer.
-                        XlsIORenderer renderer = new XlsIORenderer();
-                        //Convert Excel document into PDF document 
-                        PdfDocument pdfDocument = renderer.ConvertToPDF(workbook);
-                        using (MemoryStream pdfStream = new MemoryStream())
-                        {
-                            pdfDocument.Save(pdfStream);
-                            response.Data = pdfStream.ToArray();
-                        }
-
-
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                response.Result = Framework.Model.Model.Enumerations.ResultEnum.Error;
-                response.MessageList.Add(ex.ToString());
-            }
-
-            return response;
+            return excel;
         }
+
+        using var excelStream = new MemoryStream(excel.Data);
+        using var excelEngine = new ExcelEngine();
+        var workbook = excelEngine.Excel.Workbooks.Open(excelStream);
+
+        using var pdfDocument = new XlsIORenderer().ConvertToPDF(workbook);
+        using var pdfStream = new MemoryStream();
+        pdfDocument.Save(pdfStream);
+        return BaseResponseDataModel<byte[]>.Success(pdfStream.ToArray());
     }
 }
