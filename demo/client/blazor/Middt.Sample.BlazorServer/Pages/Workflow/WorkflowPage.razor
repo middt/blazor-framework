@@ -1,0 +1,111 @@
+@page "/workflow/{Key}"
+@using Middt.Framework.Blazor.Web.Base.Component.Workflow
+@using Microsoft.AspNetCore.WebUtilities
+@using Middt.Framework.Model.Workflow
+@implements IDisposable
+
+@* One page for every workflow: instance list + detail of /workflow/{key}; ?start=1 opens the start dialog once,
+   ?key=… prefills its business key and parameters named like start input properties prefill those fields. *@
+@* Keyed once on the container (sibling keys must be unique): another workflow recreates both components. *@
+<div class="middt-wf-layout" @key="Key">
+    <WorkflowInstanceList @ref="list" Workflow="@Key" Title="@ListTitle(Key)" SelectedId="@selectedId" OnSelected="OnSelected"
+                          OpenStart="@OpenStart" StartKey="@StartKey" StartValues="@startValues"
+                          OnStartOpened="RemoveStartQuery" OnDefinitionLoaded="OnDefinitionLoaded" />
+    <WorkflowInstanceDetail Workflow="@Key" InstanceId="@selectedId" OnChanged="OnChanged" />
+</div>
+
+@code {
+    private WorkflowInstanceList? list;
+    private Guid? selectedId;
+    private string? shownKey;
+    private IReadOnlyDictionary<string, string?>? startValues;
+    private readonly CancellationTokenSource cancellation = new();
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JsRuntime { get; set; } = default!;
+
+    /// <summary>Workflow key (e.g. <c>order-approval</c>).</summary>
+    [Parameter]
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary><c>?start=1</c>: open the start dialog (once; the query is removed when the dialog is shown).</summary>
+    [SupplyParameterFromQuery(Name = "start")]
+    public string? Start { get; set; }
+
+    /// <summary><c>?key=…</c>: business key prefilled in the start dialog (with <c>?start=1</c>).</summary>
+    [SupplyParameterFromQuery(Name = "key")]
+    public string? StartKey { get; set; }
+
+    private bool OpenStart => Start is "1" || string.Equals(Start, "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// List heading: the workflow definition title (the list's default); order approval keeps its historic heading.
+    /// </summary>
+    public static string? ListTitle(string key) => key == "order-approval" ? "Sipariş onayları" : null;
+
+    protected override void OnParametersSet()
+    {
+        if (shownKey != Key)
+        {
+            shownKey = Key;
+            selectedId = null;
+        }
+
+        // The other query parameters are start input candidates (the list keeps those named like a start property).
+        // Read only while ?start=1 is present; a stable dictionary otherwise (no per-render allocation).
+        startValues = OpenStart ? QueryValues(NavigationManager.Uri) : null;
+    }
+
+    private static Dictionary<string, string?> QueryValues(string uri)
+    {
+        var query = new Uri(uri).Query;
+        return QueryHelpers.ParseQuery(query).ToDictionary(p => p.Key, p => (string?)p.Value.LastOrDefault(), StringComparer.Ordinal);
+    }
+
+    private void OnSelected(WorkflowInstanceModel instance) => selectedId = instance.Id;
+
+    // A transition changes state/status in the list as well.
+    private Task OnChanged(WorkflowInstanceModel instance) => list?.RefreshAsync() ?? Task.CompletedTask;
+
+    // Removes start, key and the prefilled parameters (replace: the back button does not reopen the dialog).
+    private void RemoveStartQuery(IReadOnlyList<string> prefilled)
+    {
+        var remove = new Dictionary<string, object?>(StringComparer.Ordinal)
+        {
+            [WorkflowUi.StartQueryParameter] = null,
+            [WorkflowUi.StartKeyQueryParameter] = null,
+        };
+        foreach (var name in prefilled)
+        {
+            remove[name] = null;
+        }
+
+        NavigationManager.NavigateTo(NavigationManager.GetUriWithQueryParameters(remove), replace: true);
+    }
+
+    private async Task OnDefinitionLoaded(WorkflowDefinitionModel definition)
+    {
+        if (string.IsNullOrEmpty(definition.Title))
+        {
+            return;
+        }
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("middt.setTitle", cancellation.Token, definition.Title);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or InvalidOperationException)
+        {
+            // the title is cosmetic; the circuit is gone or JS is unavailable
+        }
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

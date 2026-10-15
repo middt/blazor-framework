@@ -14,7 +14,18 @@ namespace Middt.Framework.Blazor.Web.Base;
 /// </summary>
 public abstract class BaseComponent : ComponentBase, IDisposable
 {
-    private readonly CancellationTokenSource disposeCts = new();
+    private readonly CancellationTokenSource disposeCts;
+
+    // Captured once: reading Token of the disposed source throws, but work that ends after disposal (pending loads,
+    // timers) still asks for the component token – it must get the cancelled token instead of an exception.
+    private readonly CancellationToken disposeToken;
+
+    protected BaseComponent()
+    {
+        disposeCts = new CancellationTokenSource();
+        disposeToken = disposeCts.Token;
+    }
+
     private ILogger? logger;
 
     [Inject]
@@ -35,7 +46,7 @@ public abstract class BaseComponent : ComponentBase, IDisposable
     protected ILogger Logger => logger ??= LoggerFactory.CreateLogger(GetType());
 
     /// <summary>Cancelled when the component is disposed (e.g. the user navigates away).</summary>
-    protected CancellationToken ComponentCancellation => disposeCts.Token;
+    protected CancellationToken ComponentCancellation => disposeToken;
 
     public BaseLoadingModal? LoadingModal { get; set; }
 

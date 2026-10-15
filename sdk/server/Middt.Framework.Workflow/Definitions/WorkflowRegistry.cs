@@ -97,6 +97,7 @@ public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
         ["http"] = typeof(HttpTask),
         ["publish"] = typeof(PublishTask),
         ["startWorkflow"] = typeof(StartWorkflowTask),
+        ["setKey"] = typeof(SetKeyTask),
     };
 
     public Type? Find(string name) =>

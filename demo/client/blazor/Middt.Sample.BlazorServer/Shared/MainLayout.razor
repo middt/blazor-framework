@@ -25,7 +25,19 @@
         <RadzenPanelMenu>
             @foreach (var item in MenuService.MenuItems)
             {
-                <RadzenPanelMenuItem @key="item.Path" Text="@item.Name" Path="@item.Path" Icon="@item.Icon" />
+                if (item.Children is { } children)
+                {
+                    <RadzenPanelMenuItem @key="item.Path" Text="@item.Name" Icon="@item.Icon" @bind-Expanded="item.Expanded">
+                        @foreach (var child in children)
+                        {
+                            <RadzenPanelMenuItem @key="child.Path" Text="@child.Name" Path="@child.Path" Icon="@child.Icon" />
+                        }
+                    </RadzenPanelMenuItem>
+                }
+                else
+                {
+                    <RadzenPanelMenuItem @key="item.Path" Text="@item.Name" Path="@item.Path" Icon="@item.Icon" />
+                }
             }
         </RadzenPanelMenu>
     </RadzenSidebar>

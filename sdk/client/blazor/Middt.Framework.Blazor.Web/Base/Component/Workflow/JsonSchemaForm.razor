@@ -12,7 +12,7 @@
     {
         var id = FieldId(field);
         var errorId = $"{id}-error";
-        <div class="middt-jsf-field @(field.Error is null ? null : "middt-jsf-invalid")">
+        <div class="middt-jsf-field @(field.Error is null ? null : "middt-jsf-invalid")" data-field="@field.Name" data-lookup="@field.Lookup?.Entity">
             @if (field.Kind == FieldKind.Boolean)
             {
                 <div class="middt-jsf-check">
@@ -47,6 +47,19 @@
                                         AllowClear="@(!field.Required)" Placeholder="Seçiniz"
                                         aria-describedby="@(field.Error is null ? null : errorId)"
                                         ValueChanged="@(v => OnFieldChanged(field, () => field.TextValue = v))" class="middt-jsf-input" />
+                        break;
+                    case FieldKind.Lookup:
+                        var lookup = LookupStateOf(field);
+                        var lookupOptions = LookupOptions(field, lookup);
+                        <RadzenDropDown @ref="inputs[field.Name]" TValue="string" Name="@id" InputAttributes="@AriaLabel(field)" Data="@lookupOptions" TextProperty="Text" ValueProperty="Key"
+                                        Value="@field.TextValue" Disabled="@Disabled" AllowClear="@(!field.Required)" Placeholder="Seçiniz"
+                                        AllowFiltering="@(lookupOptions.Count > 10)" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        aria-describedby="@(field.Error is null ? null : errorId)"
+                                        ValueChanged="@(v => OnFieldChanged(field, () => field.TextValue = v))" class="middt-jsf-input" />
+                        @if (lookup.Error is not null)
+                        {
+                            <div class="middt-jsf-error middt-jsf-lookup-error" role="alert">@lookup.Error</div>
+                        }
                         break;
                     case FieldKind.DateTime:
                     case FieldKind.Date:

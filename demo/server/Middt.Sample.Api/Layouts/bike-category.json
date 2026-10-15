@@ -3,28 +3,28 @@
   "key": "bike-category",
   "title": "Kategoriler",
   "kind": "page",
-  "version": 1,
+  "version": 3,
   "menu": { "title": "Category", "icon": "category", "order": 10 },
   "body": [
     { "widget": "heading", "text": "Kategoriler" },
+    { "widget": "link", "text": "Yeni kategori talebi", "href": "/workflow/category-request?start=1", "style": "button" },
     {
       "widget": "grid",
       "id": "categories",
       "entity": "Category",
       "columns": [
-        { "field": "categoryName", "title": "Ad" }
+        { "field": "categoryName", "title": "Ad" },
+        { "field": "active", "title": "Durum", "width": "100px", "template": "{{ row.active == true ? \"Aktif\" : \"Pasif\" }}" }
       ],
       "search": [
-        { "field": "categoryName", "label": "Ad" }
+        { "field": "categoryName", "label": "Ad" },
+        { "field": "status", "label": "Durum", "type": "select", "options": [ "Aktif", "Pasif" ] }
       ],
-      "create": true,
-      "edit": true,
-      "delete": true,
-      "formTitle": "Kategori",
-      "form": [
-        { "field": "categoryName", "label": "Ad", "required": true, "maxLength": 255 }
-      ],
+      "create": false,
+      "edit": false,
+      "delete": false,
       "rowActions": [
+        { "text": "Değişiklik / kapatma", "icon": "edit_note", "navigate": "/workflow/category-request?start=1&key=category-{{ row.categoryId }}&categoryId={{ row.categoryId }}" },
         { "text": "Ürünler", "icon": "search", "navigate": "/ui/bike-category-products?id={{ row.categoryId }}" }
       ]
     }

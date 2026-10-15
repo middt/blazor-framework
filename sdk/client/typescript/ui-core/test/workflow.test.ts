@@ -6,9 +6,13 @@ import {
   parseWorkflowDate,
   ResultEnum,
   schemaFields,
+  schemaLookup,
+  schemaLookupOptions,
   schemaFormValue,
   schemaHasInput,
   schemaInitialValues,
+  schemaQueryValue,
+  schemaValuesFromQuery,
   UNAVAILABLE_MESSAGE,
   validateSchemaField,
   validateSchemaFields,
@@ -20,6 +24,7 @@ import {
   workflowLayoutVariables,
   workflowStateTitle,
   workflowStatusBadge,
+  workflowStartQuery,
   workflowStatusText,
   workflowStepClass,
   workflowStepPrefill,
@@ -377,6 +382,46 @@ test('schema fields: kinds and metadata', () => {
   assert.deepEqual(schemaFields(null), []);
 });
 
+test('schema fields: x-lookup selects (value type follows the property type)', () => {
+  const schema = {
+    type: 'object',
+    required: ['customerId'],
+    properties: {
+      customerId: { type: 'integer', title: 'Müşteri', 'x-lookup': { entity: 'Customer', valueField: 'customerId', textField: 'email' } },
+      storeCode: { type: 'string', 'x-lookup': { entity: 'Store', valueField: 'code', textField: 'name' } },
+      price: { type: 'number', 'x-lookup': { entity: 'Price', valueField: 'value', textField: 'value' } },
+      broken: { type: 'string', 'x-lookup': { entity: 'Store' } },
+    },
+  };
+  const fields = schemaFields(schema);
+  assert.deepEqual(fields.map(f => [f.name, f.kind, f.lookup?.entity ?? null]), [
+    ['customerId', 'integer', 'Customer'],
+    ['storeCode', 'text', 'Store'],
+    ['price', 'number', 'Price'],
+    ['broken', 'text', null],
+  ]);
+  assert.deepEqual(fields[0]!.lookup, { entity: 'Customer', valueField: 'customerId', textField: 'email' });
+  assert.equal(schemaLookup({ 'x-lookup': 'Customer' }), null);
+
+  const values = schemaInitialValues(schema, fields, { customerId: 7, storeCode: 'IST' });
+  assert.equal(values['customerId'], '7', 'prefilled value selects the option');
+  assert.equal(values['storeCode'], 'IST');
+  assert.equal(validateSchemaField(fields[0]!, ''), 'Bu alan zorunludur.');
+  assert.equal(validateSchemaField({ ...fields[1]!, minLength: 5 }, 'IST'), null, 'lookups only check "required"');
+  assert.deepEqual(schemaFormValue(fields, { ...values, customerId: '12' }), { customerId: 12, storeCode: 'IST' });
+
+  assert.deepEqual(schemaLookupOptions(fields[0]!.lookup!, [
+    { customerId: 7, email: 'a@b.co' },
+    { customerId: 8, email: null },
+    { customerId: 7, email: 'dup@b.co' },
+    { email: 'no-id@b.co' },
+    'not a row',
+  ]), [
+    { value: '7', text: 'a@b.co' },
+    { value: '8', text: '8' },
+  ]);
+});
+
 test('schema form validation messages (Turkish, like JsonSchemaForm)', () => {
   const fields = schemaFields(customerSchema);
   const byName = Object.fromEntries(fields.map(f => [f.name, f]));
@@ -453,4 +498,54 @@ test('workflow client rejects dot segments in workflow keys, instance ids and tr
   await assert.rejects(client.renderView('..', 'id-1'), /not a valid URL path segment/);
 
   assert.equal(requests, 0);
+});
+
+test('start link query: start, business key and the other parameters', () => {
+  assert.deepEqual(workflowStartQuery({ start: '1', key: ' category-5 ', categoryId: '5', tags: ['a', 'b'] }), {
+    open: true,
+    key: 'category-5',
+    values: { categoryId: '5', tags: 'a' },
+  });
+  assert.equal(workflowStartQuery({ start: 'true' }).open, true);
+  assert.equal(workflowStartQuery({ start: '0' }).open, false);
+  assert.deepEqual(workflowStartQuery({ key: '  ' }), { open: false, key: null, values: {} });
+  assert.deepEqual(workflowStartQuery(null), { open: false, key: null, values: {} });
+});
+
+test('start link query: values converted by the start input schema', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      categoryId: { type: 'integer', 'x-lookup': { entity: 'category', valueField: 'id', textField: 'name' } },
+      amount: { type: 'number' },
+      urgent: { type: 'boolean' },
+      note: { type: 'string' },
+      code: { type: 'string', 'x-lookup': { entity: 'store', valueField: 'code', textField: 'name' } },
+      priority: { type: ['integer', 'null'] },
+      lines: { type: 'array' },
+    },
+  };
+
+  const result = schemaValuesFromQuery(schema, {
+    categoryId: '5', amount: '12,5', urgent: '1', note: 'Merhaba', code: 'S1', priority: '2', lines: '[]', unknown: 'x', toString: 'x',
+  });
+  assert.deepEqual(result.data, { categoryId: 5, amount: 12.5, urgent: true, note: 'Merhaba', code: 'S1', priority: 2 });
+  // names: every start field present in the query (also the array 'lines' that is not prefilled) – removed from the URL
+  assert.deepEqual(result.names, ['categoryId', 'amount', 'urgent', 'note', 'code', 'priority', 'lines']);
+
+  // values that do not fit the type are ignored
+  // nothing applies, but the matching names are still reported for the URL cleanup
+  assert.deepEqual(schemaValuesFromQuery(schema, { categoryId: '5.5', amount: 'abc', urgent: 'yes', note: '' }), { data: {}, names: ['categoryId', 'amount', 'urgent', 'note'] });
+  assert.deepEqual(schemaValuesFromQuery(null, { categoryId: '5' }), { data: {}, names: [] });
+
+  // the form shows the typed values (x-lookup integer → option value text)
+  const fields = schemaFields(schema);
+  const values = schemaInitialValues(schema, fields, result.data);
+  assert.equal(values['categoryId'], '5');
+  assert.equal(values['urgent'], true);
+  assert.deepEqual(schemaFormValue(fields, values), result.data);
+
+  assert.equal(schemaQueryValue({ type: 'boolean' }, 'FALSE'), false);
+  assert.equal(schemaQueryValue({ type: 'integer' }, '-3'), -3);
+  assert.equal(schemaQueryValue({ type: 'object' }, '{}'), undefined);
 });

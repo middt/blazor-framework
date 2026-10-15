@@ -191,6 +191,41 @@ public sealed class JsonSchemaValidatorTests
             "$.b: unsupported schema keyword '$ref'.",
             "$[]: unsupported schema keyword 'if'.");
     }
+
+    private const string LookupSchema = """
+        { "type": "object", "required": [ "customerId" ],
+          "properties": {
+            "customerId": { "type": "integer", "title": "Müşteri",
+                            "x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "name" } } } }
+        """;
+
+    [Fact]
+    public void CheckSchema_accepts_a_lookup_hint_on_a_property()
+    {
+        JsonSchemaValidator.CheckSchema(JsonNode.Parse(LookupSchema)!.AsObject()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Lookup_hint_does_not_constrain_the_value()
+    {
+        Validate("""{ "customerId": 42 }""", LookupSchema).Should().BeEmpty();
+        Validate("""{ "customerId": "x" }""", LookupSchema).Should().Equal("$.customerId: expected integer.");
+        Validate("{}", LookupSchema).Should().Equal("$.customerId: is required.");
+    }
+
+    [Theory]
+    [InlineData("\"Customer\"", "$.c.x-lookup: must be an object with entity, valueField and textField.")]
+    [InlineData("""{ "valueField": "id", "textField": "name" }""", "$.c.x-lookup.entity: must be a controller name (letters and digits).")]
+    [InlineData("""{ "entity": "../admin", "valueField": "id", "textField": "name" }""", "$.c.x-lookup.entity: must be a controller name (letters and digits).")]
+    [InlineData("""{ "entity": "Customer", "valueField": "", "textField": "name" }""", "$.c.x-lookup.valueField: must be a property name (camelCase).")]
+    [InlineData("""{ "entity": "Customer", "valueField": "id", "textField": 5 }""", "$.c.x-lookup.textField: must be a property name (camelCase).")]
+    [InlineData("""{ "entity": "Customer", "valueField": "id", "textField": "name", "filter": {} }""", "$.c.x-lookup: unsupported property 'filter'.")]
+    public void CheckSchema_rejects_invalid_lookup_hints(string lookup, string error)
+    {
+        var schema = JsonNode.Parse($$"""{ "type": "object", "properties": { "c": { "type": "integer", "x-lookup": {{lookup}} } } }""")!.AsObject();
+
+        JsonSchemaValidator.CheckSchema(schema).Should().Equal(error);
+    }
 }
 
 public sealed class JsonPathTests

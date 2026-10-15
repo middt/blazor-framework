@@ -4,7 +4,7 @@
 
 <article class="sv-view" aria-labelledby="sv-result-title">
     <header class="sv-header">
-        <h3 id="sv-result-title">Sipariş #@Text("orderId") · @Text("customerName")</h3>
+        <h3 id="sv-result-title">@OrderTitle · @Text("customerName")</h3>
         <span class="@(Approved ? "sv-badge sv-good" : "sv-badge sv-bad")">@(Approved ? "Onaylandı" : "Reddedildi")</span>
     </header>
 
@@ -13,7 +13,7 @@
         <dd class="sv-amount">@ViewFormat.Money(Number("amount"))</dd>
         @if (Has("product"))
         {
-            <dt>Ürün grubu</dt>
+            <dt>Ürün</dt>
             <dd>@Text("product")</dd>
         }
         @if (Has("deliveryType"))
@@ -54,6 +54,9 @@
 </article>
 
 @code {
+    // The order row exists only after approval (order-approval v3): before that the request has no number yet.
+    private string OrderTitle => Text("orderId", string.Empty) is { Length: > 0 } id ? $"Sipariş #{id}" : "Sipariş talebi";
+
     private bool Approved => Instance.State == "approved";
 
     private bool Has(string path) => Text(path, string.Empty).Length > 0;

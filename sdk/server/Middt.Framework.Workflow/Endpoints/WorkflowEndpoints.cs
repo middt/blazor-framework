@@ -15,6 +15,12 @@ namespace Middt.Framework.Workflow.Endpoints;
 public static class WorkflowEndpoints
 {
     /// <summary>
+    /// <c>messageList</c> entry of a start whose business key already belonged to an instance (200 instead of 201): that
+    /// instance is returned and nothing new was started. Clients show it instead of "started".
+    /// </summary>
+    public const string ExistingInstanceMessage = "Bu iş anahtarıyla açık bir akış zaten var; mevcut akış açıldı.";
+
+    /// <summary>
     /// Maps the workflow REST API under <paramref name="prefix"/>:
     /// <list type="bullet">
     /// <item><c>GET /</c> workflows · <c>GET /{workflow}</c> states and transitions</item>
@@ -63,9 +69,14 @@ public static class WorkflowEndpoints
         {
             var (instance, created) = await engine.StartAsync(workflow, request ?? new StartWorkflowRequest(), WorkflowUser.From(principal), ct);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
-            return created
-                ? Results.Created($"{http.Request.Path}/{instance.Id}", body)
-                : Results.Ok(body);
+            if (created)
+            {
+                return Results.Created($"{http.Request.Path}/{instance.Id}", body);
+            }
+
+            // Same business key: the existing instance is returned (200). The message tells clients that nothing was started.
+            body.MessageList.Add(ExistingInstanceMessage);
+            return Results.Ok(body);
         }).WithName("StartWorkflowInstance");
 
         group.MapGet("{workflow}/instances", async (string workflow, string? state, WorkflowInstanceStatus? status, string? key, int? page, int? pageSize, WorkflowEngine engine, ClaimsPrincipal principal, CancellationToken ct) =>

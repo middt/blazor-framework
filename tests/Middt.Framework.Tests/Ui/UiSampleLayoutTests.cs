@@ -7,6 +7,7 @@ using Middt.Framework.Workflow;
 using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Workflow.DependencyInjection;
 using Middt.Framework.Workflow.Runtime;
+using Middt.Sample.Api.Tasks;
 
 namespace Middt.Framework.Tests.Ui;
 
@@ -50,6 +51,8 @@ public sealed class UiSampleLayoutTests
             {
                 o.AddDefinition(definition);
             }
+
+            o.AddBikeStoreTasks();
         });
 
         try

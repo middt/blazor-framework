@@ -12,11 +12,12 @@ import {
   isSuccess,
   errorText,
   schemaHasInput,
+  schemaValuesFromQuery,
   WORKFLOW_STATUS_OPTIONS,
   workflowStatusBadge,
   workflowStatusText,
 } from '@middt/ui-core';
-import type { WorkflowDefinitionModel, WorkflowInstanceModel, WorkflowInstanceStatusName } from '@middt/ui-core';
+import type { WorkflowData, WorkflowDefinitionModel, WorkflowInstanceModel, WorkflowInstanceStatusName } from '@middt/ui-core';
 import { NotifyService } from '../core/notify.service';
 import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
 import { WORKFLOW_API_CLIENT } from './workflow-client';
@@ -26,8 +27,17 @@ import { WF_SHARED_STYLES } from './workflow-styles';
 /**
  * Server-paged list of the instances of a workflow (counterpart of WorkflowInstanceList.razor) with a status filter and a
  * "Yeni başlat" dialog built from the start input schema. Workflows whose start takes no input (e.g. wizards that collect the
- * data in their first step) start immediately. State titles are resolved from each instance's definition version.
+ * data in their first step) start immediately. `openStart` (e.g. a `?start=1` link) or `showStartDialog()` open the dialog
+ * programmatically; with `startKey` / `startValues` (e.g. `?key=…&{property}=…`) the dialog opened by `openStart` is prefilled.
+ * Starting with the business key of an existing instance returns (and selects) that instance. State titles are resolved from
+ * each instance's definition version.
  */
+/** Payload of `startOpened`: the prefilled business key and the names of the applied `startValues`. */
+export interface WorkflowStartOpened {
+  key: string | null;
+  names: string[];
+}
+
 @Component({
   selector: 'middt-workflow-instance-list',
   imports: [
@@ -105,12 +115,12 @@ import { WF_SHARED_STYLES } from './workflow-styles';
         <div class="middt-jsf-field">
           <label [for]="idPrefix() + '-start-key'" class="middt-jsf-label">İş anahtarı (opsiyonel)</label>
           <mat-form-field class="middt-jsf-input" subscriptSizing="dynamic">
-            <input matInput [id]="idPrefix() + '-start-key'" [name]="idPrefix() + '-start-key'" maxlength="200" [value]="startKey()" [disabled]="starting()"
-                   placeholder="Aynı anahtarla tekrar başlatılırsa mevcut kayıt döner" (input)="startKey.set($any($event.target).value)" />
+            <input matInput [id]="idPrefix() + '-start-key'" [name]="idPrefix() + '-start-key'" maxlength="200" [value]="keyText()" [disabled]="starting()"
+                   placeholder="Aynı anahtarla tekrar başlatılırsa mevcut kayıt döner" (input)="keyText.set($any($event.target).value)" />
           </mat-form-field>
         </div>
         @if (startOpen()) {
-          <middt-json-schema-form #startForm [schema]="definition()?.startInputSchema" [idPrefix]="idPrefix() + '-start'" [disabled]="starting()" />
+          <middt-json-schema-form #startForm [schema]="definition()?.startInputSchema" [value]="startData()" [idPrefix]="idPrefix() + '-start'" [disabled]="starting()" />
         }
         @if (startErrors().length > 0) {
           <ul class="middt-wf-errors" role="alert">
@@ -159,8 +169,29 @@ export class MiddtWorkflowInstanceListComponent {
   readonly idPrefix = input('wf');
   /** Id of the instance highlighted in the list. */
   readonly selectedId = input<string | null>(null);
+  /**
+   * Opens the start dialog once the definition is loaded (e.g. a "start new" link like `?start=1`). Only honoured when
+   * `allowStart` is set; it opens again only after the value went back to `false`. The dialog is always shown (also for
+   * workflows without start input) so nothing starts without a click.
+   */
+  readonly openStart = input(false);
+  /** Business key prefilled when `openStart` opens the dialog (the user can change it). */
+  readonly startKey = input<string | null>(null);
+  /**
+   * Start form values prefilled when `openStart` opens the dialog, e.g. URL query parameters: only properties of the start
+   * input schema are taken, texts are converted by the property type (`schemaValuesFromQuery`), others are ignored. Applied
+   * once per opening; nothing starts without the user's "Başlat".
+   */
+  readonly startValues = input<Readonly<Record<string, unknown>> | null>(null);
   /** Raised when the user selects an instance (or after starting one). */
   readonly selected = output<WorkflowInstanceModel>();
+  /**
+   * Raised after `openStart` opened the dialog (e.g. to remove the query from the URL) with the names of the `startValues`
+   * that were applied.
+   */
+  readonly startOpened = output<WorkflowStartOpened>();
+  /** Raised when the current definition of the workflow is loaded (e.g. to show its title as the browser title). */
+  readonly definitionLoaded = output<WorkflowDefinitionModel>();
 
   protected readonly columns = ['key', 'state', 'status', 'createdAt', 'updatedAt'];
   protected readonly statusOptions = WORKFLOW_STATUS_OPTIONS;
@@ -178,7 +209,9 @@ export class MiddtWorkflowInstanceListComponent {
 
   protected readonly startOpen = signal(false);
   protected readonly starting = signal(false);
-  protected readonly startKey = signal('');
+  protected readonly keyText = signal('');
+  /** Initial value of the start form (prefill of `openStart`; null when opened by the user). */
+  protected readonly startData = signal<WorkflowData | null>(null);
   protected readonly startErrors = signal<string[]>([]);
   private readonly startForm = viewChild<MiddtJsonSchemaFormComponent>('startForm');
 
@@ -186,6 +219,7 @@ export class MiddtWorkflowInstanceListComponent {
   readonly #notify = inject(NotifyService);
   #abort = new AbortController();
   #pageRequest = 0;
+  #openStartRequested = false;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.#abort.abort());
@@ -194,6 +228,41 @@ export class MiddtWorkflowInstanceListComponent {
       this.state();
       untracked(() => void this.#loadAll(workflow));
     });
+    effect(() => {
+      if (!this.openStart()) {
+        this.#openStartRequested = false;
+        return;
+      }
+
+      if (this.#openStartRequested || this.definition() === null) {
+        return;
+      }
+
+      this.#openStartRequested = true;
+      untracked(() => {
+        if (this.allowStart() && !this.starting()) {
+          const prefill = schemaValuesFromQuery(this.definition()?.startInputSchema, this.startValues());
+          const key = this.startKey()?.trim() ?? '';
+          this.#openStartDialog(key, prefill.names.length > 0 ? prefill.data : null);
+          this.startOpened.emit({ key: key === '' ? null : key, names: prefill.names });
+        }
+      });
+    });
+  }
+
+  /** Opens the start dialog (same as the "Yeni başlat" button, but always with the dialog). */
+  showStartDialog(): void {
+    if (this.allowStart() && this.definition() !== null && !this.starting()) {
+      this.#openStartDialog();
+    }
+  }
+
+  #openStartDialog(key = '', data: WorkflowData | null = null): void {
+    this.keyText.set(key);
+    this.startData.set(data);
+    this.startErrors.set([]);
+    this.startForm()?.reset(data);
+    this.startOpen.set(true);
   }
 
   /** Reloads the current page. */
@@ -224,6 +293,7 @@ export class MiddtWorkflowInstanceListComponent {
     if (isSuccess(response) && response.data) {
       this.definition.set(response.data);
       this.#addDefinition(response.data);
+      this.definitionLoaded.emit(response.data);
     } else {
       this.#notify.error('Akış tanımı alınamadı', errorText(response));
     }
@@ -297,12 +367,14 @@ export class MiddtWorkflowInstanceListComponent {
   }
 
   protected onStartClick(): void {
-    this.startKey.set('');
-    this.startErrors.set([]);
     if (schemaHasInput(this.definition()?.startInputSchema)) {
-      this.startOpen.set(true);
+      this.#openStartDialog();
       return;
     }
+
+    this.keyText.set('');
+    this.startData.set(null);
+    this.startErrors.set([]);
 
     // Nothing to ask: start right away and select the new instance (its first step is shown by the detail).
     void this.start();
@@ -324,7 +396,7 @@ export class MiddtWorkflowInstanceListComponent {
     this.starting.set(true);
     this.startErrors.set([]);
     try {
-      const key = this.startKey().trim();
+      const key = this.keyText().trim();
       const response = await this.#client.start(this.workflow(), { key: key === '' ? null : key, data: open ? (form?.getValue() ?? {}) : {} }, this.#abort.signal);
       const instance = response.data;
       if (!isSuccess(response) || !instance) {
@@ -338,7 +410,12 @@ export class MiddtWorkflowInstanceListComponent {
       }
 
       this.startOpen.set(false);
-      this.#notify.success('Akış başlatıldı', `${instance.stateTitle ?? instance.state} (${workflowStatusText(instance.status)})`);
+      // A start with the business key of an existing instance returns that instance with a message (nothing started).
+      if (response.messageList.length > 0) {
+        this.#notify.info('Mevcut akış açıldı', response.messageList.join(' '));
+      } else {
+        this.#notify.success('Akış başlatıldı', `${instance.stateTitle ?? instance.state} (${workflowStatusText(instance.status)})`);
+      }
       this.selectedRowId.set(instance.id);
       this.page.set(1);
       await this.#loadPage();

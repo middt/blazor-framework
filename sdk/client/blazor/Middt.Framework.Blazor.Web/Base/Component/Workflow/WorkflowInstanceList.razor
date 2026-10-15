@@ -55,7 +55,7 @@
             <RadzenTextBox Name="@($"{IdPrefix}-start-key")" id="@($"{IdPrefix}-start-key")" @bind-Value="startKey" MaxLength="200" class="middt-jsf-input"
                            Placeholder="Aynı anahtarla tekrar başlatılırsa mevcut kayıt döner" />
         </div>
-        <JsonSchemaForm @ref="startForm" Schema="@definition?.StartInputSchema" IdPrefix="@($"{IdPrefix}-start")" Disabled="@starting" />
+        <JsonSchemaForm @ref="startForm" Schema="@definition?.StartInputSchema" Value="@startPrefill" IdPrefix="@($"{IdPrefix}-start")" Disabled="@starting" />
         @if (startErrors.Count > 0)
         {
             <ul class="middt-wf-errors" role="alert">

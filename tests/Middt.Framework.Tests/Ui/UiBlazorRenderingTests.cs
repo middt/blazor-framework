@@ -236,7 +236,7 @@ public sealed class UiBlazorRenderingTests
         var blazorHtml = await RenderAsync(layout, UiStaticRenderingTests.OrderEscalatedVariables());
 
         var text = UiRenderInput.VisibleText(staticHtml);
-        text.Should().Contain("Sipariş #42").And.Contain("Ada <Ltd>").And.Contain("Skor 72");
+        text.Should().Contain("Ada <Ltd> siparişi süresi içinde").And.Contain("Ada <Ltd>").And.Contain("Skor 72");
         UiRenderInput.VisibleText(blazorHtml).Should().Be(text);
     }
 

@@ -3,6 +3,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using Middt.Framework.Blazor.Web.Ui;
+using Middt.Framework.Ui.Model;
 using Radzen;
 
 namespace Middt.Framework.Blazor.Web.Base.Component.Workflow;
@@ -12,17 +15,28 @@ namespace Middt.Framework.Blazor.Web.Base.Component.Workflow;
 /// string (text, long text, enum, date/date-time, e-mail), number/integer and boolean; nested objects/arrays fall back
 /// to a JSON text area. The value is exposed as a <see cref="JsonObject"/>; call <see cref="Validate"/> before
 /// submitting to show required/length/range errors next to the fields.
+/// A property with <c>"x-lookup": { "entity", "valueField", "textField" }</c> is a select whose options are the items of
+/// the entity (same shape as the layout field <c>lookup</c>; loaded through <see cref="UiLookupCache"/>); the selected
+/// value is written with the property's <c>type</c> (integer/number → JSON number, otherwise string).
 /// </summary>
-public partial class JsonSchemaForm : ComponentBase
+public partial class JsonSchemaForm : ComponentBase, IDisposable
 {
+    /// <summary>Shown when the options of an <c>x-lookup</c> field cannot be loaded.</summary>
+    public const string LookupLoadError = "Liste yüklenemedi.";
+
     private const int LongTextThreshold = 200;
     private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
     private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.CultureInvariant, PatternTimeout);
 
     private readonly List<SchemaField> fields = [];
     private readonly Dictionary<string, IRadzenFormComponent> inputs = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, LookupState> lookups = new(StringComparer.Ordinal);
     private JsonObject? renderedSchema;
+    private CancellationTokenSource? lookupCancellation;
     private bool validated;
+
+    [Inject]
+    private IServiceProvider Services { get; set; } = default!;
 
     /// <summary>JSON Schema of the object to edit.</summary>
     [Parameter]
@@ -49,15 +63,77 @@ public partial class JsonSchemaForm : ComponentBase
     /// <summary><c>true</c> when the schema declares at least one property.</summary>
     public bool HasFields => fields.Count > 0;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         if (!ReferenceEquals(Schema, renderedSchema))
         {
             renderedSchema = Schema;
             validated = false;
             BuildFields(Schema, Value);
+            await LoadLookupsAsync();
         }
     }
+
+    /// <summary>Loads the options of the <c>x-lookup</c> fields (shared per circuit by <see cref="UiLookupCache"/>).</summary>
+    private async Task LoadLookupsAsync()
+    {
+        if (lookupCancellation is not null)
+        {
+            await lookupCancellation.CancelAsync();
+            lookupCancellation.Dispose();
+        }
+
+        lookups.Clear();
+        var lookupFields = fields.Where(f => f.Lookup is not null).ToList();
+        if (lookupFields.Count == 0)
+        {
+            lookupCancellation = null;
+            return;
+        }
+
+        var cancellation = lookupCancellation = new CancellationTokenSource();
+        var cache = Services.GetService<UiLookupCache>();
+        foreach (var field in lookupFields)
+        {
+            lookups[field.Name] = new LookupState();
+        }
+
+        foreach (var field in lookupFields)
+        {
+            var lookup = field.Lookup!;
+            LookupState state;
+            try
+            {
+                var items = cache is null
+                    ? throw new InvalidOperationException("UiLookupCache is not registered (AddMiddtUi).")
+                    : await cache.GetAllAsync(lookup.Entity, cancellation.Token);
+                state = new LookupState { Options = [.. items.Select(i => new UiOption(i[lookup.ValueField]?.DeepClone(), UiFieldJson.Key(i[lookup.TextField])))] };
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return; // schema changed or the form was disposed
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException or HttpRequestException)
+            {
+                state = new LookupState { Error = LookupLoadError };
+            }
+
+            if (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            lookups[field.Name] = state;
+        }
+    }
+
+    /// <summary>Options of a lookup select; a prefilled value missing from the loaded items stays selectable (shown as is).</summary>
+    private static List<UiOption> LookupOptions(SchemaField field, LookupState state) =>
+        field.TextValue is { Length: > 0 } value && !state.Options.Exists(o => o.Key == value)
+            ? [new UiOption(JsonValue.Create(value), value), .. state.Options]
+            : state.Options;
+
+    private LookupState LookupStateOf(SchemaField field) => lookups.TryGetValue(field.Name, out var state) ? state : LookupState.Empty;
 
     /// <summary>Validates all fields, shows the errors and returns <c>true</c> when the value is valid.</summary>
     public bool Validate()
@@ -105,11 +181,11 @@ public partial class JsonSchemaForm : ComponentBase
         }
     }
 
-    /// <summary>Clears the entered values and errors.</summary>
-    public void Reset()
+    /// <summary>Clears the entered values and errors; <paramref name="value"/> prefills the fields (like <see cref="Value"/>).</summary>
+    public void Reset(JsonObject? value = null)
     {
         validated = false;
-        BuildFields(Schema, null);
+        BuildFields(Schema, value);
         StateHasChanged();
     }
 
@@ -164,7 +240,13 @@ public partial class JsonSchemaForm : ComponentBase
 
             var type = GetType(property);
             var format = GetString(property, "format");
-            if (property["enum"] is JsonArray values)
+            field.Type = type;
+            if (GetLookup(property) is { } lookup)
+            {
+                field.Kind = FieldKind.Lookup;
+                field.Lookup = lookup;
+            }
+            else if (property["enum"] is JsonArray values)
             {
                 field.Kind = FieldKind.Enum;
                 field.EnumValues = [.. values.Select(v => v is JsonValue jv && jv.GetValueKind() == JsonValueKind.String ? jv.GetValue<string>() : v?.ToJsonString() ?? string.Empty)];
@@ -254,6 +336,9 @@ public partial class JsonSchemaForm : ComponentBase
 
             case FieldKind.DateTime or FieldKind.Date:
                 return field.Required && field.DateValue is null ? "Bu alan zorunludur." : null;
+
+            case FieldKind.Lookup:
+                return field.Required && string.IsNullOrEmpty(field.TextValue) ? "Bu alan zorunludur." : null;
 
             case FieldKind.Json:
                 if (string.IsNullOrWhiteSpace(field.TextValue))
@@ -353,6 +438,8 @@ public partial class JsonSchemaForm : ComponentBase
                     return null;
                 }
 
+            case FieldKind.Lookup when !string.IsNullOrEmpty(field.TextValue):
+                return WorkflowUi.LookupValue(field.TextValue, field.Type);
             case FieldKind.Text or FieldKind.LongText or FieldKind.Enum when !string.IsNullOrEmpty(field.TextValue):
                 return JsonValue.Create(field.TextValue);
             default:
@@ -360,19 +447,16 @@ public partial class JsonSchemaForm : ComponentBase
         }
     }
 
-    private static string GetType(JsonObject property)
-    {
-        switch (property["type"])
-        {
-            case JsonValue value when value.GetValueKind() == JsonValueKind.String:
-                return value.GetValue<string>();
-            case JsonArray types:
-                return types.Select(t => t?.GetValueKind() == JsonValueKind.String ? t.GetValue<string>() : null)
-                    .FirstOrDefault(t => t is not null and not "null") ?? "string";
-            default:
-                return property["properties"] is not null ? "object" : "string";
-        }
-    }
+    private static string GetType(JsonObject property) => WorkflowUi.SchemaType(property);
+
+    /// <summary>Reads <c>x-lookup</c>; incomplete definitions are ignored (the property renders by its type).</summary>
+    private static SchemaLookup? GetLookup(JsonObject property) =>
+        property["x-lookup"] is JsonObject lookup
+        && GetString(lookup, "entity") is { Length: > 0 } entity
+        && GetString(lookup, "valueField") is { Length: > 0 } valueField
+        && GetString(lookup, "textField") is { Length: > 0 } textField
+            ? new SchemaLookup(entity, valueField, textField)
+            : null;
 
     private static string? GetString(JsonObject property, string name) =>
         property[name] is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
@@ -391,6 +475,17 @@ public partial class JsonSchemaForm : ComponentBase
         Integer,
         Boolean,
         Json,
+        Lookup,
+    }
+
+    private sealed record SchemaLookup(string Entity, string ValueField, string TextField);
+
+    private sealed class LookupState
+    {
+        public static readonly LookupState Empty = new();
+
+        public List<UiOption> Options { get; init; } = [];
+        public string? Error { get; init; }
     }
 
     private sealed class SchemaField
@@ -400,6 +495,8 @@ public partial class JsonSchemaForm : ComponentBase
         public string? Description { get; init; }
         public bool Required { get; init; }
         public FieldKind Kind { get; set; }
+        public string Type { get; set; } = "string";
+        public SchemaLookup? Lookup { get; set; }
         public int? MinLength { get; init; }
         public int? MaxLength { get; init; }
         public decimal? Minimum { get; init; }
@@ -413,5 +510,13 @@ public partial class JsonSchemaForm : ComponentBase
         public bool BoolValue { get; set; }
         public DateTime? DateValue { get; set; }
         public string? Error { get; set; }
+    }
+
+    public void Dispose()
+    {
+        lookupCancellation?.Cancel();
+        lookupCancellation?.Dispose();
+        lookupCancellation = null;
+        GC.SuppressFinalize(this);
     }
 }

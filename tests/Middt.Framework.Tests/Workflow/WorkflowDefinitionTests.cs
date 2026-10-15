@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Workflow.DependencyInjection;
 using Middt.Framework.Workflow.Runtime;
+using Middt.Sample.Api.Tasks;
 
 namespace Middt.Framework.Tests.Workflow;
 
@@ -37,6 +38,7 @@ public sealed class WorkflowDefinitionTests
             }
 
             o.AddTask<RecordTask>("record");
+            o.AddBikeStoreTasks(); // the demo definitions use the bike-* tasks
         });
         services.AddSingleton<TaskLog>();
 
@@ -93,11 +95,47 @@ public sealed class WorkflowDefinitionTests
 
         errors.Should().BeEmpty();
         var latest = registry!.GetLatest("order-approval");
-        latest.Version.Should().Be(2);
+        latest.Version.Should().Be(3);
         latest.Start.Target.Should().Be("customer");
-        latest.States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4, 5 });
+        latest.States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4 });
+        registry.Get("order-approval", 2).States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4, 5 });
         registry.Get("order-approval", 1).Start.Target.Should().Be("credit-check", "running v1 instances keep their definition");
+        registry.Latest.Select(d => d.Key).Should().BeEquivalentTo(
+            "store-opening", "staff-onboarding", "category-request", "product-launch", "stock-replenishment",
+            "customer-onboarding", "order-approval", "order-fulfillment", "credit-check");
         registry.GetLatest("credit-check").Version.Should().Be(2);
+
+        // Master data lifecycles: v2 keeps the record's instance in "active" (change / close), v1 stays for running instances.
+        foreach (var key in new[] { "store-opening", "staff-onboarding", "category-request", "product-launch", "customer-onboarding" })
+        {
+            var lifecycle = registry.GetLatest(key);
+            lifecycle.Version.Should().Be(2, key);
+            lifecycle.Start.Input!.Schema.Should().NotBeNull(key);
+            lifecycle.FindState("active")!.Transitions.Select(t => t.Key).Should().Equal(["request-change", "request-close"], key);
+            lifecycle.FindState("closed")!.IsFinal.Should().BeTrue(key);
+            registry.Get(key, 1).States.Should().NotContain(s => s.Key == "active", key);
+        }
+    }
+
+    [Fact]
+    public void Sample_definitions_validate_like_at_api_startup()
+    {
+        // Same registrations as demo/server/Middt.Sample.Api/Program.cs: bike-* tasks and the Razor state views.
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddMiddtWorkflow(o =>
+        {
+            o.UseDbContext(db => db.UseSqlite("DataSource=:memory:"));
+            o.EnableJobProcessor = false;
+            o.AddDefinitionsFromDirectory(Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows"));
+            o.AddBikeStoreTasks();
+            o.UseViews(Middt.Framework.Workflow.Razor.WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>().Views);
+        });
+
+        var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();
+
+        registry.Invoking(r => r.EnsureLoaded()).Should().NotThrow();
+        registry.Latest.Should().HaveCount(9);
     }
 
     [Fact]

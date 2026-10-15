@@ -17,6 +17,130 @@ public static class WorkflowUi
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    /// <summary>
+    /// Converts the selected key of an <c>x-lookup</c> select to the JSON value of the schema type: <c>integer</c> and
+    /// <c>number</c> become JSON numbers (when the key parses), everything else a string.
+    /// </summary>
+    public static JsonNode? LookupValue(string? key, string? type)
+    {
+        if (string.IsNullOrEmpty(key))
+        {
+            return null;
+        }
+
+        return type switch
+        {
+            "integer" when long.TryParse(key, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) => JsonValue.Create(integer),
+            "integer" or "number" when decimal.TryParse(key, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) => JsonValue.Create(number),
+            _ => JsonValue.Create(key),
+        };
+    }
+
+    /// <summary>Query parameter that opens the start dialog (<c>?start=1</c>); never a start input value.</summary>
+    public const string StartQueryParameter = "start";
+
+    /// <summary>Query parameter that prefills the business key of the start dialog (<c>?key=…</c>).</summary>
+    public const string StartKeyQueryParameter = "key";
+
+    /// <summary>
+    /// Names of the query parameters that prefill the start input: every name that is a property of
+    /// <paramref name="schema"/> except <c>start</c> and <c>key</c> (unknown names are ignored). These are removed from
+    /// the URL together with <c>start</c>/<c>key</c> once the dialog was opened.
+    /// </summary>
+    public static IReadOnlyList<string> StartPrefillParameters(JsonObject? schema, IEnumerable<string>? names)
+    {
+        if (names is null || schema?["properties"] is not JsonObject properties || properties.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. names
+            .Where(n => n is not (StartQueryParameter or StartKeyQueryParameter) && properties[n] is JsonObject)
+            .Distinct(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Start dialog prefill from URL query values (e.g. <c>?start=1&amp;key=category-5&amp;categoryId=5</c>): each
+    /// value whose name is a property of <paramref name="schema"/> (see <see cref="StartPrefillParameters"/>) converted by
+    /// the property type (<see cref="QueryValue"/>). Values that do not convert are skipped. <c>null</c> when nothing applies.
+    /// </summary>
+    public static JsonObject? StartPrefill(JsonObject? schema, IEnumerable<KeyValuePair<string, string?>>? values)
+    {
+        if (values is null || schema?["properties"] is not JsonObject properties)
+        {
+            return null;
+        }
+
+        var list = values.ToList();
+        var result = new JsonObject();
+        foreach (var name in StartPrefillParameters(schema, list.Select(v => v.Key)))
+        {
+            // the last value wins when a parameter is repeated
+            var text = list.Last(v => v.Key == name).Value;
+            if (QueryValue(text, SchemaType(properties[name]!.AsObject())) is { } node)
+            {
+                result[name] = node;
+            }
+        }
+
+        return result.Count > 0 ? result : null;
+    }
+
+    /// <summary>
+    /// Converts a query string value to the JSON value of a schema type: <c>integer</c> → JSON integer, <c>number</c> →
+    /// JSON number, <c>boolean</c> → <c>true</c>/<c>false</c> (also <c>1</c>/<c>0</c>), <c>string</c> → string;
+    /// <c>null</c> for empty values, values that do not parse and object/array types.
+    /// </summary>
+    public static JsonNode? QueryValue(string? text, string? type)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        switch (type)
+        {
+            case "integer":
+                return long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer)
+                    ? JsonValue.Create(integer)
+                    : null;
+            case "number":
+                return decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
+                    ? JsonValue.Create(number)
+                    : null;
+            case "boolean":
+                return text.ToUpperInvariant() switch
+                {
+                    "TRUE" or "1" => JsonValue.Create(true),
+                    "FALSE" or "0" => JsonValue.Create(false),
+                    _ => null,
+                };
+            case "object" or "array":
+                return null;
+            default:
+                return JsonValue.Create(text);
+        }
+    }
+
+    /// <summary>
+    /// The JSON Schema type of a property: <c>type</c> (the first non-<c>null</c> entry of a type array); without a type
+    /// <c>object</c> when it declares <c>properties</c>, otherwise <c>string</c>.
+    /// </summary>
+    public static string SchemaType(JsonObject property)
+    {
+        ArgumentNullException.ThrowIfNull(property);
+        switch (property["type"])
+        {
+            case JsonValue value when value.GetValueKind() == JsonValueKind.String:
+                return value.GetValue<string>();
+            case JsonArray types:
+                return types.Select(t => t?.GetValueKind() == JsonValueKind.String ? t.GetValue<string>() : null)
+                    .FirstOrDefault(t => t is not null and not "null") ?? "string";
+            default:
+                return property["properties"] is not null ? "object" : "string";
+        }
+    }
+
     public static string StatusText(WorkflowInstanceStatus status) => status switch
     {
         WorkflowInstanceStatus.Active => "Aktif",

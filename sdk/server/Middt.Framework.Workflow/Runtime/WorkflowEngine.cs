@@ -59,6 +59,8 @@ public sealed partial class WorkflowEngine(
         if (!string.IsNullOrEmpty(request.Key) &&
             await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.WorkflowKey == workflow && i.BusinessKey == request.Key, cancellationToken) is { } existing)
         {
+            // Same read checks as GET: in owner mode another user's instance is not disclosed through its business key.
+            EnsureCanAccess(registry.Get(existing.WorkflowKey, existing.WorkflowVersion), existing, user);
             return (await ToModelAsync(existing, user, cancellationToken), false);
         }
 
@@ -88,6 +90,7 @@ public sealed partial class WorkflowEngine(
         {
             db.ChangeTracker.Clear();
             var winner = await db.Instances.AsNoTracking().FirstAsync(i => i.WorkflowKey == workflow && i.BusinessKey == instance.BusinessKey, cancellationToken);
+            EnsureCanAccess(registry.Get(winner.WorkflowKey, winner.WorkflowVersion), winner, user);
             return (await ToModelAsync(winner, user, cancellationToken), false);
         }
 
@@ -592,6 +595,7 @@ public sealed partial class WorkflowEngine(
         var jobsBefore = run.NewJobs.ToList();
         var leftBefore = run.LeftStates.ToList();
         var waitingBefore = instance.WaitingForInstanceId;
+        var keyBefore = instance.BusinessKey;
 
         try
         {
@@ -664,6 +668,7 @@ public sealed partial class WorkflowEngine(
             instance.Status = WorkflowInstanceStatus.Busy;
             instance.CompletedAt = null;
             instance.WaitingForInstanceId = waitingBefore;
+            instance.BusinessKey = keyBefore;
             run.ClearAllJobs = false;
             run.NotifyParent = false;
 
@@ -726,6 +731,8 @@ public sealed partial class WorkflowEngine(
                     Services = services,
                     Logger = logger,
                     StartWorkflow = async (workflow, data, key, ct) => (await StartChildAsync(workflow, data, key, run.Instance.Id, run.User, ct)).Id,
+                    BusinessKey = run.Instance.BusinessKey,
+                    SetBusinessKey = (key, ct) => SetBusinessKeyAsync(run, key, ct),
                 };
 
                 try
@@ -841,6 +848,34 @@ public sealed partial class WorkflowEngine(
             ["data"] = childData.DeepClone(),
         };
         run.Instance.WaitingForInstanceId = null;
+    }
+
+    /// <summary>
+    /// <c>setKey</c>: gives the instance its business key once (same key again = no-op). The unique index on
+    /// (workflow, business key) stays the last line of defence against a concurrent claim; this check makes the usual
+    /// conflict a clear task error instead of a failed commit.
+    /// </summary>
+    private async Task SetBusinessKeyAsync(Run run, string key, CancellationToken cancellationToken)
+    {
+        var instance = run.Instance;
+        if (string.Equals(instance.BusinessKey, key, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (instance.BusinessKey is not null)
+        {
+            throw new WorkflowTaskException($"setKey: the instance already has the business key '{instance.BusinessKey}' (cannot change it to '{key}').");
+        }
+
+        var id = instance.Id;
+        var workflow = instance.WorkflowKey;
+        if (await db.Instances.AsNoTracking().AnyAsync(i => i.WorkflowKey == workflow && i.BusinessKey == key && i.Id != id, cancellationToken))
+        {
+            throw new WorkflowTaskException($"setKey: the business key '{key}' is already used by another instance of '{workflow}'.");
+        }
+
+        instance.BusinessKey = key;
     }
 
     /// <summary>Starts a workflow in its own scope/transaction (the child is committed independently of the parent).</summary>

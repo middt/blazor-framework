@@ -1,0 +1,68 @@
+{
+  // 3/8: category name + justification → manager approval → bike-create-category (categories table, publishes
+  // CategoryCreated like the Category API). Reject → Error; duplicate name → "fix".
+  "key": "category-request",
+  "version": 1,
+  "title": "Kategori talebi",
+  "instanceAccess": { "mode": "owner", "supervisorRoles": [ "manager" ] },
+  "start": {
+    "key": "start",
+    "target": "request",
+    "onExecute": [ { "task": "set", "config": { "values": { "requestedBy": "user.Name", "requestedAt": "now" } } } ]
+  },
+  "states": [
+    {
+      "key": "request", "title": "Talep", "step": 1, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit", "title": "Onaya gönder", "target": "approval", "view": { "inline": true },
+          "input": { "into": "category", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "categoryName", "justification" ],
+            "properties": {
+              "categoryName": { "type": "string", "minLength": 2, "maxLength": 255, "title": "Kategori adı" },
+              "justification": { "type": "string", "minLength": 5, "maxLength": 500, "title": "Gerekçe" }
+            } } }
+        }
+      ]
+    },
+    {
+      "key": "approval", "title": "Yönetici onayı", "step": 2, "subType": "Human",
+      "transitions": [
+        { "key": "approve", "title": "Onayla", "target": "creating", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "review.approvedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "reject", "title": "Reddet", "target": "rejected", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "review.rejectedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "back", "title": "Düzenle", "target": "request" }
+      ]
+    },
+    {
+      "key": "creating", "title": "Kategori oluşturuluyor",
+      "onEntry": [ { "task": "bike-create-category", "config": { "categoryName": "{{ data.category.categoryName }}", "into": "categoryId" } } ],
+      "transitions": [
+        { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "created", "target": "completed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "fix", "title": "Düzeltme gerekli", "step": 2, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "edit", "title": "Bilgileri düzelt", "target": "request", "input": { "set": { "error": "null" } } } ]
+    },
+    { "key": "completed", "title": "Kategori oluşturuldu", "step": 3, "type": "Finish", "subType": "Success" },
+    { "key": "rejected", "title": "Reddedildi", "step": 3, "type": "Finish", "subType": "Error" },
+    { "key": "cancelled", "title": "İptal edildi", "type": "Finish", "subType": "Cancelled" }
+  ],
+  "sharedTransitions": [
+    {
+      "key": "cancel", "title": "İptal et", "target": "cancelled", "availableIn": [ "request", "approval", "fix" ],
+      "input": {
+        "schema": { "type": "object", "additionalProperties": false, "properties": { "reason": { "type": "string", "maxLength": 500, "title": "İptal nedeni" } } },
+        "into": "cancellation",
+        "set": { "cancellation.by": "user.Name" }
+      }
+    }
+  ]
+}

@@ -151,6 +151,29 @@ public sealed class WorkflowBuiltInTaskTests
     }
 
     [Fact]
+    public async Task Templates_render_the_instance_id()
+    {
+        // instance.id is a Guid in the expression scope: templates must render its text instead of faulting the task.
+        const string definition = """
+            {
+              "key": "instance-id-wf",
+              "start": { "key": "start", "target": "done" },
+              "states": [
+                { "key": "done", "type": "Finish", "subType": "Success",
+                  "onEntry": [ { "task": "publish", "config": { "type": "Started", "payload": { "ref": "wf-{{ instance.id }}" } } } ] }
+              ]
+            }
+            """;
+        var publisher = new FakePublisher();
+        await using var host = await WorkflowTestHost.StartAsync([definition], services: s => s.AddSingleton<IWorkflowMessagePublisher>(publisher));
+
+        var instance = await host.StartInstanceAsync("instance-id-wf", new { });
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Completed);
+        publisher.Published.Should().ContainSingle().Subject.Payload["ref"]!.GetValue<string>().Should().Be($"wf-{instance.Id}");
+    }
+
+    [Fact]
     public async Task Publish_task_without_a_publisher_fails_the_task()
     {
         await using var host = await WorkflowTestHost.StartAsync(PublishWorkflow);
@@ -197,5 +220,114 @@ public sealed class WorkflowBuiltInTaskTests
         instance.Data["totals"]!["label"]!.GetValue<string>().Should().Be("x4");
         instance.Data["stamp"]!.GetValue<DateTimeOffset>().Should().Be(WorkflowTestHost.StartTime);
         instance.Data["who"]!.GetValue<string>().Should().Be("ann");
+    }
+
+    private const string KeyedWorkflow = """
+        { "key": "keyed",
+          "start": { "key": "start", "target": "draft",
+                     "input": { "schema": { "type": "object", "properties": { "id": { "type": "integer" }, "other": { "type": "integer" } } } } },
+          "states": [
+            { "key": "draft", "transitions": [
+                { "key": "create", "target": "active", "onExecute": [ { "task": "setKey", "config": { "key": "record-{{ data.id }}" } } ] },
+                { "key": "create-other", "target": "active", "onExecute": [ { "task": "setKey", "config": { "key": "record-{{ data.other }}" } } ] },
+                { "key": "create-broken", "target": "active", "onExecute": [
+                    { "task": "setKey", "config": { "key": "record-{{ data.id }}" } }, { "task": "fail", "config": { "message": "later task failed" } } ] } ] },
+            { "key": "active", "transitions": [
+                { "key": "again", "target": "$self", "onExecute": [ { "task": "setKey", "config": { "key": "record-{{ data.id }}" } } ] },
+                { "key": "rename", "target": "$self", "onExecute": [ { "task": "setKey", "config": { "key": "renamed-{{ data.id }}" } } ] } ] }
+          ] }
+        """;
+
+    [Fact]
+    public async Task Set_key_gives_the_instance_its_business_key_and_a_start_with_that_key_returns_it()
+    {
+        await using var host = await WorkflowTestHost.StartAsync(KeyedWorkflow);
+
+        var instance = await host.StartInstanceAsync("keyed", new { id = 7 });
+        instance.Key.Should().BeNull();
+
+        instance = await host.TransitionAsync(instance.Id, "create");
+        instance.Key.Should().Be("record-7");
+        (await host.RowAsync(instance.Id)).BusinessKey.Should().Be("record-7");
+
+        instance = await host.TransitionAsync(instance.Id, "again");
+        instance.Status.Should().Be(WorkflowInstanceStatus.Active, "the same key again is a no-op");
+
+        var (existing, created) = await host.StartWithFlagAsync("keyed", new { id = 99 }, key: "record-7");
+        created.Should().BeFalse();
+        existing.Id.Should().Be(instance.Id);
+    }
+
+    [Fact]
+    public async Task Set_key_with_a_different_key_than_the_existing_one_fails_the_task()
+    {
+        await using var host = await WorkflowTestHost.StartAsync(KeyedWorkflow);
+        var instance = await host.StartInstanceAsync("keyed", new { id = 7 }, key: "given");
+
+        instance = await host.TransitionAsync(instance.Id, "create");
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Faulted);
+        instance.State.Should().Be("draft");
+        instance.Key.Should().Be("given");
+        (await host.IncidentsAsync(instance.Id)).Should().ContainSingle().Which.Error.Should().Contain("already has the business key 'given'");
+    }
+
+    [Fact]
+    public async Task Set_key_already_used_by_another_instance_fails_with_a_clear_error()
+    {
+        await using var host = await WorkflowTestHost.StartAsync(KeyedWorkflow);
+        var first = await host.StartInstanceAsync("keyed", new { id = 7 });
+        await host.TransitionAsync(first.Id, "create");
+        var second = await host.StartInstanceAsync("keyed", new { id = 8, other = 7 });
+
+        second = await host.TransitionAsync(second.Id, "create-other");
+
+        second.Status.Should().Be(WorkflowInstanceStatus.Faulted);
+        second.Key.Should().BeNull();
+        (await host.IncidentsAsync(second.Id)).Should().ContainSingle().Which.Error.Should()
+            .Contain("business key 'record-7' is already used by another instance of 'keyed'");
+    }
+
+    [Fact]
+    public async Task A_failed_hop_rolls_the_key_back()
+    {
+        await using var host = await WorkflowTestHost.StartAsync(KeyedWorkflow);
+        var instance = await host.StartInstanceAsync("keyed", new { id = 7 });
+
+        instance = await host.TransitionAsync(instance.Id, "create-broken");
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Faulted);
+        instance.Key.Should().BeNull();
+        (await host.RowAsync(instance.Id)).BusinessKey.Should().BeNull();
+        (await host.StartWithFlagAsync("keyed", new { id = 7 }, key: "record-7")).Created.Should().BeTrue("the key was never committed");
+    }
+
+    [Theory]
+    [InlineData("""{ }""", "setKey: 'key' (text template) is required.")]
+    [InlineData("""{ "key": "  " }""", "setKey: 'key' (text template) is required.")]
+    [InlineData("""{ "key": 5 }""", "setKey: 'key' (text template) is required.")]
+    public async Task Set_key_config_is_validated_when_definitions_load(string config, string error)
+    {
+        var definition = $$"""
+            { "key": "bad-key", "start": { "key": "start", "target": "a" },
+              "states": [ { "key": "a", "onEntry": [ { "task": "setKey", "config": {{config}} } ] } ] }
+            """;
+
+        var act = () => WorkflowTestHost.StartAsync(definition);
+
+        (await act.Should().ThrowAsync<Middt.Framework.Workflow.Runtime.WorkflowDefinitionException>()).Which.Errors.Should().Contain(e => e.EndsWith(error, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Set_key_template_errors_are_reported_when_definitions_load()
+    {
+        const string definition = """
+            { "key": "bad-template", "start": { "key": "start", "target": "a" },
+              "states": [ { "key": "a", "onEntry": [ { "task": "setKey", "config": { "key": "x-{{ data.( }}" } } ] } ] }
+            """;
+
+        var act = () => WorkflowTestHost.StartAsync(definition);
+
+        (await act.Should().ThrowAsync<Middt.Framework.Workflow.Runtime.WorkflowDefinitionException>()).Which.Errors.Should().Contain(e => e.Contains("setKey: ", StringComparison.Ordinal));
     }
 }

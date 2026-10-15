@@ -1,0 +1,36 @@
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "bike-staff",
+  "title": "Personel",
+  "kind": "page",
+  "version": 2,
+  "menu": { "title": "Personel", "icon": "badge", "order": 50 },
+  "body": [
+    { "widget": "heading", "text": "Personel" },
+    { "widget": "link", "text": "Yeni personel alımı", "href": "/workflow/staff-onboarding?start=1", "style": "button" },
+    {
+      "widget": "grid",
+      "id": "staff",
+      "entity": "Staff",
+      "columns": [
+        { "field": "firstName", "title": "Ad" },
+        { "field": "lastName", "title": "Soyad" },
+        { "field": "email", "title": "E-posta" },
+        { "field": "phone", "title": "Telefon", "width": "160px" },
+        { "field": "active", "title": "Durum", "width": "100px", "template": "{{ row.active == 1 ? \"Aktif\" : \"Pasif\" }}" }
+      ],
+      "search": [
+        { "field": "firstName", "label": "Ad" },
+        { "field": "lastName", "label": "Soyad" },
+        { "field": "storeId", "label": "Mağaza", "type": "select", "lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } },
+        { "field": "status", "label": "Durum", "type": "select", "options": [ "Aktif", "Pasif" ] }
+      ],
+      "create": false,
+      "edit": false,
+      "delete": false,
+      "rowActions": [
+        { "text": "Değişiklik / kapatma", "icon": "edit_note", "navigate": "/workflow/staff-onboarding?start=1&key=staff-{{ row.staffId }}&staffId={{ row.staffId }}" }
+      ]
+    }
+  ]
+}

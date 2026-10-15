@@ -1,0 +1,99 @@
+{
+  // 2/8: store → personal details (optional manager) → manager approval → bike-create-staff (staffs table).
+  // Started by store-opening with data { storeId, storeName, source: "store-opening" }: the store step is skipped.
+  "key": "staff-onboarding",
+  "version": 1,
+  "title": "Personel alımı",
+  "instanceAccess": { "mode": "owner", "supervisorRoles": [ "manager" ] },
+  "start": {
+    "key": "start",
+    "target": "entry",
+    "onExecute": [ { "task": "set", "config": { "values": { "requestedBy": "user.Name", "requestedAt": "now" } } } ]
+  },
+  "states": [
+    {
+      "key": "entry", "title": "Başlangıç",
+      "transitions": [
+        { "key": "store-known", "target": "personal", "trigger": "Automatic", "rule": "data.storeId != null" },
+        { "key": "choose-store", "target": "store", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "store", "title": "Mağaza", "step": 1, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-store", "title": "Devam", "target": "personal", "view": { "inline": true },
+          "input": { "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "storeId" ],
+            "properties": {
+              "storeId": { "type": "integer", "minimum": 1, "title": "Mağaza",
+                           "x-lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } }
+            } } }
+        }
+      ]
+    },
+    {
+      "key": "personal", "title": "Personel bilgileri", "step": 2, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-personal", "title": "Onaya gönder", "target": "approval", "view": { "inline": true },
+          "input": { "into": "staff", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "firstName", "lastName", "email" ],
+            "properties": {
+              "firstName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Ad" },
+              "lastName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Soyad" },
+              "email": { "type": "string", "format": "email", "maxLength": 255, "title": "E-posta" },
+              "phone": { "type": "string", "pattern": "^\\+?[0-9 ()-]{7,25}$", "maxLength": 25, "title": "Telefon" },
+              "managerId": { "type": "integer", "minimum": 1, "title": "Yönetici (isteğe bağlı)",
+                             "x-lookup": { "entity": "Staff", "valueField": "staffId", "textField": "name" } }
+            } } }
+        },
+        // The store cannot be changed when the store-opening workflow chose it.
+        { "key": "back", "title": "Geri", "target": "store", "rule": "data.source != \"store-opening\"" }
+      ]
+    },
+    {
+      "key": "approval", "title": "Yönetici onayı", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "approve", "title": "Onayla", "target": "creating", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "review.approvedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "reject", "title": "Reddet", "target": "rejected", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "review.rejectedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "back", "title": "Düzenle", "target": "personal" }
+      ]
+    },
+    {
+      "key": "creating", "title": "Personel kaydediliyor",
+      "onEntry": [ { "task": "bike-create-staff", "config": {
+        "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
+        "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
+        "into": "staffId" } } ],
+      "transitions": [
+        { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "created", "target": "hired", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "fix", "title": "Düzeltme gerekli", "step": 3, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "edit", "title": "Bilgileri düzelt", "target": "personal", "input": { "set": { "error": "null" } } } ]
+    },
+    { "key": "hired", "title": "Personel kaydedildi", "step": 4, "type": "Finish", "subType": "Success",
+      "onEntry": [ { "task": "set", "config": { "values": { "hiredAt": "now" } } } ] },
+    { "key": "rejected", "title": "Reddedildi", "step": 4, "type": "Finish", "subType": "Error" },
+    { "key": "cancelled", "title": "İptal edildi", "type": "Finish", "subType": "Cancelled" }
+  ],
+  "sharedTransitions": [
+    {
+      "key": "cancel", "title": "İptal et", "target": "cancelled", "availableIn": [ "store", "personal", "approval", "fix" ],
+      "input": {
+        "schema": { "type": "object", "additionalProperties": false, "properties": { "reason": { "type": "string", "maxLength": 500, "title": "İptal nedeni" } } },
+        "into": "cancellation",
+        "set": { "cancellation.by": "user.Name" }
+      }
+    }
+  ]
+}

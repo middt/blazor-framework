@@ -13,6 +13,7 @@ using Middt.Sample.Api;
 using Middt.Sample.Api.Handlers;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
+using Middt.Sample.Api.Tasks;
 using Middt.Sample.Common.Messages;
 using Middt.Sample.Views;
 
@@ -24,10 +25,12 @@ builder.AddMiddtApi(options => options.Title = "Middt Sample API");
 // Data access: one DbContext per request, repositories resolved by the controllers.
 builder.Services.AddDbContextPool<BikeStoresContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("BikeStores")));
+builder.Services.AddScoped<BrandRepository>();
 builder.Services.AddScoped<CategoryRepository>();
 builder.Services.AddScoped<CustomerRepository>();
 builder.Services.AddScoped<ProductRepository>();
 builder.Services.AddScoped<StaffRepository>();
+builder.Services.AddScoped<StockRepository>();
 builder.Services.AddScoped<StoreRepository>();
 builder.Services.AddScoped<ViewOrderRepository>();
 
@@ -61,6 +64,7 @@ builder.Services.AddMiddtWorkflow(workflow =>
     // Raw task errors only in Development (production callers get a generic text; details stay in the logs).
     workflow.ExposeErrorDetails = builder.Environment.IsDevelopment();
     workflow.AddDefinitionsFromDirectory("Workflows");
+    workflow.AddBikeStoreTasks(); // bike-* tasks: the linked demo workflows write the BikeStores tables through them
     workflow.UseViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>().Views); // server driven UI (validated + HTML rendering)
 });
 builder.Services.AddSingleton<IWorkflowMessagePublisher, RebusWorkflowMessagePublisher>();
@@ -75,6 +79,12 @@ builder.Services.AddMiddtUi(ui =>
 builder.Services.AddScoped<IWorkflowViewRenderer, WorkflowLayoutRenderer>(); // GET api/workflows/.../view for states with a layout
 
 var app = builder.Build();
+
+// BikeStores seed upgrade: nvarchar text columns (Turkish names from the workflows) and the "active" flags of the lifecycle records.
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    await BikeStoresSchemaUpgrade.ApplyAsync(scope.ServiceProvider.GetRequiredService<BikeStoresContext>());
+}
 
 app.UseMiddtApi();
 app.MapHub<TestHub>("/hubs/testhub");

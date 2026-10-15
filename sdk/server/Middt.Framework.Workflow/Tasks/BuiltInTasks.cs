@@ -221,3 +221,48 @@ public sealed class StartWorkflowTask : IWorkflowTask
         }
     }
 }
+
+/// <summary>
+/// <c>setKey</c>: gives the instance its business key once it is known, e.g. after the record was created:
+/// <code>{ "key": "category-{{ data.categoryId }}" }</code>
+/// Starting the workflow with that key later returns this instance (idempotent start), so one record gets one instance.
+/// The same key again is a no-op; a different existing key, an empty key or a key used by another instance of the same
+/// workflow fails the task.
+/// </summary>
+public sealed class SetKeyTask : IWorkflowTask
+{
+    /// <summary>Column length of the business key.</summary>
+    public const int MaxKeyLength = 256;
+
+    public IEnumerable<string> Validate(TaskDefinition task, WorkflowExpressionEngine expressions)
+    {
+        if (task.Config["key"] is not JsonValue key || !key.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text))
+        {
+            yield return "setKey: 'key' (text template) is required.";
+            yield break;
+        }
+
+        foreach (var error in expressions.ValidateTemplate(key))
+        {
+            yield return "setKey: " + error;
+        }
+    }
+
+    public Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    {
+        var key = context.RenderText("key")?.Trim();
+        if (string.IsNullOrEmpty(key))
+        {
+            throw new WorkflowTaskException("setKey: the key is empty.");
+        }
+
+        if (key.Length > MaxKeyLength)
+        {
+            throw new WorkflowTaskException($"setKey: the key is longer than {MaxKeyLength} characters.");
+        }
+
+        return context.SetBusinessKey is { } setKey
+            ? setKey(key, cancellationToken)
+            : throw new InvalidOperationException("setKey runs inside the workflow engine only.");
+    }
+}

@@ -9,7 +9,7 @@ import { SAMPLE_VIEW_STYLES, ViewFormat } from './view-format';
   template: `
     <article class="sv-view" aria-labelledby="sv-review-title">
       <header class="sv-header">
-        <h3 id="sv-review-title">Sipariş #{{ text('orderId') }} · {{ text('customerName') }}</h3>
+        <h3 id="sv-review-title">{{ text('orderId', '') ? 'Sipariş #' + text('orderId', '') : 'Sipariş talebi' }} · {{ text('customerName') }}</h3>
         <span [class]="format.scoreClass(number('credit.score'))" title="Kredi skoru">Skor {{ text('credit.score') }}</span>
       </header>
 
@@ -33,7 +33,7 @@ import { SAMPLE_VIEW_STYLES, ViewFormat } from './view-format';
         <dt>Tutar</dt>
         <dd class="sv-amount">{{ format.money(number('amount')) }}</dd>
         @if (has('product')) {
-          <dt>Ürün grubu</dt>
+          <dt>Ürün</dt>
           <dd>{{ text('product') }}</dd>
         }
         @if (has('deliveryType')) {

@@ -3,9 +3,9 @@
   "key": "order-escalated",
   "title": "Eskale edilen sipariş",
   "kind": "view",
-  "version": 2,
+  "version": 4,
   "body": [
-    { "widget": "alert", "severity": "warning", "text": "Sipariş #{{ data.orderId }} süresi içinde karara bağlanmadığı için eskale edildi." },
+    { "widget": "alert", "severity": "warning", "text": "{{ data.customerName }} siparişi süresi içinde karara bağlanmadığı için eskale edildi." },
     {
       "widget": "columns",
       "widths": [ "2", "1" ],
@@ -18,7 +18,7 @@
               "widget": "fields",
               "items": [
                 { "label": "Tutar", "value": "{{ data.amount }}", "format": "N2" },
-                { "label": "Ürün grubu", "value": "{{ data.product }}", "visibleWhen": "data.product != null" },
+                { "label": "Ürün", "value": "{{ data.product }}", "visibleWhen": "data.product != null" },
                 { "label": "Teslimat", "value": "{{ data.deliveryType }}" },
                 { "label": "Müşteri tipi", "value": "{{ data.customerType }}" },
                 { "label": "Talep eden", "value": "{{ data.requestedBy }}" },

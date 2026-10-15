@@ -1,0 +1,240 @@
+{
+  // 2/8 and the lifecycle of a staff member (one instance per staff member, business key "staff-<id>"): store →
+  // personal details (optional manager) → manager approval → bike-create-staff (staffs table) → "active": change
+  // requests (bike-update-staff) and the close request (bike-set-active false: active = 0, soft delete).
+  // Started by store-opening with { storeId }: the store step is skipped. Started with a staffId it adopts that record.
+  "key": "staff-onboarding",
+  "version": 2,
+  "title": "Personel alımı",
+  "instanceAccess": { "mode": "owner", "supervisorRoles": [ "manager" ] },
+  "start": {
+    "key": "start",
+    "target": "entry",
+    // Optional: an existing record (adoption). The UI starts with business key "<entity>-<id>" and this id, so an
+    // existing lifecycle instance of the record is returned instead of a new one.
+    "input": { "schema": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "staffId": { "type": "integer", "minimum": 1, "title": "Mevcut kayıt (yeni kayıt için boş bırakın)",
+                      "x-lookup": { "entity": "Staff", "valueField": "staffId", "textField": "name" } },
+        "storeId": { "type": "integer", "minimum": 1, "title": "Mağaza (isteğe bağlı)",
+                     "x-lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } }
+      } } },
+    "onExecute": [ { "task": "set", "config": { "values": {
+      "requestedBy": "user.Name", "requestedAt": "now", "storePreset": "data.storeId != null" } } } ]
+  },
+  "states": [
+    {
+      "key": "entry", "title": "Başlangıç",
+      "transitions": [
+        { "key": "adopt", "target": "loading", "trigger": "Automatic", "rule": "data.staffId != null",
+          "onExecute": [ { "task": "set", "config": { "values": { "adoptedAt": "now" } } } ] },
+        { "key": "store-known", "target": "personal", "trigger": "Automatic", "rule": "data.storeId != null" },
+        { "key": "new", "target": "store", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "store", "title": "Mağaza", "step": 1, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-store", "title": "Devam", "target": "personal", "view": { "inline": true },
+          "input": { "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "storeId" ],
+            "properties": {
+              "storeId": { "type": "integer", "minimum": 1, "title": "Mağaza",
+                           "x-lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } }
+            } } }
+        }
+      ]
+    },
+    {
+      "key": "personal", "title": "Personel bilgileri", "step": 2, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-personal", "title": "Onaya gönder", "target": "approval", "view": { "inline": true },
+          "input": { "into": "staff", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "firstName", "lastName", "email" ],
+            "properties": {
+              "firstName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Ad" },
+              "lastName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Soyad" },
+              "email": { "type": "string", "format": "email", "maxLength": 255, "title": "E-posta" },
+              "phone": { "type": "string", "pattern": "^\\+?[0-9 ()-]{7,25}$", "maxLength": 25, "title": "Telefon" },
+              "managerId": { "type": "integer", "minimum": 1, "title": "Yönetici (isteğe bağlı)",
+                             "x-lookup": { "entity": "Staff", "valueField": "staffId", "textField": "name" } }
+            } } }
+        },
+        // The store cannot be changed when it was given at the start (e.g. by store-opening).
+        { "key": "back", "title": "Geri", "target": "store", "rule": "data.storePreset != true" }
+      ]
+    },
+    {
+      "key": "approval", "title": "Yönetici onayı", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "approve", "title": "Onayla", "target": "creating", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "review.approvedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "reject", "title": "Reddet", "target": "rejected", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "review.rejectedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "back", "title": "Düzenle", "target": "personal" }
+      ]
+    },
+    {
+      "key": "creating", "title": "Personel kaydediliyor",
+      "onEntry": [ { "task": "bike-create-staff", "config": {
+        "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
+        "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
+        "into": "staffId" } } ],
+      "transitions": [
+        { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "created", "target": "loading", "trigger": "Automatic", "default": true,
+          "onExecute": [ { "task": "set", "config": { "values": { "hiredAt": "now" } } } ] }
+      ]
+    },
+    {
+      "key": "fix", "title": "Düzeltme gerekli", "step": 3, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "edit", "title": "Bilgileri düzelt", "target": "personal", "input": { "set": { "error": "null" } } } ]
+    },
+    // ───────────── lifecycle: one instance per record (business key "staff-<id>"), closing = deactivating ─────────────
+    {
+      // Reached after the create task, after every approved change and when an existing record is adopted.
+      "key": "loading", "title": "Kayıt yükleniyor",
+      "onEntry": [
+        { "task": "bike-load-record", "config": { "entity": "staff", "id": "{{ data.staffId }}", "into": "staff" } },
+        { "task": "setKey", "when": "data.error == null", "config": { "key": "staff-{{ data.staffId }}" } },
+        // Prefill of the change request form: the current values.
+        { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.staff" } } }
+      ],
+      "transitions": [
+        { "key": "load-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "to-inactive", "target": "inactive", "trigger": "Automatic", "rule": "data.staff.active == false" },
+        { "key": "to-active", "target": "active", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "active", "title": "Aktif", "step": 4, "subType": "Human",
+      "transitions": [
+        {
+          "key": "request-change", "title": "Değişiklik talebi", "target": "change-approval", "view": { "inline": true },
+          "input": { "into": "change", "schema": {
+              "type": "object", "additionalProperties": false, "required": [ "storeId", "firstName", "lastName", "email" ],
+              "properties": {
+                "storeId": { "type": "integer", "minimum": 1, "title": "Mağaza",
+                             "x-lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } },
+                "firstName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Ad" },
+                "lastName": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Soyad" },
+                "email": { "type": "string", "format": "email", "maxLength": 255, "title": "E-posta" },
+                "phone": { "type": "string", "pattern": "^\\+?[0-9 ()-]{7,25}$", "maxLength": 25, "title": "Telefon" },
+                "managerId": { "type": "integer", "minimum": 1, "title": "Yönetici (isteğe bağlı)",
+                               "x-lookup": { "entity": "Staff", "valueField": "staffId", "textField": "name" } }
+              } },
+            // The request replaces data.change (a cleared optional field is removed, not kept from the prefill).
+            "set": { "change": "input", "changeRequest.by": "user.Name", "changeRequest.at": "now", "changeReview": "null" } }
+        },
+        {
+          "key": "request-close", "title": "Kapatma talebi", "target": "close-approval",
+          "input": { "into": "closeRequest", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Kapatma nedeni" } } },
+            "set": { "closeRequest.by": "user.Name", "closeRequest.at": "now", "closeReview": "null" } }
+        }
+      ]
+    },
+    {
+      "key": "change-approval", "title": "Değişiklik onayı", "step": 4, "subType": "Human",
+      "transitions": [
+        { "key": "approve-change", "title": "Onayla", "target": "updating", "roles": [ "manager" ],
+          "input": { "into": "changeReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "changeReview.approvedBy": "user.Name", "changeReview.decidedAt": "now" } } },
+        // Rejected: the record keeps its values, the form is prefilled with them again.
+        { "key": "reject-change", "title": "Reddet", "target": "active", "roles": [ "manager" ],
+          "input": { "into": "changeReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "changeReview.rejectedBy": "user.Name", "changeReview.decidedAt": "now", "change": "data.staff" } } },
+        { "key": "withdraw-change", "title": "Talebi geri çek", "target": "active", "input": { "set": { "change": "data.staff" } } }
+      ]
+    },
+    {
+      "key": "updating", "title": "Değişiklik kaydediliyor",
+      "onEntry": [ { "task": "bike-update-staff", "config": {
+        "id": "{{ data.staffId }}", "storeId": "{{ data.change.storeId }}", "firstName": "{{ data.change.firstName }}",
+        "lastName": "{{ data.change.lastName }}", "email": "{{ data.change.email }}", "phone": "{{ data.change.phone }}",
+        "managerId": "{{ data.change.managerId }}" } } ],
+      "transitions": [
+        { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
+          "onExecute": [ { "task": "set", "config": { "values": { "changedAt": "now" } } } ] }
+      ]
+    },
+    {
+      // Rule violation of a change or close (duplicate name, category with active products …): back to the record,
+      // a change request form is prefilled with the values just tried.
+      "key": "change-fix", "title": "Düzeltme gerekli", "step": 4, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "back-to-record", "title": "Kayda dön", "target": "active", "input": { "set": { "error": "null" } } } ]
+    },
+    {
+      "key": "close-approval", "title": "Kapatma onayı", "step": 4, "subType": "Human",
+      "transitions": [
+        { "key": "approve-close", "title": "Onayla", "target": "closing", "roles": [ "manager" ],
+          "input": { "into": "closeReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "closeReview.approvedBy": "user.Name", "closeReview.decidedAt": "now" } } },
+        { "key": "reject-close", "title": "Reddet", "target": "active", "roles": [ "manager" ],
+          "input": { "into": "closeReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "closeReview.rejectedBy": "user.Name", "closeReview.decidedAt": "now" } } },
+        { "key": "withdraw-close", "title": "Talebi geri çek", "target": "active" }
+      ]
+    },
+    {
+      // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
+      "key": "closing", "title": "Kayıt kapatılıyor",
+      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "staff", "id": "{{ data.staffId }}", "active": false } } ],
+      "transitions": [
+        { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "closed", "title": "Kapatıldı", "step": 4, "type": "Finish", "subType": "Success",
+      "onEntry": [ { "task": "set", "config": { "values": { "closedAt": "now", "staff.active": "false" } } } ] },
+    {
+      // An adopted record that was already passive (closed before the lifecycle existed).
+      "key": "inactive", "title": "Pasif", "step": 4, "subType": "Human",
+      "transitions": [
+        { "key": "request-reactivate", "title": "Yeniden etkinleştirme talebi", "target": "reactivate-approval",
+          "input": { "into": "reactivateRequest", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Gerekçe" } } },
+            "set": { "reactivateRequest.by": "user.Name", "reactivateRequest.at": "now", "reactivateReview": "null" } } }
+      ]
+    },
+    {
+      "key": "reactivate-approval", "title": "Etkinleştirme onayı", "step": 4, "subType": "Human",
+      "transitions": [
+        { "key": "approve-reactivate", "title": "Onayla", "target": "reactivating", "roles": [ "manager" ],
+          "input": { "into": "reactivateReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "reactivateReview.approvedBy": "user.Name", "reactivateReview.decidedAt": "now" } } },
+        { "key": "reject-reactivate", "title": "Reddet", "target": "inactive", "roles": [ "manager" ],
+          "input": { "into": "reactivateReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "reactivateReview.rejectedBy": "user.Name", "reactivateReview.decidedAt": "now" } } },
+        { "key": "withdraw-reactivate", "title": "Talebi geri çek", "target": "inactive" }
+      ]
+    },
+    {
+      "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
+      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "staff", "id": "{{ data.staffId }}", "active": true } } ],
+      "transitions": [
+        { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "not-found", "title": "Kayıt bulunamadı", "step": 4, "type": "Finish", "subType": "Error" },
+    { "key": "rejected", "title": "Reddedildi", "step": 4, "type": "Finish", "subType": "Error" },
+    { "key": "cancelled", "title": "İptal edildi", "type": "Finish", "subType": "Cancelled" }
+  ],
+  "sharedTransitions": [
+    {
+      "key": "cancel", "title": "İptal et", "target": "cancelled", "availableIn": [ "store", "personal", "approval", "fix" ],
+      "input": {
+        "schema": { "type": "object", "additionalProperties": false, "properties": { "reason": { "type": "string", "maxLength": 500, "title": "İptal nedeni" } } },
+        "into": "cancellation",
+        "set": { "cancellation.by": "user.Name" }
+      }
+    }
+  ]
+}

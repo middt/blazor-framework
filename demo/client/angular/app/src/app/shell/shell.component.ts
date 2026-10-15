@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatMenuModule } from '@angular/material/menu';
@@ -23,7 +24,7 @@ function storedTheme(): string | null {
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatToolbarModule, MatSidenavModule, MatListModule, MatIconModule, MatButtonModule, MatMenuModule, MatTooltipModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [MatDividerModule, MatToolbarModule, MatSidenavModule, MatListModule, MatIconModule, MatButtonModule, MatMenuModule, MatTooltipModule, RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <mat-toolbar class="shell-toolbar">
       <button mat-icon-button (click)="sidenavOpen.set(!sidenavOpen())" aria-label="Menüyü aç/kapat"><mat-icon>menu</mat-icon></button>
@@ -41,6 +42,13 @@ function storedTheme(): string | null {
       <mat-sidenav [mode]="mobile() ? 'over' : 'side'" [opened]="sidenavOpen()" (closedStart)="sidenavOpen.set(false)" class="shell-sidenav">
         <mat-nav-list aria-label="Ana menü">
           <a mat-list-item routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><mat-icon matListItemIcon>home</mat-icon><span matListItemTitle>Home</span></a>
+          <div mat-subheader class="shell-menu-group">
+            <mat-icon aria-hidden="true">{{ menu.workflowGroup.icon }}</mat-icon>{{ menu.workflowGroup.name }}
+          </div>
+          @for (item of menu.workflowGroup.items; track item.path) {
+            <a mat-list-item class="shell-menu-child" [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>
+          }
+          <mat-divider />
           @for (item of menu.layoutItems(); track item.path) {
             <a mat-list-item [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>
           }
@@ -68,6 +76,9 @@ function storedTheme(): string | null {
     .shell-main { padding: 1.5rem; }
     .shell-footer { padding: .75rem 1.5rem; color: var(--mat-sys-on-surface-variant); font: var(--mat-sys-body-small); }
     a.active { background: var(--mat-sys-secondary-container); }
+    .shell-menu-group { display: flex; align-items: center; gap: .5rem; }
+    .shell-menu-group mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    .shell-menu-child { padding-left: 1.5rem; }
   `,
 })
 export class ShellComponent implements OnInit {

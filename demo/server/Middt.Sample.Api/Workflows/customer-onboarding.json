@@ -1,0 +1,139 @@
+{
+  // 6/8: Bireysel / Kurumsal → identity (TCKN) or company (tax number) → contact & address → verification by a manager →
+  // bike-create-customer (customers table). Registered customers are then chosen in order-approval.
+  "key": "customer-onboarding",
+  "version": 1,
+  "title": "Müşteri kaydı",
+  "instanceAccess": { "mode": "owner", "supervisorRoles": [ "manager" ] },
+  "start": {
+    "key": "start",
+    "target": "customer",
+    "onExecute": [ { "task": "set", "config": { "values": { "requestedBy": "user.Name", "requestedAt": "now" } } } ]
+  },
+  "states": [
+    {
+      "key": "customer", "title": "Müşteri tipi", "step": 1, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-type", "title": "Devam", "target": "type-routing", "view": { "inline": true },
+          "input": { "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "customerType" ],
+            "properties": {
+              "customerType": { "type": "string", "enum": [ "Bireysel", "Kurumsal" ], "title": "Müşteri tipi" }
+            } } }
+        }
+      ]
+    },
+    {
+      "key": "type-routing", "title": "Müşteri tipi kontrolü",
+      "transitions": [
+        { "key": "to-company", "target": "company", "trigger": "Automatic", "rule": "data.customerType == \"Kurumsal\"" },
+        { "key": "to-person", "target": "person", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "person", "title": "Kimlik bilgileri", "step": 2, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-person", "title": "Devam", "target": "contact", "view": { "inline": true },
+          "input": { "into": "person", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "firstName", "lastName", "identityNumber", "birthDate" ],
+            "properties": {
+              "firstName": { "type": "string", "minLength": 2, "maxLength": 100, "title": "Ad" },
+              "lastName": { "type": "string", "minLength": 2, "maxLength": 100, "title": "Soyad" },
+              "identityNumber": { "type": "string", "pattern": "^[1-9][0-9]{10}$", "title": "T.C. kimlik no (11 hane)" },
+              "birthDate": { "type": "string", "format": "date-time", "title": "Doğum tarihi" }
+            } } }
+        },
+        { "key": "back", "title": "Geri", "target": "customer" }
+      ]
+    },
+    {
+      "key": "company", "title": "Firma bilgileri", "step": 2, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-company", "title": "Devam", "target": "contact", "view": { "inline": true },
+          "input": { "into": "company", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "companyName", "taxNumber", "taxOffice", "contactPerson" ],
+            "properties": {
+              "companyName": { "type": "string", "minLength": 2, "maxLength": 200, "title": "Firma unvanı" },
+              "taxNumber": { "type": "string", "pattern": "^[0-9]{10}$", "title": "Vergi numarası (10 hane)" },
+              "taxOffice": { "type": "string", "minLength": 2, "maxLength": 100, "title": "Vergi dairesi" },
+              "contactPerson": { "type": "string", "minLength": 2, "maxLength": 100, "title": "Yetkili kişi" }
+            } } }
+        },
+        { "key": "back", "title": "Geri", "target": "customer" }
+      ]
+    },
+    {
+      "key": "contact", "title": "İletişim ve adres", "step": 3, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-contact", "title": "Doğrulamaya gönder", "target": "verification", "view": { "inline": true },
+          "input": { "into": "contact", "schema": {
+            "type": "object", "additionalProperties": false, "required": [ "email", "city" ],
+            "properties": {
+              "email": { "type": "string", "format": "email", "maxLength": 255, "title": "E-posta" },
+              "phone": { "type": "string", "pattern": "^\\+?[0-9 ()-]{7,25}$", "maxLength": 25, "title": "Telefon" },
+              "street": { "type": "string", "maxLength": 255, "title": "Adres" },
+              "city": { "type": "string", "minLength": 2, "maxLength": 50, "title": "Şehir" },
+              "state": { "type": "string", "maxLength": 25, "title": "İl / eyalet" },
+              "zipCode": { "type": "string", "pattern": "^[0-9]{5}$", "title": "Posta kodu" }
+            } } }
+        },
+        { "key": "back-company", "title": "Geri", "target": "company", "rule": "data.customerType == \"Kurumsal\"" },
+        { "key": "back-person", "title": "Geri", "target": "person", "rule": "data.customerType != \"Kurumsal\"" }
+      ]
+    },
+    {
+      "key": "verification", "title": "Doğrulama", "step": 4, "subType": "Human",
+      "transitions": [
+        { "key": "verify", "title": "Doğrula ve kaydet", "target": "creating", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "review.approvedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "reject", "title": "Reddet", "target": "rejected", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "review.rejectedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "back", "title": "Düzenle", "target": "contact" }
+      ]
+    },
+    {
+      "key": "creating", "title": "Müşteri kaydediliyor",
+      "onEntry": [
+        // customers has first/last name only: a company is stored as "<unvan>" + "<yetkili kişi>".
+        { "task": "set", "when": "data.customerType == \"Kurumsal\"",
+          "config": { "values": { "customer.firstName": "data.company.companyName", "customer.lastName": "data.company.contactPerson" } } },
+        { "task": "set", "when": "data.customerType != \"Kurumsal\"",
+          "config": { "values": { "customer.firstName": "data.person.firstName", "customer.lastName": "data.person.lastName" } } },
+        { "task": "bike-create-customer", "config": {
+          "firstName": "{{ data.customer.firstName }}", "lastName": "{{ data.customer.lastName }}",
+          "email": "{{ data.contact.email }}", "phone": "{{ data.contact.phone }}", "street": "{{ data.contact.street }}",
+          "city": "{{ data.contact.city }}", "state": "{{ data.contact.state }}", "zipCode": "{{ data.contact.zipCode }}",
+          "into": "customerId" } }
+      ],
+      "transitions": [
+        { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "created", "target": "registered", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "fix", "title": "Düzeltme gerekli", "step": 4, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "edit", "title": "Bilgileri düzelt", "target": "contact", "input": { "set": { "error": "null" } } } ]
+    },
+    { "key": "registered", "title": "Müşteri kaydedildi", "step": 5, "type": "Finish", "subType": "Success" },
+    { "key": "rejected", "title": "Reddedildi", "step": 5, "type": "Finish", "subType": "Error" },
+    { "key": "cancelled", "title": "İptal edildi", "type": "Finish", "subType": "Cancelled" }
+  ],
+  "sharedTransitions": [
+    {
+      "key": "cancel", "title": "İptal et", "target": "cancelled", "availableIn": [ "customer", "person", "company", "contact", "verification", "fix" ],
+      "input": {
+        "schema": { "type": "object", "additionalProperties": false, "properties": { "reason": { "type": "string", "maxLength": 500, "title": "İptal nedeni" } } },
+        "into": "cancellation",
+        "set": { "cancellation.by": "user.Name" }
+      }
+    }
+  ]
+}

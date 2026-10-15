@@ -1,0 +1,245 @@
+{
+  // 4/8 and the lifecycle of a product (one instance per product, business key "product-<id>"): category, brand, name,
+  // model year, list price (+ optional initial stock) → price approval by a manager above 5.000 TL (automatic below) →
+  // bike-create-product (products table) → starts stock-replenishment for the initial stock when a store and a
+  // quantity > 0 were given → "active": change requests (bike-update-product) and the close request (bike-set-active
+  // false, soft delete: orders keep the product). Started with a productId it adopts that product.
+  "key": "product-launch",
+  "version": 2,
+  "title": "Ürün lansmanı",
+  "instanceAccess": { "mode": "owner", "supervisorRoles": [ "manager" ] },
+  "start": {
+    "key": "start",
+    "target": "entry",
+    // Optional: an existing record (adoption). The UI starts with business key "<entity>-<id>" and this id, so an
+    // existing lifecycle instance of the record is returned instead of a new one.
+    "input": { "schema": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "productId": { "type": "integer", "minimum": 1, "title": "Mevcut kayıt (yeni kayıt için boş bırakın)",
+                      "x-lookup": { "entity": "Product", "valueField": "productId", "textField": "productName" } }
+      } } },
+    "onExecute": [ { "task": "set", "config": { "values": { "requestedBy": "user.Name", "requestedAt": "now" } } } ]
+  },
+  "states": [
+    {
+      "key": "entry", "title": "Başlangıç",
+      "transitions": [
+        { "key": "adopt", "target": "loading", "trigger": "Automatic", "rule": "data.productId != null",
+          "onExecute": [ { "task": "set", "config": { "values": { "adoptedAt": "now" } } } ] },
+        { "key": "new", "target": "details", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "details", "title": "Ürün bilgileri", "step": 1, "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit", "title": "Devam", "target": "price-routing", "view": { "inline": true },
+          "input": { "into": "product", "schema": {
+            "type": "object", "additionalProperties": false,
+            "required": [ "categoryId", "brandId", "productName", "modelYear", "listPrice", "initialQuantity" ],
+            "properties": {
+              "categoryId": { "type": "integer", "minimum": 1, "title": "Kategori",
+                              "x-lookup": { "entity": "Category", "valueField": "categoryId", "textField": "categoryName" } },
+              "brandId": { "type": "integer", "minimum": 1, "title": "Marka",
+                           "x-lookup": { "entity": "Brand", "valueField": "brandId", "textField": "brandName" } },
+              "productName": { "type": "string", "minLength": 2, "maxLength": 255, "title": "Ürün adı" },
+              "modelYear": { "type": "integer", "minimum": 2000, "maximum": 2100, "title": "Model yılı" },
+              "listPrice": { "type": "number", "minimum": 1, "maximum": 99999999, "title": "Liste fiyatı (TL)" },
+              "initialStoreId": { "type": "integer", "minimum": 1, "title": "İlk stok mağazası (isteğe bağlı)",
+                                  "x-lookup": { "entity": "Store", "valueField": "storeId", "textField": "storeName" } },
+              "initialQuantity": { "type": "integer", "minimum": 0, "maximum": 1000, "default": 0, "title": "İlk stok adedi (0 = yok)" }
+            } } }
+        }
+      ]
+    },
+    {
+      "key": "price-routing", "title": "Fiyat kontrolü",
+      "transitions": [
+        { "key": "needs-approval", "target": "price-approval", "trigger": "Automatic", "rule": "data.product.listPrice > 5000" },
+        { "key": "auto-approve", "target": "creating", "trigger": "Automatic", "default": true,
+          "onExecute": [ { "task": "set", "config": { "values": { "review.approvedBy": "\"Otomatik (5.000 TL altı)\"", "review.decidedAt": "now" } } } ] }
+      ]
+    },
+    {
+      "key": "price-approval", "title": "Fiyat onayı", "step": 2, "subType": "Human",
+      "transitions": [
+        { "key": "approve", "title": "Onayla", "target": "creating", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "review.approvedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "reject", "title": "Reddet", "target": "rejected", "roles": [ "manager" ],
+          "input": { "into": "review",
+            "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "review.rejectedBy": "user.Name", "review.decidedAt": "now" } } },
+        { "key": "back", "title": "Düzenle", "target": "details" }
+      ]
+    },
+    {
+      "key": "creating", "title": "Ürün oluşturuluyor",
+      "onEntry": [ { "task": "bike-create-product", "config": {
+        "productName": "{{ data.product.productName }}", "brandId": "{{ data.product.brandId }}", "categoryId": "{{ data.product.categoryId }}",
+        "modelYear": "{{ data.product.modelYear }}", "listPrice": "{{ data.product.listPrice }}", "into": "productId" } } ],
+      "transitions": [
+        { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "created", "target": "launching", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "fix", "title": "Düzeltme gerekli", "step": 2, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "edit", "title": "Bilgileri düzelt", "target": "details", "input": { "set": { "error": "null" } } } ]
+    },
+    {
+      // Own hop after the insert. Next link: the initial stock goes through stock-replenishment (manager approval /
+      // automatic after 1 minute); the business key keeps a retry from starting it twice.
+      "key": "launching", "title": "Ürün yayına alınıyor",
+      "onEntry": [
+        { "task": "set", "config": { "values": { "launchedAt": "now" } } },
+        { "task": "startWorkflow", "key": "start-initial-stock",
+          "when": "data.product.initialStoreId != null && data.product.initialQuantity > 0",
+          "config": { "workflow": "stock-replenishment", "key": "product-{{ data.productId }}-initial",
+                      "data": { "storeId": "{{ data.product.initialStoreId }}", "productId": "{{ data.productId }}",
+                                "quantity": "{{ data.product.initialQuantity }}", "requestedBy": "product-launch" },
+                      "into": "stockReplenishmentId" } }
+      ],
+      "transitions": [ { "key": "launched", "target": "loading", "trigger": "Automatic", "default": true } ]
+    },
+    // ───────────── lifecycle: one instance per record (business key "product-<id>"), closing = deactivating ─────────────
+    {
+      // Reached after the create task, after every approved change and when an existing record is adopted.
+      "key": "loading", "title": "Kayıt yükleniyor",
+      "onEntry": [
+        { "task": "bike-load-record", "config": { "entity": "product", "id": "{{ data.productId }}", "into": "product" } },
+        { "task": "setKey", "when": "data.error == null", "config": { "key": "product-{{ data.productId }}" } },
+        // Prefill of the change request form: the current values.
+        { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.product" } } }
+      ],
+      "transitions": [
+        { "key": "load-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "to-inactive", "target": "inactive", "trigger": "Automatic", "rule": "data.product.active == false" },
+        { "key": "to-active", "target": "active", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "active", "title": "Aktif", "step": 3, "subType": "Human",
+      "transitions": [
+        {
+          "key": "request-change", "title": "Değişiklik talebi", "target": "change-approval", "view": { "inline": true },
+          "input": { "into": "change", "schema": {
+              "type": "object", "additionalProperties": false, "required": [ "categoryId", "brandId", "productName", "modelYear", "listPrice" ],
+              "properties": {
+                "categoryId": { "type": "integer", "minimum": 1, "title": "Kategori",
+                                "x-lookup": { "entity": "Category", "valueField": "categoryId", "textField": "categoryName" } },
+                "brandId": { "type": "integer", "minimum": 1, "title": "Marka",
+                             "x-lookup": { "entity": "Brand", "valueField": "brandId", "textField": "brandName" } },
+                "productName": { "type": "string", "minLength": 2, "maxLength": 255, "title": "Ürün adı" },
+                "modelYear": { "type": "integer", "minimum": 1900, "maximum": 2100, "title": "Model yılı" },
+                "listPrice": { "type": "number", "minimum": 1, "maximum": 99999999, "title": "Liste fiyatı (TL)" }
+              } },
+            // The request replaces data.change (a cleared optional field is removed, not kept from the prefill).
+            "set": { "change": "input", "changeRequest.by": "user.Name", "changeRequest.at": "now", "changeReview": "null" } }
+        },
+        {
+          "key": "request-close", "title": "Kapatma talebi", "target": "close-approval",
+          "input": { "into": "closeRequest", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Kapatma nedeni" } } },
+            "set": { "closeRequest.by": "user.Name", "closeRequest.at": "now", "closeReview": "null" } }
+        }
+      ]
+    },
+    {
+      "key": "change-approval", "title": "Değişiklik onayı", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "approve-change", "title": "Onayla", "target": "updating", "roles": [ "manager" ],
+          "input": { "into": "changeReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "changeReview.approvedBy": "user.Name", "changeReview.decidedAt": "now" } } },
+        // Rejected: the record keeps its values, the form is prefilled with them again.
+        { "key": "reject-change", "title": "Reddet", "target": "active", "roles": [ "manager" ],
+          "input": { "into": "changeReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "changeReview.rejectedBy": "user.Name", "changeReview.decidedAt": "now", "change": "data.product" } } },
+        { "key": "withdraw-change", "title": "Talebi geri çek", "target": "active", "input": { "set": { "change": "data.product" } } }
+      ]
+    },
+    {
+      "key": "updating", "title": "Değişiklik kaydediliyor",
+      "onEntry": [ { "task": "bike-update-product", "config": {
+        "id": "{{ data.productId }}", "productName": "{{ data.change.productName }}", "brandId": "{{ data.change.brandId }}",
+        "categoryId": "{{ data.change.categoryId }}", "modelYear": "{{ data.change.modelYear }}", "listPrice": "{{ data.change.listPrice }}" } } ],
+      "transitions": [
+        { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
+          "onExecute": [ { "task": "set", "config": { "values": { "changedAt": "now" } } } ] }
+      ]
+    },
+    {
+      // Rule violation of a change or close (duplicate name, category with active products …): back to the record,
+      // a change request form is prefilled with the values just tried.
+      "key": "change-fix", "title": "Düzeltme gerekli", "step": 3, "subType": "Human", "view": { "layout": "bike-task-error" },
+      "transitions": [ { "key": "back-to-record", "title": "Kayda dön", "target": "active", "input": { "set": { "error": "null" } } } ]
+    },
+    {
+      "key": "close-approval", "title": "Kapatma onayı", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "approve-close", "title": "Onayla", "target": "closing", "roles": [ "manager" ],
+          "input": { "into": "closeReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "closeReview.approvedBy": "user.Name", "closeReview.decidedAt": "now" } } },
+        { "key": "reject-close", "title": "Reddet", "target": "active", "roles": [ "manager" ],
+          "input": { "into": "closeReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "closeReview.rejectedBy": "user.Name", "closeReview.decidedAt": "now" } } },
+        { "key": "withdraw-close", "title": "Talebi geri çek", "target": "active" }
+      ]
+    },
+    {
+      // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
+      "key": "closing", "title": "Kayıt kapatılıyor",
+      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "product", "id": "{{ data.productId }}", "active": false } } ],
+      "transitions": [
+        { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "closed", "title": "Kapatıldı", "step": 3, "type": "Finish", "subType": "Success",
+      "onEntry": [ { "task": "set", "config": { "values": { "closedAt": "now", "product.active": "false" } } } ] },
+    {
+      // An adopted record that was already passive (closed before the lifecycle existed).
+      "key": "inactive", "title": "Pasif", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "request-reactivate", "title": "Yeniden etkinleştirme talebi", "target": "reactivate-approval",
+          "input": { "into": "reactivateRequest", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Gerekçe" } } },
+            "set": { "reactivateRequest.by": "user.Name", "reactivateRequest.at": "now", "reactivateReview": "null" } } }
+      ]
+    },
+    {
+      "key": "reactivate-approval", "title": "Etkinleştirme onayı", "step": 3, "subType": "Human",
+      "transitions": [
+        { "key": "approve-reactivate", "title": "Onayla", "target": "reactivating", "roles": [ "manager" ],
+          "input": { "into": "reactivateReview", "schema": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string", "maxLength": 500, "title": "Açıklama" } } },
+            "set": { "reactivateReview.approvedBy": "user.Name", "reactivateReview.decidedAt": "now" } } },
+        { "key": "reject-reactivate", "title": "Reddet", "target": "inactive", "roles": [ "manager" ],
+          "input": { "into": "reactivateReview", "schema": { "type": "object", "additionalProperties": false, "required": [ "reason" ], "properties": { "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red nedeni" } } },
+            "set": { "reactivateReview.rejectedBy": "user.Name", "reactivateReview.decidedAt": "now" } } },
+        { "key": "withdraw-reactivate", "title": "Talebi geri çek", "target": "inactive" }
+      ]
+    },
+    {
+      "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
+      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "product", "id": "{{ data.productId }}", "active": true } } ],
+      "transitions": [
+        { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
+        { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "not-found", "title": "Kayıt bulunamadı", "step": 3, "type": "Finish", "subType": "Error" },
+    { "key": "rejected", "title": "Reddedildi", "step": 3, "type": "Finish", "subType": "Error" },
+    { "key": "cancelled", "title": "İptal edildi", "type": "Finish", "subType": "Cancelled" }
+  ],
+  "sharedTransitions": [
+    {
+      "key": "cancel", "title": "İptal et", "target": "cancelled", "availableIn": [ "details", "price-approval", "fix" ],
+      "input": {
+        "schema": { "type": "object", "additionalProperties": false, "properties": { "reason": { "type": "string", "maxLength": 500, "title": "İptal nedeni" } } },
+        "into": "cancellation",
+        "set": { "cancellation.by": "user.Name" }
+      }
+    }
+  ]
+}

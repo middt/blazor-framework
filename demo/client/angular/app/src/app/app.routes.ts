@@ -20,7 +20,8 @@ export const routes: Routes = [
         canActivate: [middtRoleGuard('ui-admin')],
         title: 'Ekran Tasarımı',
       },
-      { path: 'workflow/order-approval', loadComponent: () => import('./pages/order-approval.page').then(m => m.OrderApprovalPage), title: 'Sipariş Onayı' },
+      // Every workflow (instance list + detail); the page sets the browser title to the workflow title.
+      { path: 'workflow/:key', loadComponent: () => import('./pages/workflow.page').then(m => m.WorkflowPage) },
       { path: '**', redirectTo: '' },
     ],
   },

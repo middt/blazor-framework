@@ -45,6 +45,7 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
 
     // The host page's <title> (TitleFor(null)); JS is only called when a page needs another one.
     private string? title = MenuService.TitleFor(null);
+    private string? titlePath;
     private PersistingComponentStateSubscription persisting;
 
     [Inject]
@@ -93,12 +94,19 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Only when the title changed: every render (menu, theme, navigation) ends here.
-        var current = MenuService.TitleFor(MenuService.FindCurrent(NavigationManager.ToAbsoluteUri(NavigationManager.Uri)));
-        if (current != title)
+        // Only when the title or the page changed: every render (menu, theme, navigation) ends here. Pages may set a more
+        // specific title themselves (the workflow page uses the workflow title), so a new path always resets it.
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var current = MenuService.TitleFor(MenuService.FindCurrent(uri));
+        if (current != title || !string.Equals(uri.AbsolutePath, titlePath, StringComparison.OrdinalIgnoreCase))
         {
+            var unchanged = current == title;
             title = current;
-            await JsRuntime.InvokeVoidAsync("middt.setTitle", current);
+            titlePath = uri.AbsolutePath;
+            if (!unchanged || !firstRender)
+            {
+                await JsRuntime.InvokeVoidAsync("middt.setTitle", current);
+            }
         }
     }
 

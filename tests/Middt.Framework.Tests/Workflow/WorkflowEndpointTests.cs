@@ -128,7 +128,11 @@ public sealed class WorkflowEndpointTests
         first.StatusCode.Should().Be(HttpStatusCode.Created);
         second.StatusCode.Should().Be(HttpStatusCode.OK);
         second.Headers.Location.Should().BeNull();
-        (await EnvelopeAsync<WorkflowInstanceModel>(second)).Data!.Id.Should().Be((await EnvelopeAsync<WorkflowInstanceModel>(first)).Data!.Id);
+        var created = await EnvelopeAsync<WorkflowInstanceModel>(first);
+        var existing = await EnvelopeAsync<WorkflowInstanceModel>(second);
+        existing.Data!.Id.Should().Be(created.Data!.Id);
+        existing.MessageList.Should().Equal(Middt.Framework.Workflow.Endpoints.WorkflowEndpoints.ExistingInstanceMessage);
+        created.MessageList.Should().BeEmpty("a new instance has no message");
     }
 
     [Fact]

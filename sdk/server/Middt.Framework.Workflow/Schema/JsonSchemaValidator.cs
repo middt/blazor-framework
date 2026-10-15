@@ -10,9 +10,17 @@ namespace Middt.Framework.Workflow.Schema;
 /// <c>type</c>, <c>properties</c>, <c>required</c>, <c>additionalProperties</c> (bool), <c>enum</c>, <c>const</c>,
 /// <c>minimum</c>/<c>maximum</c>, <c>minLength</c>/<c>maxLength</c>, <c>pattern</c>, <c>format</c> (date-time, email),
 /// <c>items</c>, <c>minItems</c>/<c>maxItems</c>. Unknown keywords are rejected when the definition is loaded.
+/// <para>
+/// UI extension: <c>"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "name" }</c> on a property
+/// tells frontends to render a select whose options come from <c>api/v{version}/{entity}/getitems</c> (same shape as the
+/// layout <c>lookup</c>). Its shape is checked at load time; it does not constrain the submitted value.
+/// </para>
 /// </summary>
-public static class JsonSchemaValidator
+public static partial class JsonSchemaValidator
 {
+    /// <summary>Schema keyword of the lookup UI hint.</summary>
+    public const string LookupKeyword = "x-lookup";
+
     private static readonly HashSet<string> SupportedKeywords =
     [
         "$schema", "title", "description", "type", "properties", "required", "additionalProperties", "enum", "const",
@@ -24,7 +32,14 @@ public static class JsonSchemaValidator
     {
         foreach (var (keyword, value) in schema)
         {
-            if (!SupportedKeywords.Contains(keyword))
+            if (keyword == LookupKeyword)
+            {
+                foreach (var error in CheckLookup(value, $"{path}.{LookupKeyword}"))
+                {
+                    yield return error;
+                }
+            }
+            else if (!SupportedKeywords.Contains(keyword))
             {
                 yield return $"{path}: unsupported schema keyword '{keyword}'.";
             }
@@ -56,6 +71,46 @@ public static class JsonSchemaValidator
             }
         }
     }
+
+    private static IEnumerable<string> CheckLookup(JsonNode? lookup, string path)
+    {
+        if (lookup is not JsonObject obj)
+        {
+            yield return $"{path}: must be an object with entity, valueField and textField.";
+            yield break;
+        }
+
+        foreach (var (name, _) in obj)
+        {
+            if (name is not ("entity" or "valueField" or "textField"))
+            {
+                yield return $"{path}: unsupported property '{name}'.";
+            }
+        }
+
+        // The entity becomes a URL path segment and the fields JSON property names: restrict them to plain identifiers.
+        if (!IsMatch(obj["entity"], EntityRegex()))
+        {
+            yield return $"{path}.entity: must be a controller name (letters and digits).";
+        }
+
+        foreach (var field in (string[])["valueField", "textField"])
+        {
+            if (!IsMatch(obj[field], FieldRegex()))
+            {
+                yield return $"{path}.{field}: must be a property name (camelCase).";
+            }
+        }
+    }
+
+    private static bool IsMatch(JsonNode? node, Regex regex) =>
+        node is JsonValue value && value.TryGetValue<string>(out var text) && regex.IsMatch(text);
+
+    [GeneratedRegex("^[A-Za-z][A-Za-z0-9]{0,63}$", RegexOptions.CultureInvariant)]
+    private static partial Regex EntityRegex();
+
+    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,63}$", RegexOptions.CultureInvariant)]
+    private static partial Regex FieldRegex();
 
     public static List<string> Validate(JsonNode? instance, JsonObject schema)
     {

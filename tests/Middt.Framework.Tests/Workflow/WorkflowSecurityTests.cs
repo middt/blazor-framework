@@ -138,6 +138,22 @@ public sealed class WorkflowSecurityTests
     }
 
     [Fact]
+    public async Task Owner_mode_start_with_a_foreign_business_key_does_not_disclose_the_instance()
+    {
+        await using var host = await WorkflowTestHost.StartAsync([OwnedWorkflow]);
+        var bob = await host.StartInstanceAsync("owned", key: "record-1", user: WorkflowTestHost.User("bob"));
+
+        await FluentActions.Awaiting(() => host.StartWithFlagAsync("owned", key: "record-1", user: WorkflowTestHost.User("alice")))
+            .Should().ThrowAsync<WorkflowNotFoundException>();
+        var (asBob, created) = await host.StartWithFlagAsync("owned", key: "record-1", user: WorkflowTestHost.User("bob"));
+        var (asManager, _) = await host.StartWithFlagAsync("owned", key: "record-1", user: WorkflowTestHost.User("boss", "manager"));
+
+        created.Should().BeFalse();
+        asBob.Id.Should().Be(bob.Id);
+        asManager.Id.Should().Be(bob.Id, "supervisors see every instance");
+    }
+
+    [Fact]
     public async Task Instances_of_another_workflow_answer_404_on_every_instance_endpoint()
     {
         await using var host = await WorkflowTestHost.StartAsync([OwnedWorkflow, TestWorkflows.Pipeline]);

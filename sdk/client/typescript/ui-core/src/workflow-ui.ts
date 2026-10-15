@@ -378,6 +378,16 @@ export type SchemaFieldKind = 'text' | 'longText' | 'enum' | 'dateTime' | 'date'
 /** Editor value of a field: `boolean` for check boxes, text otherwise (`yyyy-MM-dd` / `yyyy-MM-ddTHH:mm` local for dates). */
 export type SchemaFieldValue = string | boolean;
 
+/**
+ * `x-lookup` of a schema property: the value is picked from the rows of an API entity (`api/v{version}/{entity}/…`), same
+ * shape as the layout field `lookup`. The property's `type` decides the value type (integer/number → number, else string).
+ */
+export interface SchemaLookup {
+  entity: string;
+  valueField: string;
+  textField: string;
+}
+
 /** A property of a flat `type: object` JSON Schema. */
 export interface SchemaField {
   name: string;
@@ -392,6 +402,8 @@ export interface SchemaField {
   pattern: string | null;
   format: string | null;
   enumValues: string[];
+  /** Options loaded from an entity (`x-lookup`); the field is then shown as a select. */
+  lookup: SchemaLookup | null;
 }
 
 const LONG_TEXT_THRESHOLD = 200;
@@ -399,6 +411,53 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const getString = (obj: WorkflowData, name: string): string | null => (typeof obj[name] === 'string' ? (obj[name] as string) : null);
 const getNumber = (obj: WorkflowData, name: string): number | null => (typeof obj[name] === 'number' && Number.isFinite(obj[name]) ? (obj[name] as number) : null);
+
+/** Parses `x-lookup`; null when missing or incomplete (entity, valueField and textField are required). */
+export function schemaLookup(property: WorkflowData): SchemaLookup | null {
+  const lookup = property['x-lookup'];
+  if (!isObject(lookup)) {
+    return null;
+  }
+
+  const entity = getString(lookup, 'entity');
+  const valueField = getString(lookup, 'valueField');
+  const textField = getString(lookup, 'textField');
+  return entity && valueField && textField ? { entity, valueField, textField } : null;
+}
+
+/** Option of a lookup select: the editor value (text, like every schema form value) and the shown text. */
+export interface SchemaLookupOption {
+  value: string;
+  text: string;
+}
+
+const optionText = (value: unknown): string =>
+  value === null || value === undefined ? '' : typeof value === 'string' ? value : typeof value === 'object' ? (JSON.stringify(value) ?? '') : String(value);
+
+/**
+ * Select options of a lookup from the entity rows: value = `row[valueField]` as text (numbers in invariant form), text =
+ * `row[textField]` (the value when empty). Rows without a value are skipped, duplicate values keep the first row.
+ */
+export function schemaLookupOptions(lookup: SchemaLookup, rows: readonly unknown[]): SchemaLookupOption[] {
+  const options: SchemaLookupOption[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!isObject(row)) {
+      continue;
+    }
+
+    const value = optionText(row[lookup.valueField]);
+    if (value === '' || seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    const text = optionText(row[lookup.textField]);
+    options.push({ value, text: text === '' ? value : text });
+  }
+
+  return options;
+}
 
 function schemaType(property: WorkflowData): string {
   const type = property['type'];
@@ -433,9 +492,13 @@ export function schemaFields(schema: WorkflowData | null | undefined): SchemaFie
     const format = getString(node, 'format');
     const type = schemaType(node);
     const values = node['enum'];
+    const lookup = schemaLookup(node);
     let kind: SchemaFieldKind;
     let enumValues: string[] = [];
-    if (Array.isArray(values)) {
+    if (lookup !== null) {
+      // Lookup values are plain numbers or texts (the select stores the option value as text).
+      kind = type === 'integer' ? 'integer' : type === 'number' ? 'number' : 'text';
+    } else if (Array.isArray(values)) {
       kind = 'enum';
       enumValues = values.map(v => (typeof v === 'string' ? v : (JSON.stringify(v) ?? '')));
     } else if (type === 'string') {
@@ -463,6 +526,7 @@ export function schemaFields(schema: WorkflowData | null | undefined): SchemaFie
       pattern: getString(node, 'pattern'),
       format,
       enumValues,
+      lookup,
     });
   }
 
@@ -543,6 +607,11 @@ const formatDecimal = (value: number): string => String(value).replace('.', ',')
 
 /** Validation message of a field (Turkish, like JsonSchemaForm); null when valid. */
 export function validateSchemaField(field: SchemaField, value: SchemaFieldValue | undefined): string | null {
+  if (field.lookup !== null) {
+    // The value comes from the entity rows: only "required" applies (like JsonSchemaForm's lookup fields).
+    return field.required && asText(value) === '' ? 'Bu alan zorunludur.' : null;
+  }
+
   switch (field.kind) {
     case 'number':
     case 'integer': {
@@ -693,4 +762,124 @@ export function schemaFormValue(fields: readonly SchemaField[], values: Record<s
   }
 
   return result;
+}
+
+// ------------------------------------------------------------------------------------------- start dialog prefill (URL)
+
+/**
+ * Query parameters of a "start new" link (`/workflow/{key}?start=1&key=…&{property}=…`, same contract as WorkflowPage.razor):
+ * `start` (`1`/`true`) opens the start dialog, `key` prefills the business key and every other parameter is a candidate for a
+ * start input property (see `schemaValuesFromQuery`).
+ */
+export interface WorkflowStartQuery {
+  open: boolean;
+  /** Business key (trimmed); null when missing or empty. */
+  key: string | null;
+  /** The other parameters (first value of repeated ones). */
+  values: Record<string, string>;
+}
+
+/** Query parameter names reserved by the start link contract. */
+export const WORKFLOW_START_QUERY_PARAM = 'start';
+export const WORKFLOW_START_KEY_PARAM = 'key';
+
+/** First text of a query value (`string`, repeated `string[]`, or a number/boolean given programmatically); null otherwise. */
+function queryText(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? queryText(value[0]) : null;
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return typeof value === 'number' || typeof value === 'boolean' ? String(value) : null;
+}
+
+/** Splits the query of a page into the start link parts (`start`, `key`, the rest). */
+export function workflowStartQuery(query: Readonly<Record<string, unknown>> | null | undefined): WorkflowStartQuery {
+  const values: Record<string, string> = {};
+  let open = false;
+  let key: string | null = null;
+  for (const [name, value] of Object.entries(query ?? {})) {
+    const text = queryText(value);
+    if (text === null) {
+      continue;
+    }
+
+    if (name === WORKFLOW_START_QUERY_PARAM) {
+      open = text === '1' || text.toLowerCase() === 'true';
+    } else if (name === WORKFLOW_START_KEY_PARAM) {
+      key = text.trim() === '' ? null : text.trim();
+    } else {
+      values[name] = text;
+    }
+  }
+
+  return { open, key, values };
+}
+
+/**
+ * Typed value of a query text for a schema property: integer/number → number (invariant, `,` accepted as decimal separator;
+ * integers must be whole), boolean → `true`/`1`/`false`/`0`, string (also enums, dates and string `x-lookup`s) → the text.
+ * undefined when the text does not fit the type or the type is not a scalar (objects/arrays are not taken from URLs).
+ */
+export function schemaQueryValue(property: WorkflowData, text: string): string | number | boolean | undefined {
+  switch (schemaType(property)) {
+    case 'integer': {
+      const number = parseNumber(text);
+      return number !== null && Number.isInteger(number) ? number : undefined;
+    }
+    case 'number':
+      return parseNumber(text) ?? undefined;
+    case 'boolean': {
+      const value = text.trim().toLowerCase();
+      return value === 'true' || value === '1' ? true : value === 'false' || value === '0' ? false : undefined;
+    }
+    case 'string':
+      return text === '' ? undefined : text;
+    default:
+      return undefined;
+  }
+}
+
+/** Start form values taken from query parameters and the names of the parameters that were applied. */
+export interface SchemaQueryValues {
+  data: WorkflowData;
+  names: string[];
+}
+
+/**
+ * Initial value of a schema form from (URL) parameters: only names declared in `schema.properties` are taken, converted by
+ * the property type (`schemaQueryValue`); unknown names and values that do not fit the type are ignored.
+ */
+export function schemaValuesFromQuery(schema: WorkflowData | null | undefined, values: Readonly<Record<string, unknown>> | null | undefined): SchemaQueryValues {
+  const properties = schema?.['properties'];
+  const data: WorkflowData = {};
+  const names: string[] = [];
+  if (!isObject(properties)) {
+    return { data, names };
+  }
+
+  for (const [name, value] of Object.entries(values ?? {})) {
+    const property = Object.hasOwn(properties, name) ? properties[name] : undefined;
+    if (!isObject(property)) {
+      continue;
+    }
+
+    // Every matching start field is reported (also when it is empty or does not fit the type), so the page removes it
+    // from the URL – same as Blazor's WorkflowUi.StartPrefillParameters.
+    names.push(name);
+    const text = queryText(value);
+    if (text === null) {
+      continue;
+    }
+
+    const typed = schemaQueryValue(property, text);
+    if (typed !== undefined) {
+      data[name] = typed;
+    }
+  }
+
+  return { data, names };
 }

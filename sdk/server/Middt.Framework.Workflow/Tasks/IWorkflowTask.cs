@@ -47,6 +47,12 @@ public sealed class WorkflowTaskContext
     public string? RenderText(string configKey) =>
         Config[configKey]?.GetValue<string>() is { } text ? Expressions.RenderText(text, Scope) : null;
 
+    /// <summary>Business key of the instance when the task started (<c>null</c> when it has none).</summary>
+    public string? BusinessKey { get; init; }
+
+    /// <summary>Sets the instance's business key (wired by the engine, see the <c>setKey</c> task).</summary>
+    internal Func<string, CancellationToken, Task>? SetBusinessKey { get; init; }
+
     /// <summary>Starts another workflow (wired by the engine).</summary>
     internal Func<string, JsonObject, string?, CancellationToken, Task<Guid>>? StartWorkflow { get; init; }
 }

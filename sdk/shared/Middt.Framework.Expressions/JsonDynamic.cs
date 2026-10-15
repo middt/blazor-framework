@@ -44,7 +44,9 @@ public sealed class JsonDynamic(JsonObject? node) : DynamicObject
         switch (value.GetValueKind())
         {
             case JsonValueKind.String:
-                return value.GetValue<string>();
+                // Values created from .NET types that serialize as strings (Guid, DateTimeOffset …) are not readable as
+                // string directly: use their JSON text, so e.g. {{ instance.id }} renders the id.
+                return value.TryGetValue<string>(out var text) ? text : JsonSerializer.Deserialize<string>(value.ToJsonString());
             case JsonValueKind.True:
                 return true;
             case JsonValueKind.False:

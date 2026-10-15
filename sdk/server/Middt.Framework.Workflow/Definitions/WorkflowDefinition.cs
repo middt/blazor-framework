@@ -192,7 +192,7 @@ public sealed class InstanceAccessDefinition
 /// </summary>
 public sealed class InputDefinition
 {
-    /// <summary>JSON Schema (subset: type, properties, required, additionalProperties, enum, min/max, minLength/maxLength, pattern, items).</summary>
+    /// <summary>JSON Schema (subset: type, properties, required, additionalProperties, enum, min/max, minLength/maxLength, pattern, items; UI hint x-lookup, see <see cref="Schema.JsonSchemaValidator"/>).</summary>
     public JsonObject? Schema { get; set; }
 
     /// <summary>Data path the validated body is merged into (empty = root).</summary>
@@ -229,7 +229,7 @@ public sealed class InputDefinition
 
 public sealed class TaskDefinition
 {
-    /// <summary>Task type: a built-in (<c>http</c>, <c>set</c>, <c>log</c>, <c>publish</c>, <c>startWorkflow</c>) or an application task.</summary>
+    /// <summary>Task type: a built-in (<c>http</c>, <c>set</c>, <c>log</c>, <c>publish</c>, <c>startWorkflow</c>, <c>setKey</c>) or an application task.</summary>
     public string Task { get; set; } = string.Empty;
 
     /// <summary>Identifies the task in history/incidents (defaults to the task type).</summary>

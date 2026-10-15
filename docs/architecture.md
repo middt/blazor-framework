@@ -78,6 +78,8 @@ in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a compone
 4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; Razor views (`view.component`) have
    Angular counterparts registered with `provideWorkflowViews()`; states with `view.layout` use the layout host;
    unregistered views fall back to the server rendered HTML.
+   Transition input schemas are rendered as forms; a property with `x-lookup` (`entity`, `valueField`, `textField`)
+   becomes a select loaded from the entity's CRUD `getall` endpoint (cached per circuit/page for a minute, capped at 1000 rows) – the engine only checks the hint's shape.
 5. **Editor**: the layout API is frontend independent; both frontends ship an editor.
 
 For a third frontend (e.g. React) repeat 1–4: reuse `@middt/ui-core` and a BFF host built with `AddMiddtSpaBff()`.

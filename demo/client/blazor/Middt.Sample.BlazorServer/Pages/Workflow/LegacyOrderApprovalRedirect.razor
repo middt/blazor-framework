@@ -1,0 +1,14 @@
+@page "/Workflow/OrderApproval"
+
+@* The order approval screen is the generic workflow page now; old links (and the E2E suite) keep working. *@
+
+@code {
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        var query = NavigationManager.ToAbsoluteUri(NavigationManager.Uri).Query;
+        NavigationManager.NavigateTo(MenuService.WorkflowPath("order-approval") + query, replace: true);
+    }
+}

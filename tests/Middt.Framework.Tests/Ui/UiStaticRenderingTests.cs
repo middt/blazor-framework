@@ -334,11 +334,11 @@ public sealed class UiStaticRenderingTests
             .Render(OrderEscalated(), OrderEscalatedVariables(), UiRenderInput.User, CultureInfo.InvariantCulture);
         var text = WebUtility.HtmlDecode(html);
 
-        html.Should().Contain("Sipari&#x15F; #42");
+        text.Should().Contain("Ada <Ltd> siparişi süresi içinde karara bağlanmadığı için eskale edildi.");
         html.Should().Contain("Ada &lt;Ltd&gt;");
         html.Should().Contain("<dd>25,000.00</dd>");
         html.Should().Contain("Skor 72").And.Contain("middt-ui-badge-success").And.NotContain("middt-ui-badge-warning").And.NotContain("middt-ui-badge-danger");
         text.Should().Contain("Yüksek tutar").And.Contain("Durum: Eskale edildi · Akış: order-approval");
-        text.Should().NotContain("Firma bilgileri").And.NotContain("⚠").And.NotContain("Not:").And.NotContain("Ürün grubu");
+        text.Should().NotContain("Firma bilgileri").And.NotContain("⚠").And.NotContain("Not:").And.NotContain("Ürün");
     }
 }

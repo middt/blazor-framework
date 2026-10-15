@@ -228,8 +228,8 @@ A definition ([full example](demo/server/Middt.Sample.Api/Workflows/order-approv
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
 | Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [order-approval.v2.json](demo/server/Middt.Sample.Api/Workflows/order-approval.v2.json) |
-| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body) |
-| Tasks | `onEntry`, `onExit`, `onExecute`; built-ins `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`; custom `IWorkflowTask`; `when` condition |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "name" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
+| Tasks | `onEntry`, `onExit`, `onExecute`; built-ins `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `setKey` (gives the instance its business key once it is known, e.g. `category-{{ data.categoryId }}`; a start with that key then returns the instance); custom `IWorkflowTask`; `when` condition |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
 | Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
@@ -243,8 +243,16 @@ REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
 `Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, start dialog generated from the
 start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
-with a form generated from its input schema) and `JsonSchemaForm`. See `demo/client/blazor/Middt.Sample.BlazorServer/Pages/Workflow/OrderApprovalPage.razor`
-(menu "Sipariş Onayı").
+with a form generated from its input schema) and `JsonSchemaForm`. A schema property with
+`"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "email" }` is rendered as a select of the
+entity's rows (same shape as the layout field `lookup`; the value type follows the property `type`). The demo has one
+generic page per workflow, `/workflow/{key}` (`demo/client/blazor/Middt.Sample.BlazorServer/Pages/Workflow/WorkflowPage.razor`,
+menu group "İş Akışları"); `?start=1` opens the start dialog once (`WorkflowInstanceList.OpenStart`), `key` prefills
+its business key and every other parameter named like a start input property prefills that field (typed by the schema,
+e.g. `/workflow/category-request?start=1&key=category-5&categoryId=5`); nothing starts before "Başlat", and these
+parameters are removed from the URL once the dialog is open. A start with the business key of an existing instance
+returns that instance (200) with `messageList` = `WorkflowEndpoints.ExistingInstanceMessage`; both frontends then show
+"Mevcut akış açıldı" instead of "Akış başlatıldı".
 
 ### Server driven UI (Razor views)
 
@@ -467,7 +475,7 @@ token reuse; personal data is kept out of logs; vulnerable transitive packages a
 
 ## Running the sample
 
-The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the OAuth 2.0 / OpenID Connect identity provider, the API, the Blazor UI and the Angular UI. Both UIs sign in at the identity provider (authorization code + PKCE through their BFF) and the API accepts its access tokens. Inserting a category publishes a `CategoryCreated` event that the API's own handler consumes.
+The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the OAuth 2.0 / OpenID Connect identity provider, the API, the Blazor UI and the Angular UI. Both UIs sign in at the identity provider (authorization code + PKCE through their BFF) and the API accepts its access tokens. Creating a category (category-request workflow) publishes a `CategoryCreated` event that the API's own handler consumes.
 
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
@@ -491,6 +499,47 @@ identity provider: <http://localhost:8083> (login, registration, password reset,
 `/dev/mailbox` for verification codes) · demo users `test@test.com` / `test` (roles `manager`, `ui-admin`, `idp-admin`)
 and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference: <http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
+
+**Linked workflows of the sample.** Every "new record" of the bike store goes through a workflow that writes the
+real BikeStores tables with application tasks (`bike-*`, `demo/server/Middt.Sample.Api/Tasks`). In logical order:
+
+| # | Workflow | Steps | Writes / links |
+|---|---|---|---|
+| 1 | `store-opening` v2 Mağaza açılışı | details → manager approval → lifecycle | `stores`; starts `staff-onboarding` with the new store pre-selected |
+| 2 | `staff-onboarding` v2 Personel alımı | store → person (+ manager) → manager approval → lifecycle | `staffs` |
+| 3 | `category-request` v2 Kategori talebi | name + justification → manager approval → lifecycle | `categories` (+ `CategoryCreated` event) |
+| 4 | `product-launch` v2 Ürün lansmanı | category, brand, price, optional initial stock → price approval above 5.000 TL → lifecycle | `products`; starts `stock-replenishment` for the initial stock |
+| 5 | `stock-replenishment` Stok ikmali | store, product, quantity → manager approval (automatic after 1 minute, immediate for orders) | `stocks` (+quantity) |
+| 6 | `customer-onboarding` v2 Müşteri kaydı | Bireysel/Kurumsal → TCKN or tax number → contact → verification → lifecycle | `customers` |
+| 7 | `order-approval` v3 Sipariş onayı | registered customer → store, product, quantity → credit check → finance/manager/express review | `orders` + `order_items` (status 1); starts `order-fulfillment` |
+| 8 | `order-fulfillment` Sipariş karşılama | stock check (missing stock → `stock-replenishment` subflow) → reserve → picking → shipping → delivered | `stocks` (−quantity), order status 2 → 4, shipped date; cancel returns the stock (status 3) |
+
+Rule violations a user can fix (duplicate e-mail, store without staff, not enough stock) do not fault the instance:
+the task writes the Turkish message to `data.error` and the workflow moves to a "Düzeltme gerekli" step
+(layout `bike-task-error`) that leads back to the form.
+
+**One lifecycle per record.** Stores, staff, categories, products and customers change only through their workflow
+(1–4, 6): their API `insert` / `update` / `delete` answer 403 ("Bu kayıt iş akışı üzerinden değiştirilir."), orders
+(`ViewOrder`) and stocks are read-only too. After the record is created the instance does not finish: `setKey` gives it
+the business key `store-12`, `staff-3`, `category-8`, `product-41` or `customer-1501` and it waits in **Aktif**
+(`active`, current values in `data.store` / `data.staff` / …):
+
+- `request-change` "Değişiklik talebi" (inline form prefilled with the current values) → `change-approval` (manager:
+  `approve-change` → `bike-update-*` → back to `active` with the new values; `reject-change` / `withdraw-change` → `active`
+  unchanged; a rule violation → `change-fix` "Düzeltme gerekli" → `back-to-record`).
+- `request-close` "Kapatma talebi" (reason) → `close-approval` (manager `approve-close` / `reject-close`) →
+  `bike-set-active` false → final state `closed` "Kapatıldı". Closing is a **soft delete** (`active = 0`): existing
+  orders keep the record, lookups (`getall`, the selects of forms and filters) offer active records only, lists
+  (`getitems`) show all with a "Durum" column and filter; new orders, staff of a closed store and products of a closed
+  category are refused with a "… pasif durumda." message. A category with active products cannot be closed.
+- Existing records (the seed has no instances) are **adopted**: the lists' row action "Değişiklik / kapatma" opens
+  `/workflow/<key>?start=1&key=<entity>-<id>&<idField>=<id>`; the start input carries the id (`storeId`, `staffId`,
+  `categoryId`, `productId`, `customerId`), the record is loaded and the instance goes straight to `active` – or to
+  `inactive` "Pasif" for a passive record (`request-reactivate` → `reactivate-approval` → active). Starting again with
+  the same key returns the existing instance.
+
+The stores/categories/products/customers `active` columns are added at API startup (`BikeStoresSchemaUpgrade`,
+idempotent, SQL Server).
 
 ## Development
 

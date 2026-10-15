@@ -8,7 +8,30 @@ export interface MenuItem {
   icon: string;
 }
 
-/** Side menu: fixed entries plus every JSON layout page with a `menu` entry (same as the Blazor sample's MenuService). */
+/** Titled group of menu entries (rendered as a sub header followed by its entries). */
+export interface MenuGroup {
+  name: string;
+  icon: string;
+  items: readonly MenuItem[];
+}
+
+/** The demo workflows, in process order (store → staff → catalog → stock → customers → orders). */
+export const WORKFLOW_MENU: MenuGroup = {
+  name: 'İş Akışları',
+  icon: 'account_tree',
+  items: [
+    { name: 'Mağaza açılışı', path: '/workflow/store-opening', icon: 'storefront' },
+    { name: 'Personel alımı', path: '/workflow/staff-onboarding', icon: 'badge' },
+    { name: 'Kategori talebi', path: '/workflow/category-request', icon: 'category' },
+    { name: 'Ürün lansmanı', path: '/workflow/product-launch', icon: 'new_releases' },
+    { name: 'Stok ikmali', path: '/workflow/stock-replenishment', icon: 'inventory_2' },
+    { name: 'Müşteri kaydı', path: '/workflow/customer-onboarding', icon: 'person_add' },
+    { name: 'Sipariş Onayı', path: '/workflow/order-approval', icon: 'shopping_cart' },
+    { name: 'Sipariş karşılama', path: '/workflow/order-fulfillment', icon: 'local_shipping' },
+  ],
+};
+
+/** Side menu: the workflow group, fixed entries plus every JSON layout page with a `menu` entry (same as the Blazor sample's MenuService). */
 @Injectable({ providedIn: 'root' })
 export class MenuService {
   readonly #ui = inject(UI_API_CLIENT);
@@ -16,10 +39,10 @@ export class MenuService {
   readonly #layoutItems = signal<MenuItem[]>([]);
 
   readonly layoutItems = this.#layoutItems.asReadonly();
+  readonly workflowGroup = WORKFLOW_MENU;
 
   /** Recomputed only when the user (roles) changes, not on every change detection pass. */
   readonly fixedItems = computed<MenuItem[]>(() => [
-    { name: 'Sipariş Onayı', path: '/workflow/order-approval', icon: 'account_tree' },
     ...(this.#auth.hasRole('ui-admin') ? [{ name: 'Ekran Tasarımı', path: '/ui-admin', icon: 'dashboard_customize' }] : []),
   ]);
 

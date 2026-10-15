@@ -34,7 +34,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.BrandName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("brand_name");
             });
 
@@ -44,10 +43,11 @@ namespace Middt.Sample.Api.Model.Database
 
                 entity.Property(e => e.CategoryId).HasColumnName("category_id");
 
+                entity.Property(e => e.Active).HasColumnName("active"); // added by BikeStoresSchemaUpgrade
+
                 entity.Property(e => e.CategoryName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("category_name");
             });
 
@@ -57,47 +57,41 @@ namespace Middt.Sample.Api.Model.Database
 
                 entity.Property(e => e.CustomerId).HasColumnName("customer_id");
 
+                entity.Property(e => e.Active).HasColumnName("active"); // added by BikeStoresSchemaUpgrade
+
                 entity.Property(e => e.City)
                     .HasMaxLength(50)
-                    .IsUnicode(false)
                     .HasColumnName("city");
 
                 entity.Property(e => e.Email)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("email");
 
                 entity.Property(e => e.FirstName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("first_name");
 
                 entity.Property(e => e.LastName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("last_name");
 
                 entity.Property(e => e.Phone)
                     .HasMaxLength(25)
-                    .IsUnicode(false)
                     .HasColumnName("phone");
 
                 entity.Property(e => e.State)
                     .HasMaxLength(25)
-                    .IsUnicode(false)
                     .HasColumnName("state");
 
                 entity.Property(e => e.Street)
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("street");
 
                 entity.Property(e => e.ZipCode)
                     .HasMaxLength(5)
-                    .IsUnicode(false)
                     .HasColumnName("zip_code");
             });
 
@@ -185,6 +179,8 @@ namespace Middt.Sample.Api.Model.Database
 
                 entity.Property(e => e.ProductId).HasColumnName("product_id");
 
+                entity.Property(e => e.Active).HasColumnName("active"); // added by BikeStoresSchemaUpgrade
+
                 entity.Property(e => e.BrandId).HasColumnName("brand_id");
 
                 entity.Property(e => e.CategoryId).HasColumnName("category_id");
@@ -198,7 +194,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.ProductName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("product_name");
 
                 entity.HasOne(d => d.Brand)
@@ -235,26 +230,22 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.Email)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("email");
 
                 entity.Property(e => e.FirstName)
                     .IsRequired()
                     .HasMaxLength(50)
-                    .IsUnicode(false)
                     .HasColumnName("first_name");
 
                 entity.Property(e => e.LastName)
                     .IsRequired()
                     .HasMaxLength(50)
-                    .IsUnicode(false)
                     .HasColumnName("last_name");
 
                 entity.Property(e => e.ManagerId).HasColumnName("manager_id");
 
                 entity.Property(e => e.Phone)
                     .HasMaxLength(25)
-                    .IsUnicode(false)
                     .HasColumnName("phone");
 
                 entity.Property(e => e.StoreId).HasColumnName("store_id");
@@ -300,40 +291,35 @@ namespace Middt.Sample.Api.Model.Database
 
                 entity.Property(e => e.StoreId).HasColumnName("store_id");
 
+                entity.Property(e => e.Active).HasColumnName("active"); // added by BikeStoresSchemaUpgrade
+
                 entity.Property(e => e.City)
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("city");
 
                 entity.Property(e => e.Email)
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("email");
 
                 entity.Property(e => e.Phone)
                     .HasMaxLength(25)
-                    .IsUnicode(false)
                     .HasColumnName("phone");
 
                 entity.Property(e => e.State)
                     .HasMaxLength(10)
-                    .IsUnicode(false)
                     .HasColumnName("state");
 
                 entity.Property(e => e.StoreName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("store_name");
 
                 entity.Property(e => e.Street)
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("street");
 
                 entity.Property(e => e.ZipCode)
                     .HasMaxLength(5)
-                    .IsUnicode(false)
                     .HasColumnName("zip_code");
             });
 
@@ -346,7 +332,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.CustomerFirstName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("customer_first_name");
 
                 entity.Property(e => e.CustomerId).HasColumnName("customer_id");
@@ -354,7 +339,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.CustomerLastName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("customer_last_name");
 
                 entity.Property(e => e.OrderDate)
@@ -368,7 +352,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.StaffFirstName)
                     .IsRequired()
                     .HasMaxLength(50)
-                    .IsUnicode(false)
                     .HasColumnName("staff_first_name");
 
                 entity.Property(e => e.StaffId).HasColumnName("staff_id");
@@ -376,7 +359,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.StaffLastName)
                     .IsRequired()
                     .HasMaxLength(50)
-                    .IsUnicode(false)
                     .HasColumnName("staff_last_name");
 
                 entity.Property(e => e.StoreId).HasColumnName("store_id");
@@ -384,7 +366,6 @@ namespace Middt.Sample.Api.Model.Database
                 entity.Property(e => e.StoreName)
                     .IsRequired()
                     .HasMaxLength(255)
-                    .IsUnicode(false)
                     .HasColumnName("store_name");
             });
 
