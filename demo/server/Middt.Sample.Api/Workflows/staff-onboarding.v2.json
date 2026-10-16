@@ -83,10 +83,22 @@
     },
     {
       "key": "creating", "title": "Personel kaydediliyor",
-      "onEntry": [ { "task": "bike-create-staff", "config": {
-        "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
-        "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
-        "into": "staffId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Staff",
+        "values": {
+          "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
+          "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
+          "active": 1
+        },
+        "uniqueBy": "email",
+        "uniqueError": "{0} e-posta adresiyle kayıtlı bir personel var.",
+        "into": "staffId",
+        "conflictIf": {
+          "entity": "Store",
+          "match": { "storeId": "{{ data.storeId }}", "active": false },
+          "error": "{0} mağazası pasif durumda."
+        }
+      } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "loading", "trigger": "Automatic", "default": true,
@@ -102,7 +114,7 @@
       // Reached after the create task, after every approved change and when an existing record is adopted.
       "key": "loading", "title": "Kayıt yükleniyor",
       "onEntry": [
-        { "task": "bike-load-record", "config": { "entity": "staff", "id": "{{ data.staffId }}", "into": "staff" } },
+        { "task": "entity-load", "config": { "entity": "Staff", "id": "{{ data.staffId }}", "into": "staff" } },
         { "task": "setKey", "when": "data.error == null", "config": { "key": "staff-{{ data.staffId }}" } },
         // Prefill of the change request form: the current values.
         { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.staff" } } }
@@ -155,10 +167,22 @@
     },
     {
       "key": "updating", "title": "Değişiklik kaydediliyor",
-      "onEntry": [ { "task": "bike-update-staff", "config": {
-        "id": "{{ data.staffId }}", "storeId": "{{ data.change.storeId }}", "firstName": "{{ data.change.firstName }}",
-        "lastName": "{{ data.change.lastName }}", "email": "{{ data.change.email }}", "phone": "{{ data.change.phone }}",
-        "managerId": "{{ data.change.managerId }}" } } ],
+      "onEntry": [ { "task": "entity-update", "config": {
+        "entity": "Staff",
+        "id": "{{ data.staffId }}",
+        "values": {
+          "storeId": "{{ data.change.storeId }}", "firstName": "{{ data.change.firstName }}",
+          "lastName": "{{ data.change.lastName }}", "email": "{{ data.change.email }}", "phone": "{{ data.change.phone }}",
+          "managerId": "{{ data.change.managerId }}"
+        },
+        "uniqueBy": "email",
+        "uniqueError": "{0} e-posta adresiyle kayıtlı bir personel var.",
+        "conflictIf": {
+          "entity": "Store",
+          "match": { "storeId": "{{ data.change.storeId }}", "active": false },
+          "error": "{0} mağazası pasif durumda."
+        }
+      } } ],
       "transitions": [
         { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
@@ -186,7 +210,7 @@
     {
       // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
       "key": "closing", "title": "Kayıt kapatılıyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "staff", "id": "{{ data.staffId }}", "active": false } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Staff", "id": "{{ data.staffId }}", "values": { "active": false } } } ],
       "transitions": [
         { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
@@ -217,7 +241,7 @@
     },
     {
       "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "staff", "id": "{{ data.staffId }}", "active": true } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Staff", "id": "{{ data.staffId }}", "values": { "active": true } } } ],
       "transitions": [
         { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }

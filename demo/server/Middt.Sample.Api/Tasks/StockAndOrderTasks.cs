@@ -8,6 +8,8 @@ using Middt.Framework.Workflow.Runtime;
 using Middt.Framework.Workflow.Tasks;
 using Middt.Sample.Api.Model.Database;
 
+using Middt.Framework.Plugin.Rebus;
+
 namespace Middt.Sample.Api.Tasks;
 
 /// <summary>
@@ -276,6 +278,7 @@ internal static class StockNames
 public static class BikeWorkflowTasks
 {
     public static Middt.Framework.Workflow.MiddtWorkflowOptions AddBikeStoreTasks(this Middt.Framework.Workflow.MiddtWorkflowOptions options) => options
+        .AddRebusTasks()
         .AddTask<CreateStoreTask>("bike-create-store")
         .AddTask<CreateStaffTask>("bike-create-staff")
         .AddTask<CreateCategoryTask>("bike-create-category")

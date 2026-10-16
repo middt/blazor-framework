@@ -107,10 +107,16 @@
           "config": { "values": { "customer.firstName": "data.company.companyName", "customer.lastName": "data.company.contactPerson" } } },
         { "task": "set", "when": "data.customerType != \"Kurumsal\"",
           "config": { "values": { "customer.firstName": "data.person.firstName", "customer.lastName": "data.person.lastName" } } },
-        { "task": "bike-create-customer", "config": {
-          "firstName": "{{ data.customer.firstName }}", "lastName": "{{ data.customer.lastName }}",
-          "email": "{{ data.contact.email }}", "phone": "{{ data.contact.phone }}", "street": "{{ data.contact.street }}",
-          "city": "{{ data.contact.city }}", "state": "{{ data.contact.state }}", "zipCode": "{{ data.contact.zipCode }}",
+        { "task": "entity-create", "config": {
+          "entity": "Customer",
+          "values": {
+            "firstName": "{{ data.customer.firstName }}", "lastName": "{{ data.customer.lastName }}",
+            "email": "{{ data.contact.email }}", "phone": "{{ data.contact.phone }}", "street": "{{ data.contact.street }}",
+            "city": "{{ data.contact.city }}", "state": "{{ data.contact.state }}", "zipCode": "{{ data.contact.zipCode }}",
+            "active": true
+          },
+          "uniqueBy": "email",
+          "uniqueError": "{0} e-posta adresiyle kayıtlı bir müşteri var.",
           "into": "customerId" } }
       ],
       "transitions": [

@@ -11,6 +11,7 @@ place that must change and verifies the result.
 | New or changed workflow (definition, views, layouts) | [add-workflow.md](add-workflow.md) |
 | Change the portable expression language | [change-expression-language.md](change-expression-language.md) |
 | Security review checklist for every change | [security-checklist.md](security-checklist.md) |
+| Row-level security & branch authorization best practices | [../row-level-security-best-practices.md](../row-level-security-best-practices.md) |
 | How to test and verify (unit, spec, builds, E2E) | [testing.md](testing.md) |
 | Known pitfalls and how they showed up | [gotchas.md](gotchas.md) |
 

@@ -16,4 +16,9 @@
     <PackageReference Include="Rebus.ServiceProvider" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+    <ProjectReference Include="..\..\Middt.Framework.Workflow\Middt.Framework.Workflow.csproj" />
+  </ItemGroup>
+
 </Project>

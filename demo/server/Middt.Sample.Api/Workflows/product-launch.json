@@ -59,9 +59,20 @@
     },
     {
       "key": "creating", "title": "Ürün oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-product", "config": {
-        "productName": "{{ data.product.productName }}", "brandId": "{{ data.product.brandId }}", "categoryId": "{{ data.product.categoryId }}",
-        "modelYear": "{{ data.product.modelYear }}", "listPrice": "{{ data.product.listPrice }}", "into": "productId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Product",
+        "values": {
+          "productName": "{{ data.product.productName }}", "brandId": "{{ data.product.brandId }}", "categoryId": "{{ data.product.categoryId }}",
+          "modelYear": "{{ data.product.modelYear }}", "listPrice": "{{ data.product.listPrice }}"
+        },
+        "uniqueBy": ["productName", "modelYear"],
+        "into": "productId",
+        "conflictIf": {
+          "entity": "Category",
+          "match": { "categoryId": "{{ data.product.categoryId }}", "active": false },
+          "error": "{0} kategorisi pasif durumda."
+        }
+      } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "launched", "trigger": "Automatic", "default": true }

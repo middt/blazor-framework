@@ -13,25 +13,58 @@ namespace Middt.Framework.Workflow.Definitions;
 /// <summary>Loads, validates and indexes the workflow definitions (all versions).</summary>
 public sealed class WorkflowRegistry
 {
-    private readonly Lazy<IReadOnlyDictionary<string, SortedList<int, WorkflowDefinition>>> definitions;
+    private readonly IServiceProvider services;
+    private readonly IOptions<MiddtWorkflowOptions> options;
+    private readonly WorkflowExpressionEngine expressions;
+    private readonly WorkflowTaskRegistry tasks;
+    private readonly Lock sync = new();
+    private volatile IReadOnlyDictionary<string, SortedList<int, WorkflowDefinition>>? currentDefinitions;
 
     public WorkflowRegistry(IServiceProvider services, IOptions<MiddtWorkflowOptions> options, WorkflowExpressionEngine expressions, WorkflowTaskRegistry tasks)
     {
-        definitions = new(() => Load(services, options.Value, expressions, tasks));
+        this.services = services;
+        this.options = options;
+        this.expressions = expressions;
+        this.tasks = tasks;
+    }
+
+    private IReadOnlyDictionary<string, SortedList<int, WorkflowDefinition>> Definitions
+    {
+        get
+        {
+            if (currentDefinitions is not null)
+            {
+                return currentDefinitions;
+            }
+
+            lock (sync)
+            {
+                return currentDefinitions ??= Load(services, options.Value, expressions, tasks);
+            }
+        }
     }
 
     /// <summary>Loads and validates all definitions; throws <see cref="WorkflowDefinitionException"/> listing every problem.</summary>
-    public void EnsureLoaded() => _ = definitions.Value;
+    public void EnsureLoaded() => _ = Definitions;
 
-    public IEnumerable<WorkflowDefinition> Latest => definitions.Value.Values.Select(v => v.Values[^1]);
+    /// <summary>Reloads definitions from all configured sources at runtime without restarting.</summary>
+    public void Reload()
+    {
+        lock (sync)
+        {
+            currentDefinitions = Load(services, options.Value, expressions, tasks);
+        }
+    }
+
+    public IEnumerable<WorkflowDefinition> Latest => Definitions.Values.Select(v => v.Values[^1]);
 
     public WorkflowDefinition GetLatest(string key) =>
-        definitions.Value.TryGetValue(key, out var versions)
+        Definitions.TryGetValue(key, out var versions)
             ? versions.Values[^1]
             : throw new WorkflowNotFoundException($"Workflow '{key}' does not exist.");
 
     public WorkflowDefinition Get(string key, int version) =>
-        definitions.Value.TryGetValue(key, out var versions) && versions.TryGetValue(version, out var definition)
+        Definitions.TryGetValue(key, out var versions) && versions.TryGetValue(version, out var definition)
             ? definition
             : throw new WorkflowNotFoundException($"Workflow '{key}' version {version} does not exist.");
 
@@ -90,18 +123,64 @@ public sealed class WorkflowRegistry
 /// <summary>Name → task type map (built-ins plus application tasks).</summary>
 public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
 {
-    private static readonly Dictionary<string, Type> BuiltIns = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, Type> BuiltIns = new(StringComparer.OrdinalIgnoreCase)
     {
         ["set"] = typeof(SetTask),
         ["log"] = typeof(LogTask),
         ["http"] = typeof(HttpTask),
+        ["http-request"] = typeof(HttpTask),
+        ["httpRequest"] = typeof(HttpTask),
+        ["rabbitmq"] = typeof(RabbitMqTask),
+        ["rabbit"] = typeof(RabbitMqTask),
+        ["rabbit-publish"] = typeof(RabbitMqTask),
+        ["rabbitPublish"] = typeof(RabbitMqTask),
         ["publish"] = typeof(PublishTask),
         ["startWorkflow"] = typeof(StartWorkflowTask),
+        ["start-workflow"] = typeof(StartWorkflowTask),
         ["setKey"] = typeof(SetKeyTask),
+        ["set-key"] = typeof(SetKeyTask),
+        // Generic DB / Entity tasks
+        ["entity-create"] = typeof(EntityCreateTask),
+        ["entity-insert"] = typeof(EntityCreateTask),
+        ["entityCreate"] = typeof(EntityCreateTask),
+        ["entityInsert"] = typeof(EntityCreateTask),
+        ["entity-update"] = typeof(EntityUpdateTask),
+        ["entityUpdate"] = typeof(EntityUpdateTask),
+        ["entity-load"] = typeof(EntityLoadTask),
+        ["entity-find"] = typeof(EntityLoadTask),
+        ["entityLoad"] = typeof(EntityLoadTask),
+        ["entityFind"] = typeof(EntityLoadTask),
+        ["entity-delete"] = typeof(EntityDeleteTask),
+        ["entityDelete"] = typeof(EntityDeleteTask),
+        ["db-sql"] = typeof(DbSqlTask),
+        ["db-execute"] = typeof(DbSqlTask),
+        ["dbSql"] = typeof(DbSqlTask),
+        ["dbExecute"] = typeof(DbSqlTask),
+        ["db-query"] = typeof(DbQueryTask),
+        ["dbQuery"] = typeof(DbQueryTask),
     };
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type> runtimeCustomTasks = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Registers or overrides a workflow task type at runtime without redeploying or restarting the application.</summary>
+    public void Register(string name, Type taskType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(taskType);
+        if (!typeof(IWorkflowTask).IsAssignableFrom(taskType) || taskType.IsAbstract || !taskType.IsClass)
+        {
+            throw new ArgumentException($"Task type '{taskType.FullName}' must be a non-abstract class implementing {nameof(IWorkflowTask)}.", nameof(taskType));
+        }
+
+        runtimeCustomTasks[name] = taskType;
+    }
+
     public Type? Find(string name) =>
-        options.Value.TaskTypes.TryGetValue(name, out var custom) ? custom : BuiltIns.GetValueOrDefault(name);
+        runtimeCustomTasks.TryGetValue(name, out var runtimeType)
+            ? runtimeType
+            : options.Value.TaskTypes.TryGetValue(name, out var custom)
+                ? custom
+                : BuiltIns.GetValueOrDefault(name);
 
     public IWorkflowTask Resolve(IServiceProvider services, string name) =>
         Find(name) is { } type

@@ -46,10 +46,15 @@
     },
     {
       "key": "creating", "title": "Mağaza oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-store", "config": {
-        "storeName": "{{ data.store.storeName }}", "phone": "{{ data.store.phone }}", "email": "{{ data.store.email }}",
-        "street": "{{ data.store.street }}", "city": "{{ data.store.city }}", "state": "{{ data.store.state }}",
-        "zipCode": "{{ data.store.zipCode }}", "into": "storeId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Store",
+        "values": {
+          "storeName": "{{ data.store.storeName }}", "phone": "{{ data.store.phone }}", "email": "{{ data.store.email }}",
+          "street": "{{ data.store.street }}", "city": "{{ data.store.city }}", "state": "{{ data.store.state }}",
+          "zipCode": "{{ data.store.zipCode }}"
+        },
+        "uniqueBy": "storeName",
+        "into": "storeId" } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "opened", "trigger": "Automatic", "default": true }

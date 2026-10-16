@@ -46,6 +46,7 @@ public static class WorkflowServiceCollectionExtensions
         services.TryAddTransient<SetTask>();
         services.TryAddTransient<LogTask>();
         services.TryAddTransient<HttpTask>();
+        services.TryAddTransient<RabbitMqTask>();
         services.TryAddTransient<PublishTask>();
         services.TryAddTransient<StartWorkflowTask>();
         foreach (var taskType in options.TaskTypes.Values)

@@ -55,11 +55,13 @@ builder.Services.AddMiddtRebus(
     },
     rebus => rebus.Subscribe<CategoryCreated>().Subscribe<WorkflowNotification>());
 builder.Services.AddMiddtRebusHandlersFromAssemblyOf<CategoryCreatedHandler>();
+builder.Services.AddHostedService<RabbitMqQueueInitializer>();
 
 // Workflow engine: JSON definitions from ./Workflows, tables in the "wf" schema of the BikeStores database.
 builder.Services.AddMiddtWorkflow(workflow =>
 {
     workflow.UseDbContext(db => db.UseSqlServer(builder.Configuration.GetConnectionString("BikeStores")));
+    workflow.UseApplicationDbContext<BikeStoresContext>();
     workflow.AutoCreateSchema = true;
     // Raw task errors only in Development (production callers get a generic text; details stay in the logs).
     workflow.ExposeErrorDetails = builder.Environment.IsDevelopment();

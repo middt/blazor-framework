@@ -77,9 +77,20 @@
     },
     {
       "key": "creating", "title": "Ürün oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-product", "config": {
-        "productName": "{{ data.product.productName }}", "brandId": "{{ data.product.brandId }}", "categoryId": "{{ data.product.categoryId }}",
-        "modelYear": "{{ data.product.modelYear }}", "listPrice": "{{ data.product.listPrice }}", "into": "productId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Product",
+        "values": {
+          "productName": "{{ data.product.productName }}", "brandId": "{{ data.product.brandId }}", "categoryId": "{{ data.product.categoryId }}",
+          "modelYear": "{{ data.product.modelYear }}", "listPrice": "{{ data.product.listPrice }}"
+        },
+        "uniqueBy": ["productName", "modelYear"],
+        "into": "productId",
+        "conflictIf": {
+          "entity": "Category",
+          "match": { "categoryId": "{{ data.product.categoryId }}", "active": false },
+          "error": "{0} kategorisi pasif durumda."
+        }
+      } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "launching", "trigger": "Automatic", "default": true }
@@ -109,7 +120,7 @@
       // Reached after the create task, after every approved change and when an existing record is adopted.
       "key": "loading", "title": "Kayıt yükleniyor",
       "onEntry": [
-        { "task": "bike-load-record", "config": { "entity": "product", "id": "{{ data.productId }}", "into": "product" } },
+        { "task": "entity-load", "config": { "entity": "Product", "key": "{{ data.productId }}", "into": "product" } },
         { "task": "setKey", "when": "data.error == null", "config": { "key": "product-{{ data.productId }}" } },
         // Prefill of the change request form: the current values.
         { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.product" } } }
@@ -161,9 +172,12 @@
     },
     {
       "key": "updating", "title": "Değişiklik kaydediliyor",
-      "onEntry": [ { "task": "bike-update-product", "config": {
-        "id": "{{ data.productId }}", "productName": "{{ data.change.productName }}", "brandId": "{{ data.change.brandId }}",
-        "categoryId": "{{ data.change.categoryId }}", "modelYear": "{{ data.change.modelYear }}", "listPrice": "{{ data.change.listPrice }}" } } ],
+      "onEntry": [ { "task": "entity-update", "config": {
+        "entity": "Product", "key": "{{ data.productId }}",
+        "values": {
+          "productName": "{{ data.change.productName }}", "brandId": "{{ data.change.brandId }}",
+          "categoryId": "{{ data.change.categoryId }}", "modelYear": "{{ data.change.modelYear }}", "listPrice": "{{ data.change.listPrice }}"
+        } } } ],
       "transitions": [
         { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
@@ -191,7 +205,7 @@
     {
       // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
       "key": "closing", "title": "Kayıt kapatılıyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "product", "id": "{{ data.productId }}", "active": false } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Product", "key": "{{ data.productId }}", "values": { "active": false } } } ],
       "transitions": [
         { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
@@ -222,7 +236,7 @@
     },
     {
       "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "product", "id": "{{ data.productId }}", "active": true } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Product", "key": "{{ data.productId }}", "values": { "active": true } } } ],
       "transitions": [
         { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }

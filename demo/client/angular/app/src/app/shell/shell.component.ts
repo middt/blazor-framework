@@ -48,6 +48,12 @@ function storedTheme(): string | null {
           @for (item of menu.workflowGroup.items; track item.path) {
             <a mat-list-item class="shell-menu-child" [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>
           }
+          <div mat-subheader class="shell-menu-group">
+            <mat-icon aria-hidden="true">{{ menu.testWorkflowGroup.icon }}</mat-icon>{{ menu.testWorkflowGroup.name }}
+          </div>
+          @for (item of menu.testWorkflowGroup.items; track item.path) {
+            <a mat-list-item class="shell-menu-child" [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>
+          }
           <mat-divider />
           @for (item of menu.layoutItems(); track item.path) {
             <a mat-list-item [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>

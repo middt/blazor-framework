@@ -59,7 +59,7 @@
     },
     {
       "key": "creating", "title": "Kategori oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-category", "config": { "categoryName": "{{ data.category.categoryName }}", "into": "categoryId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": { "entity": "Category", "values": { "categoryName": "{{ data.category.categoryName }}" }, "uniqueBy": "categoryName", "into": "categoryId" } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         // data.category is replaced by the stored record: the justification is kept next to it.
@@ -76,7 +76,7 @@
       // Reached after the create task, after every approved change and when an existing record is adopted.
       "key": "loading", "title": "Kayıt yükleniyor",
       "onEntry": [
-        { "task": "bike-load-record", "config": { "entity": "category", "id": "{{ data.categoryId }}", "into": "category" } },
+        { "task": "entity-load", "config": { "entity": "Category", "key": "{{ data.categoryId }}", "into": "category" } },
         { "task": "setKey", "when": "data.error == null", "config": { "key": "category-{{ data.categoryId }}" } },
         // Prefill of the change request form: the current values.
         { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.category" } } }
@@ -122,7 +122,7 @@
     },
     {
       "key": "updating", "title": "Değişiklik kaydediliyor",
-      "onEntry": [ { "task": "bike-update-category", "config": { "id": "{{ data.categoryId }}", "categoryName": "{{ data.change.categoryName }}" } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Category", "key": "{{ data.categoryId }}", "values": { "categoryName": "{{ data.change.categoryName }}" } } } ],
       "transitions": [
         { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
@@ -150,7 +150,21 @@
     {
       // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
       "key": "closing", "title": "Kayıt kapatılıyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "category", "id": "{{ data.categoryId }}", "active": false } } ],
+      "onEntry": [
+        {
+          "task": "entity-update",
+          "config": {
+            "entity": "Category",
+            "key": "{{ data.categoryId }}",
+            "values": { "active": false },
+            "conflictIf": {
+              "entity": "Product",
+              "match": { "categoryId": "{{ data.categoryId }}", "active": true },
+              "error": "Bu kategoride aktif ürünler var: önce ürünleri kapatın."
+            }
+          }
+        }
+      ],
       "transitions": [
         { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
@@ -181,7 +195,7 @@
     },
     {
       "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "category", "id": "{{ data.categoryId }}", "active": true } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Category", "key": "{{ data.categoryId }}", "values": { "active": true } } } ],
       "transitions": [
         { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }

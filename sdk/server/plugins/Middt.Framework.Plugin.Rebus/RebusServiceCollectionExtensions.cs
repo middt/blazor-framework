@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Middt.Framework.Workflow;
+using Middt.Framework.Workflow.Tasks;
 using Rebus.Config;
 using Rebus.Retry.Simple;
 using Rebus.Routing.TypeBased;
@@ -88,8 +90,31 @@ public static class RebusServiceCollectionExtensions
                 }
             });
 
+        services.TryAddSingleton<IWorkflowRabbitMqPublisher, RebusRabbitMqPublisher>();
+        services.TryAddSingleton<IWorkflowMessagePublisher, RebusMessagePublisher>();
+        services.TryAddTransient<RebusTask>();
+        services.Configure<MiddtWorkflowOptions>(o => o.AddRebusTasks());
+
         return services;
     }
+
+    /// <summary>Registers the Rebus workflow tasks on <see cref="MiddtWorkflowOptions"/>.</summary>
+    public static MiddtWorkflowOptions AddRebusTasks(this MiddtWorkflowOptions options) => options
+        .AddTask<RebusTask>("rebus")
+        .AddTask<RebusTask>("rebus-publish")
+        .AddTask<RebusTask>("rebusPublish")
+        .AddTask<RebusTask>("rebus-send")
+        .AddTask<RebusTask>("rebusSend")
+        .AddTask<RebusTask>("rebus-send-local")
+        .AddTask<RebusTask>("rebusSendLocal")
+        .AddTask<RebusTask>("rebus-defer")
+        .AddTask<RebusTask>("rebusDefer")
+        .AddTask<RebusTask>("rebus-defer-local")
+        .AddTask<RebusTask>("rebusDeferLocal")
+        .AddTask<RebusTask>("rebus-subscribe")
+        .AddTask<RebusTask>("rebusSubscribe")
+        .AddTask<RebusTask>("rebus-unsubscribe")
+        .AddTask<RebusTask>("rebusUnsubscribe");
 
     /// <summary>Registers every <c>IHandleMessages&lt;T&gt;</c> implementation of <typeparamref name="T"/>'s assembly.</summary>
     public static IServiceCollection AddMiddtRebusHandlersFromAssemblyOf<T>(this IServiceCollection services)

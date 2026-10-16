@@ -49,11 +49,81 @@ public sealed class WorkflowBuiltInTaskTests
         }
         """;
 
+    private const string HttpQueryParamsWorkflow = """
+        {
+          "key": "http-query-wf",
+          "start": { "key": "start", "target": "calling",
+                     "input": { "schema": { "type": "object", "properties": { "query": { "type": "string" }, "page": { "type": "integer" } } } } },
+          "states": [
+            { "key": "calling",
+              "onEntry": [
+                {
+                  "task": "http-request",
+                  "config": {
+                    "method": "GET",
+                    "url": "https://scoring.test/search",
+                    "queryParams": { "q": "{{ data.query }}", "page": "{{ data.page }}" },
+                    "headers": { "X-Api-Key": "secret-123" },
+                    "into": "result"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private const string HttpFailOnErrorWorkflow = """
+        {
+          "key": "http-fail-wf",
+          "start": { "key": "start", "target": "calling" },
+          "states": [
+            { "key": "calling",
+              "onEntry": [
+                {
+                  "task": "http",
+                  "config": {
+                    "method": "POST",
+                    "url": "https://scoring.test/fail",
+                    "failOnError": false,
+                    "into": "failResult"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private const string RabbitMqWorkflow = """
+        {
+          "key": "rabbit-wf",
+          "start": { "key": "start", "target": "publishing",
+                     "input": { "schema": { "type": "object", "properties": { "orderId": { "type": "integer" } } } } },
+          "states": [
+            { "key": "publishing", "type": "Finish", "subType": "Success",
+              "onEntry": [
+                {
+                  "task": "rabbitmq",
+                  "config": {
+                    "exchange": "orders.topic",
+                    "routingKey": "order.created.{{ data.orderId }}",
+                    "payload": { "id": "{{ data.orderId }}", "source": "api" },
+                    "headers": { "correlationId": "corr-{{ data.orderId }}" },
+                    "into": "pubResult"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+        """;
+
     private static async Task<(WorkflowTestHost Host, FakeHttpHandler Handler)> HttpHostAsync()
     {
         var handler = new FakeHttpHandler();
         var host = await WorkflowTestHost.StartAsync(
-            [HttpWorkflow, HttpGetWorkflow],
+            [HttpWorkflow, HttpGetWorkflow, HttpQueryParamsWorkflow, HttpFailOnErrorWorkflow],
             services: s => s.AddHttpClient(HttpTask.DefaultClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
         return (host, handler);
     }
@@ -131,6 +201,80 @@ public sealed class WorkflowBuiltInTaskTests
         handler.Requests.Single().Body.Should().BeNull();
         instance.Data["ping"]!["statusCode"]!.GetValue<int>().Should().Be(404);
         instance.Data["ping"]!["body"]!.GetValue<string>().Should().Be("not json");
+    }
+
+    [Fact]
+    public async Task Http_task_supports_query_params_and_custom_headers()
+    {
+        var (host, handler) = await HttpHostAsync();
+        await using var _ = host;
+        handler.ResponseBody = """{ "items": [1, 2, 3] }""";
+
+        var instance = await host.StartInstanceAsync("http-query-wf", new { query = "bikes & parts", page = 2 });
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Active);
+        var req = handler.Requests.Should().ContainSingle().Subject;
+        req.Method.Should().Be(HttpMethod.Get);
+        req.Uri.PathAndQuery.Should().Be("/search?q=bikes%20%26%20parts&page=2");
+        req.Headers["X-Api-Key"].Should().Be("secret-123");
+        instance.Data["result"]!["statusCode"]!.GetValue<int>().Should().Be(200);
+        instance.Data["result"]!["isSuccess"]!.GetValue<bool>().Should().BeTrue();
+        instance.Data["result"]!["body"]!["items"]!.AsArray().Count.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Http_task_with_failOnError_false_records_error_response_without_throwing()
+    {
+        var (host, handler) = await HttpHostAsync();
+        await using var _ = host;
+        handler.StatusCode = HttpStatusCode.BadRequest;
+        handler.ResponseBody = """{ "error": "Invalid request" }""";
+
+        var instance = await host.StartInstanceAsync("http-fail-wf");
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Active);
+        instance.Data["failResult"]!["statusCode"]!.GetValue<int>().Should().Be(400);
+        instance.Data["failResult"]!["isSuccess"]!.GetValue<bool>().Should().BeFalse();
+        instance.Data["failResult"]!["body"]!["error"]!.GetValue<string>().Should().Be("Invalid request");
+    }
+
+    [Fact]
+    public async Task Rabbitmq_task_publishes_message_with_rendered_payload_and_headers()
+    {
+        var rabbitPublisher = new FakeRabbitMqPublisher();
+        await using var host = await WorkflowTestHost.StartAsync([RabbitMqWorkflow], services: s => s.AddSingleton<IWorkflowRabbitMqPublisher>(rabbitPublisher));
+
+        var instance = await host.StartInstanceAsync("rabbit-wf", new { orderId = 105 });
+
+        instance.Status.Should().Be(WorkflowInstanceStatus.Completed);
+        var msg = rabbitPublisher.Published.Should().ContainSingle().Subject;
+        msg.Exchange.Should().Be("orders.topic");
+        msg.RoutingKey.Should().Be("order.created.105");
+        var json = System.Text.Encoding.UTF8.GetString(msg.Body);
+        var payloadObj = JsonNode.Parse(json)!;
+        payloadObj["id"]!.GetValue<long>().Should().Be(105);
+        payloadObj["source"]!.GetValue<string>().Should().Be("api");
+        msg.Headers!["correlationId"]!.ToString().Should().Be("corr-105");
+
+        instance.Data["pubResult"]!["published"]!.GetValue<bool>().Should().BeTrue();
+        instance.Data["pubResult"]!["exchange"]!.GetValue<string>().Should().Be("orders.topic");
+        instance.Data["pubResult"]!["routingKey"]!.GetValue<string>().Should().Be("order.created.105");
+    }
+
+    [Theory]
+    [InlineData("""{ }""", "rabbitmq: either 'exchange' or 'routingKey' (or 'queue') is required.")]
+    [InlineData("""{ "exchange": "ex" }""", "rabbitmq: 'payload' (or 'message' / 'body') is required.")]
+    public async Task Rabbitmq_task_validates_required_configuration(string config, string expectedError)
+    {
+        var definition = $$"""
+            { "key": "bad-rabbit", "start": { "key": "start", "target": "a" },
+              "states": [ { "key": "a", "onEntry": [ { "task": "rabbitmq", "config": {{config}} } ] } ] }
+            """;
+
+        var act = () => WorkflowTestHost.StartAsync(definition);
+
+        (await act.Should().ThrowAsync<Middt.Framework.Workflow.Runtime.WorkflowDefinitionException>())
+            .Which.Errors.Should().Contain(e => e.Contains(expectedError, StringComparison.Ordinal));
     }
 
     [Fact]

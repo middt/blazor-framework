@@ -44,7 +44,11 @@ public sealed class BikeStoreWorkflowTests
             var definitions = Directory.GetFiles(UiSampleLayoutTests.SampleDirectory("Workflows"), "*.json").Select(File.ReadAllText);
             var host = await WorkflowTestHost.StartAsync(
                 definitions,
-                o => o.AddBikeStoreTasks(),
+                o =>
+                {
+                    o.UseApplicationDbContext<BikeStoresContext>();
+                    o.AddBikeStoreTasks();
+                },
                 s =>
                 {
                     s.AddDbContext<BikeStoresContext>(db => db.UseSqlite(connection));

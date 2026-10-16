@@ -41,7 +41,7 @@
     },
     {
       "key": "creating", "title": "Kategori oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-category", "config": { "categoryName": "{{ data.category.categoryName }}", "into": "categoryId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": { "entity": "Category", "values": { "categoryName": "{{ data.category.categoryName }}" }, "uniqueBy": "categoryName", "into": "categoryId" } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "completed", "trigger": "Automatic", "default": true }

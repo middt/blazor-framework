@@ -125,10 +125,16 @@
           "config": { "values": { "customer.firstName": "data.company.companyName", "customer.lastName": "data.company.contactPerson" } } },
         { "task": "set", "when": "data.customerType != \"Kurumsal\"",
           "config": { "values": { "customer.firstName": "data.person.firstName", "customer.lastName": "data.person.lastName" } } },
-        { "task": "bike-create-customer", "config": {
-          "firstName": "{{ data.customer.firstName }}", "lastName": "{{ data.customer.lastName }}",
-          "email": "{{ data.contact.email }}", "phone": "{{ data.contact.phone }}", "street": "{{ data.contact.street }}",
-          "city": "{{ data.contact.city }}", "state": "{{ data.contact.state }}", "zipCode": "{{ data.contact.zipCode }}",
+        { "task": "entity-create", "config": {
+          "entity": "Customer",
+          "values": {
+            "firstName": "{{ data.customer.firstName }}", "lastName": "{{ data.customer.lastName }}",
+            "email": "{{ data.contact.email }}", "phone": "{{ data.contact.phone }}", "street": "{{ data.contact.street }}",
+            "city": "{{ data.contact.city }}", "state": "{{ data.contact.state }}", "zipCode": "{{ data.contact.zipCode }}",
+            "active": true
+          },
+          "uniqueBy": "email",
+          "uniqueError": "{0} e-posta adresiyle kayıtlı bir müşteri var.",
           "into": "customerId" } }
       ],
       "transitions": [
@@ -146,7 +152,7 @@
       // Reached after the create task, after every approved change and when an existing record is adopted.
       "key": "loading", "title": "Kayıt yükleniyor",
       "onEntry": [
-        { "task": "bike-load-record", "config": { "entity": "customer", "id": "{{ data.customerId }}", "into": "customer" } },
+        { "task": "entity-load", "config": { "entity": "Customer", "id": "{{ data.customerId }}", "into": "customer" } },
         { "task": "setKey", "when": "data.error == null", "config": { "key": "customer-{{ data.customerId }}" } },
         // Prefill of the change request form: the current values.
         { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.customer" } } }
@@ -199,10 +205,17 @@
     },
     {
       "key": "updating", "title": "Değişiklik kaydediliyor",
-      "onEntry": [ { "task": "bike-update-customer", "config": {
-        "id": "{{ data.customerId }}", "firstName": "{{ data.change.firstName }}", "lastName": "{{ data.change.lastName }}",
-        "email": "{{ data.change.email }}", "phone": "{{ data.change.phone }}", "street": "{{ data.change.street }}",
-        "city": "{{ data.change.city }}", "state": "{{ data.change.state }}", "zipCode": "{{ data.change.zipCode }}" } } ],
+      "onEntry": [ { "task": "entity-update", "config": {
+        "entity": "Customer",
+        "id": "{{ data.customerId }}",
+        "values": {
+          "firstName": "{{ data.change.firstName }}", "lastName": "{{ data.change.lastName }}",
+          "email": "{{ data.change.email }}", "phone": "{{ data.change.phone }}", "street": "{{ data.change.street }}",
+          "city": "{{ data.change.city }}", "state": "{{ data.change.state }}", "zipCode": "{{ data.change.zipCode }}"
+        },
+        "uniqueBy": "email",
+        "uniqueError": "{0} e-posta adresiyle kayıtlı bir müşteri var."
+      } } ],
       "transitions": [
         { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
@@ -230,7 +243,7 @@
     {
       // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
       "key": "closing", "title": "Kayıt kapatılıyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "customer", "id": "{{ data.customerId }}", "active": false } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Customer", "id": "{{ data.customerId }}", "values": { "active": false } } } ],
       "transitions": [
         { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
@@ -261,7 +274,7 @@
     },
     {
       "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "customer", "id": "{{ data.customerId }}", "active": true } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Customer", "id": "{{ data.customerId }}", "values": { "active": true } } } ],
       "transitions": [
         { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }

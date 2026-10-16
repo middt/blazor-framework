@@ -68,10 +68,22 @@
     },
     {
       "key": "creating", "title": "Personel kaydediliyor",
-      "onEntry": [ { "task": "bike-create-staff", "config": {
-        "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
-        "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
-        "into": "staffId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Staff",
+        "values": {
+          "storeId": "{{ data.storeId }}", "firstName": "{{ data.staff.firstName }}", "lastName": "{{ data.staff.lastName }}",
+          "email": "{{ data.staff.email }}", "phone": "{{ data.staff.phone }}", "managerId": "{{ data.staff.managerId }}",
+          "active": 1
+        },
+        "uniqueBy": "email",
+        "uniqueError": "{0} e-posta adresiyle kayıtlı bir personel var.",
+        "into": "staffId",
+        "conflictIf": {
+          "entity": "Store",
+          "match": { "storeId": "{{ data.storeId }}", "active": false },
+          "error": "{0} mağazası pasif durumda."
+        }
+      } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "hired", "trigger": "Automatic", "default": true }

@@ -64,10 +64,15 @@
     },
     {
       "key": "creating", "title": "Mağaza oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-store", "config": {
-        "storeName": "{{ data.store.storeName }}", "phone": "{{ data.store.phone }}", "email": "{{ data.store.email }}",
-        "street": "{{ data.store.street }}", "city": "{{ data.store.city }}", "state": "{{ data.store.state }}",
-        "zipCode": "{{ data.store.zipCode }}", "into": "storeId" } } ],
+      "onEntry": [ { "task": "entity-create", "config": {
+        "entity": "Store",
+        "values": {
+          "storeName": "{{ data.store.storeName }}", "phone": "{{ data.store.phone }}", "email": "{{ data.store.email }}",
+          "street": "{{ data.store.street }}", "city": "{{ data.store.city }}", "state": "{{ data.store.state }}",
+          "zipCode": "{{ data.store.zipCode }}"
+        },
+        "uniqueBy": "storeName",
+        "into": "storeId" } } ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "opening", "trigger": "Automatic", "default": true }
@@ -93,7 +98,7 @@
       // Reached after the create task, after every approved change and when an existing record is adopted.
       "key": "loading", "title": "Kayıt yükleniyor",
       "onEntry": [
-        { "task": "bike-load-record", "config": { "entity": "store", "id": "{{ data.storeId }}", "into": "store" } },
+        { "task": "entity-load", "config": { "entity": "Store", "key": "{{ data.storeId }}", "into": "store" } },
         { "task": "setKey", "when": "data.error == null", "config": { "key": "store-{{ data.storeId }}" } },
         // Prefill of the change request form: the current values.
         { "task": "set", "when": "data.error == null", "config": { "values": { "change": "data.store" } } }
@@ -145,10 +150,13 @@
     },
     {
       "key": "updating", "title": "Değişiklik kaydediliyor",
-      "onEntry": [ { "task": "bike-update-store", "config": {
-        "id": "{{ data.storeId }}", "storeName": "{{ data.change.storeName }}", "phone": "{{ data.change.phone }}",
-        "email": "{{ data.change.email }}", "street": "{{ data.change.street }}", "city": "{{ data.change.city }}",
-        "state": "{{ data.change.state }}", "zipCode": "{{ data.change.zipCode }}" } } ],
+      "onEntry": [ { "task": "entity-update", "config": {
+        "entity": "Store", "key": "{{ data.storeId }}",
+        "values": {
+          "storeName": "{{ data.change.storeName }}", "phone": "{{ data.change.phone }}",
+          "email": "{{ data.change.email }}", "street": "{{ data.change.street }}", "city": "{{ data.change.city }}",
+          "state": "{{ data.change.state }}", "zipCode": "{{ data.change.zipCode }}"
+        } } } ],
       "transitions": [
         { "key": "update-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "updated", "target": "loading", "trigger": "Automatic", "default": true,
@@ -176,7 +184,7 @@
     {
       // Soft delete: the record stays (orders keep referencing it) but is no longer offered in lookups.
       "key": "closing", "title": "Kayıt kapatılıyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "store", "id": "{{ data.storeId }}", "active": false } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Store", "key": "{{ data.storeId }}", "values": { "active": false } } } ],
       "transitions": [
         { "key": "close-failed", "target": "change-fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "deactivated", "target": "closed", "trigger": "Automatic", "default": true }
@@ -207,7 +215,7 @@
     },
     {
       "key": "reactivating", "title": "Kayıt etkinleştiriliyor",
-      "onEntry": [ { "task": "bike-set-active", "config": { "entity": "store", "id": "{{ data.storeId }}", "active": true } } ],
+      "onEntry": [ { "task": "entity-update", "config": { "entity": "Store", "key": "{{ data.storeId }}", "values": { "active": true } } } ],
       "transitions": [
         { "key": "reactivate-failed", "target": "not-found", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "reactivated", "target": "loading", "trigger": "Automatic", "default": true }

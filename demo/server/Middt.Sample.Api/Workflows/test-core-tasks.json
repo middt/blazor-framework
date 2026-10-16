@@ -1,0 +1,97 @@
+{
+  "key": "test-core-tasks",
+  "version": 1,
+  "title": "Temel Görevler Test Akışı (set, log, setKey, startWorkflow)",
+  "start": {
+    "key": "start",
+    "target": "compute",
+    "input": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "amount": { "type": "number" }
+        }
+      }
+    }
+  },
+  "states": [
+    {
+      "key": "compute",
+      "title": "Hesaplama ve Log",
+      "onEntry": [
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "Temel görevler testi başladı. Kod: {{ data.code }}, Tutar: {{ data.amount }}"
+          }
+        },
+        {
+          "task": "set",
+          "config": {
+            "values": {
+              "taxRate": "0.20",
+              "taxAmount": "data.amount * 0.20",
+              "totalWithTax": "data.amount * 1.20",
+              "isLargeOrder": "data.amount > 5000",
+              "computedAt": "now"
+            }
+          }
+        },
+        {
+          "task": "setKey",
+          "config": {
+            "key": "test-core-{{ data.code }}"
+          }
+        },
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "Hesaplama tamamlandı. KDV'li Toplam: {{ data.totalWithTax }}"
+          }
+        }
+      ],
+      "transitions": [
+        { "key": "to-subflow", "target": "run-subflow", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "run-subflow",
+      "title": "Alt Akış Başlatma",
+      "onEntry": [
+        {
+          "task": "startWorkflow",
+          "config": {
+            "workflow": "credit-check",
+            "key": "credit-{{ data.code }}",
+            "data": {
+              "amount": "{{ data.totalWithTax }}",
+              "customerType": "Bireysel"
+            },
+            "into": "subflowInstanceId"
+          }
+        }
+      ],
+      "transitions": [
+        { "key": "finish", "target": "completed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "completed",
+      "title": "Tamamlandı",
+      "type": "Finish",
+      "subType": "Success",
+      "onEntry": [
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "Temel görevler testi başarıyla tamamlandı. Alt akış ID: {{ data.subflowInstanceId }}"
+          }
+        }
+      ]
+    }
+  ]
+}

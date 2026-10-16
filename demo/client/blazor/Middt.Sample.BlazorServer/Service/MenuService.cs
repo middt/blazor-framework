@@ -24,6 +24,15 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
         ("order-fulfillment", "Sipariş karşılama", "local_shipping"),
     ];
 
+    /// <summary>Test workflows covering all workflow tasks (core, entity, http, messaging).</summary>
+    public static readonly IReadOnlyList<(string Key, string Name, string Icon)> TestWorkflows =
+    [
+        ("test-core-tasks", "Temel Görevler Testi", "play_arrow"),
+        ("test-entity-tasks", "Entity / DB Testi", "storage"),
+        ("test-http-tasks", "Dış Servis / HTTP Testi", "http"),
+        ("test-messaging-tasks", "Mesajlaşma Testi", "send"),
+    ];
+
     private static readonly MenuItem Designer = new() { Name = "Ekran Tasarımı", Path = "/ui-admin", Icon = "dashboard_customize", Title = "Ekran Tasarımı" };
 
     // Per circuit (scoped service): the group's Expanded state is mutable.
@@ -36,11 +45,20 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
         Children = [.. Workflows.Select(w => new MenuItem { Name = w.Name, Path = WorkflowPath(w.Key), Icon = w.Icon, Title = w.Name })],
     };
 
+    private readonly MenuItem testWorkflowGroup = new()
+    {
+        Name = "Test Akışları",
+        Path = "/workflow/test-core-tasks",
+        Icon = "science",
+        Expanded = true,
+        Children = [.. TestWorkflows.Select(w => new MenuItem { Name = w.Name, Path = WorkflowPath(w.Key), Icon = w.Icon, Title = w.Name })],
+    };
+
     private IReadOnlyList<MenuItem> layoutItems = [];
 
     public event Action? Changed;
 
-    public IReadOnlyList<MenuItem> MenuItems => [Home, workflowGroup, .. layoutItems, Designer];
+    public IReadOnlyList<MenuItem> MenuItems => [Home, workflowGroup, testWorkflowGroup, .. layoutItems, Designer];
 
     /// <summary>Route of the generic workflow page.</summary>
     public static string WorkflowPath(string key) => $"/workflow/{key}";

@@ -386,6 +386,24 @@ public sealed class FakePublisher : IWorkflowMessagePublisher
     }
 }
 
+public sealed class FakeRabbitMqPublisher : IWorkflowRabbitMqPublisher
+{
+    public ConcurrentQueue<(string Exchange, string RoutingKey, byte[] Body, IDictionary<string, object?>? Headers, string? ContentType, bool Persistent)> Published { get; } = new();
+
+    public Task PublishAsync(
+        string exchange,
+        string routingKey,
+        ReadOnlyMemory<byte> body,
+        IDictionary<string, object?>? headers = null,
+        string? contentType = "application/json",
+        bool persistent = true,
+        CancellationToken cancellationToken = default)
+    {
+        Published.Enqueue((exchange, routingKey, body.ToArray(), headers, contentType, persistent));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Records requests and answers with a configurable response.</summary>
 public sealed class FakeHttpHandler : HttpMessageHandler
 {

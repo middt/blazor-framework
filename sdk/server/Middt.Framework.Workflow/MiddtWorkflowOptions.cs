@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Middt.Framework.Workflow.Tasks;
 
 namespace Middt.Framework.Workflow;
@@ -48,13 +49,37 @@ public sealed class MiddtWorkflowOptions
 
     internal List<Func<IServiceProvider, IEnumerable<(string Source, string Json)>>> DefinitionSources { get; } = [];
 
-    internal Dictionary<string, Type> TaskTypes { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, Type> TaskTypes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    internal Dictionary<string, Type> ViewTypes { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, Type> ViewTypes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public MiddtWorkflowOptions UseDbContext(Action<DbContextOptionsBuilder> configure)
     {
         ConfigureDbContext = configure;
+        return this;
+    }
+
+    /// <summary>Types of application DbContexts used by generic entity workflow tasks (<c>entity-create</c>, <c>entity-update</c>, etc.).</summary>
+    public List<Type> ApplicationDbContextTypes { get; } = [];
+
+    /// <summary>Registers an application DbContext type used by generic entity workflow tasks.</summary>
+    public MiddtWorkflowOptions UseApplicationDbContext<TDbContext>() where TDbContext : DbContext =>
+        UseApplicationDbContext(typeof(TDbContext));
+
+    /// <summary>Registers an application DbContext type used by generic entity workflow tasks.</summary>
+    public MiddtWorkflowOptions UseApplicationDbContext(Type dbContextType)
+    {
+        ArgumentNullException.ThrowIfNull(dbContextType);
+        if (!typeof(DbContext).IsAssignableFrom(dbContextType))
+        {
+            throw new ArgumentException($"Type '{dbContextType.FullName}' must inherit from {nameof(DbContext)}.", nameof(dbContextType));
+        }
+
+        if (!ApplicationDbContextTypes.Contains(dbContextType))
+        {
+            ApplicationDbContextTypes.Add(dbContextType);
+        }
+
         return this;
     }
 
@@ -65,7 +90,7 @@ public sealed class MiddtWorkflowOptions
         {
             var root = Path.IsPathRooted(directory)
                 ? directory
-                : Path.Combine(sp.GetService<Microsoft.Extensions.Hosting.IHostEnvironment>()?.ContentRootPath ?? AppContext.BaseDirectory, directory);
+                : Path.Combine(sp.GetService<IHostEnvironment>()?.ContentRootPath ?? AppContext.BaseDirectory, directory);
 
             return Directory.Exists(root)
                 ? Directory.EnumerateFiles(root, "*.json", SearchOption.AllDirectories).Select(f => (f, File.ReadAllText(f)))
@@ -111,9 +136,20 @@ public sealed class MiddtWorkflowOptions
 
     /// <summary>Registers an application task usable in definitions as <c>"task": "<paramref name="name"/>"</c>.</summary>
     public MiddtWorkflowOptions AddTask<TTask>(string name)
-        where TTask : class, IWorkflowTask
+        where TTask : class, IWorkflowTask =>
+        AddTask(name, typeof(TTask));
+
+    /// <summary>Registers an application task type usable in definitions as <c>"task": "<paramref name="name"/>"</c>.</summary>
+    public MiddtWorkflowOptions AddTask(string name, Type taskType)
     {
-        TaskTypes[name] = typeof(TTask);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(taskType);
+        if (!typeof(IWorkflowTask).IsAssignableFrom(taskType) || taskType.IsAbstract || !taskType.IsClass)
+        {
+            throw new ArgumentException($"Task type '{taskType.FullName}' must be a non-abstract class implementing {nameof(IWorkflowTask)}.", nameof(taskType));
+        }
+
+        TaskTypes[name] = taskType;
         return this;
     }
 }
