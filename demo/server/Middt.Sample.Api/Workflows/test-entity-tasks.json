@@ -1,4 +1,6 @@
 {
+  // Demonstrates generic tasks by creating and deleting a brand. For durable business writes use an idempotent
+  // application task or a unique business key: the workflow transaction cannot roll back an external DbContext.
   "key": "test-entity-tasks",
   "version": 1,
   "title": "Veritabanı ve Entity Görevleri Test Akışı",

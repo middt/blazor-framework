@@ -65,18 +65,27 @@ public sealed partial class BffTokenAccessor(IServerTokenStore store, ITokenServ
             return accessToken;
         }
 
-        var refresh = Refreshes.GetOrAdd(sessionId, _ => new Lazy<Task<SaveTokenResponseModel?>>(() => RefreshAsync(sessionId, tokens)));
-        try
+        var refresh = Refreshes.GetOrAdd(sessionId, id =>
         {
-            return (await refresh.Value.WaitAsync(cancellationToken))?.access_token;
-        }
-        finally
-        {
-            if (refresh.Value.IsCompleted)
+            Lazy<Task<SaveTokenResponseModel?>>? lazy = null;
+            lazy = new Lazy<Task<SaveTokenResponseModel?>>(async () =>
             {
-                Refreshes.TryRemove(new KeyValuePair<string, Lazy<Task<SaveTokenResponseModel?>>>(sessionId, refresh));
-            }
-        }
+                try
+                {
+                    return await RefreshAsync(id, tokens);
+                }
+                finally
+                {
+                    if (lazy is not null)
+                    {
+                        Refreshes.TryRemove(new KeyValuePair<string, Lazy<Task<SaveTokenResponseModel?>>>(id, lazy));
+                    }
+                }
+            });
+            return lazy;
+        });
+
+        return (await refresh.Value.WaitAsync(cancellationToken))?.access_token;
     }
 
     private bool ExpiresSoon(string accessToken)

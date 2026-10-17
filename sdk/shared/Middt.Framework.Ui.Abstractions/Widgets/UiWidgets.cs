@@ -238,6 +238,17 @@ public static partial class UiWidgets
             if (field["lookup"] is JsonObject lookup)
             {
                 ValidateEntity(lookup["entity"] is JsonValue e && e.TryGetValue<string>(out var entity) ? entity : null, $"{path}[{i}].lookup.entity", errors);
+                if (lookup["valueField"] is JsonValue vf && vf.TryGetValue<string>(out var valueField) && !FieldNameRegex().IsMatch(valueField))
+                {
+                    errors.Add($"{path}[{i}].lookup.valueField: invalid field name '{valueField}'.");
+                }
+
+                if (lookup["textField"] is JsonValue tf && tf.TryGetValue<string>(out var textField) && !FieldNameRegex().IsMatch(textField))
+                {
+                    errors.Add($"{path}[{i}].lookup.textField: invalid field name '{textField}'.");
+                }
+
+                ValidateFieldNames(lookup["columns"] as JsonArray, "field", $"{path}[{i}].lookup.columns", errors);
                 ValidateFields(lookup["search"] as JsonArray, $"{path}[{i}].lookup.search", errors);
             }
         }

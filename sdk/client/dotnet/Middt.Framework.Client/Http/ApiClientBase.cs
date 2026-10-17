@@ -103,19 +103,27 @@ public abstract class ApiClientBase(
 
         // Refresh tokens are single use (rotation + reuse detection on the API): concurrent 401s of the same
         // session must share one refresh call, otherwise the second call would revoke the whole session.
-        var inflight = InflightRefreshes.GetOrAdd(refreshToken, _ => new Lazy<Task<bool>>(() => RefreshAsync(token, refreshToken)));
-        var refresh = inflight.Value;
-        try
+        var inflight = InflightRefreshes.GetOrAdd(refreshToken, key =>
         {
-            return await refresh.WaitAsync(cancellationToken);
-        }
-        finally
-        {
-            if (refresh.IsCompleted)
+            Lazy<Task<bool>>? lazy = null;
+            lazy = new Lazy<Task<bool>>(async () =>
             {
-                InflightRefreshes.TryRemove(new KeyValuePair<string, Lazy<Task<bool>>>(refreshToken, inflight));
-            }
-        }
+                try
+                {
+                    return await RefreshAsync(token, key);
+                }
+                finally
+                {
+                    if (lazy is not null)
+                    {
+                        InflightRefreshes.TryRemove(new KeyValuePair<string, Lazy<Task<bool>>>(key, lazy));
+                    }
+                }
+            });
+            return lazy;
+        });
+
+        return await inflight.Value.WaitAsync(cancellationToken);
     }
 
     private async Task<bool> RefreshAsync(string token, string refreshToken)
@@ -189,4 +197,18 @@ public abstract class ApiClientBase(
     protected static TResponse Failure<TResponse>(params string[] messages)
         where TResponse : BaseResponseModel, new() =>
         new() { Result = ResultEnum.Error, MessageList = [.. messages] };
+
+    /// <summary>
+    /// Encodes a single URI path segment while rejecting empty strings and dot segments (<c>.</c>, <c>..</c>)
+    /// that <see cref="Uri.EscapeDataString"/> leaves unescaped and that would collapse path segments.
+    /// </summary>
+    protected static string EscapePathSegment(string value, string paramName)
+    {
+        if (string.IsNullOrEmpty(value) || value is "." or "..")
+        {
+            throw new ArgumentException($"Invalid {paramName}.", paramName);
+        }
+
+        return Uri.EscapeDataString(value);
+    }
 }

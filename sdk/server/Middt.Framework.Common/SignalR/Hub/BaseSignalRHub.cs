@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Middt.Framework.Model.SignalR;
 
@@ -10,6 +11,7 @@ namespace Middt.Framework.Common.SignalR;
 /// specific users (by <see cref="ClaimTypes.NameIdentifier"/>) or groups.
 /// Scale out with a backplane (e.g. <c>AddSignalR().AddStackExchangeRedis()</c>).
 /// </summary>
+[Authorize]
 public class BaseSignalRHub<TModel> : Hub<IBaseSignalRClient<TModel>>, IBaseSignalRHub<TModel>
 {
     protected ClaimsPrincipal? CurrentUser => Context.User;
@@ -20,6 +22,10 @@ public class BaseSignalRHub<TModel> : Hub<IBaseSignalRClient<TModel>>, IBaseSign
         CurrentUser?.FindFirst(ClaimTypes.Sid) is { } claim && int.TryParse(claim.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id)
             ? id
             : -1;
+
+    /// <summary>Subject identifier (<see cref="ClaimTypes.Sid"/> or <see cref="ClaimTypes.NameIdentifier"/>), regardless of whether it is numeric or a GUID/string.</summary>
+    public string? SubjectId =>
+        CurrentUser?.FindFirst(ClaimTypes.Sid)?.Value ?? CurrentUser?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
     public IReadOnlyList<string> UserRoles =>
         CurrentUser?.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList() ?? [];

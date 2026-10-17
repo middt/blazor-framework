@@ -126,7 +126,7 @@ else
         {
             var scopes = sp.GetRequiredService<IOpenIddictScopeManager>();
             var names = new HashSet<string>(ClientSettings.StandardScopes, StringComparer.Ordinal);
-            await foreach (var scope in scopes.ListAsync(500, 0))
+            foreach (var scope in await scopes.ListAsync(500, 0).ToListAsync())
             {
                 if (await scopes.GetNameAsync(scope) is { Length: > 0 } name)
                 {

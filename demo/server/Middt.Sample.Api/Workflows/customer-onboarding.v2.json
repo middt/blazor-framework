@@ -1,7 +1,7 @@
 {
   // 6/8 and the lifecycle of a customer (one instance per customer, business key "customer-<id>"): Bireysel / Kurumsal →
-  // identity (TCKN) or company (tax number) → contact & address → verification by a manager → bike-create-customer
-  // (customers table) → "active": change requests (bike-update-customer) and the close request (bike-set-active false:
+  // identity (TCKN) or company (tax number) → contact & address → verification by a manager → entity-create
+  // (customers table) → "active": change requests (entity-update) and the close request (entity-update false:
   // no new orders, existing orders stay). Started with a customerId it adopts that customer.
   "key": "customer-onboarding",
   "version": 2,

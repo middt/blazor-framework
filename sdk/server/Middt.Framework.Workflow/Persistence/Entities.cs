@@ -82,6 +82,12 @@ public enum WorkflowJobKind
 
     /// <summary>Resume a parent whose subflow finished while the parent was busy.</summary>
     ResumeParent,
+
+    /// <summary>Cancel a child after its parent commits a cancellation transition.</summary>
+    CancelChild,
+
+    /// <summary>Deliver an event committed with the workflow state.</summary>
+    Event,
 }
 
 /// <summary>Durable timer / deferred work item processed by <c>WorkflowJobProcessor</c>.</summary>

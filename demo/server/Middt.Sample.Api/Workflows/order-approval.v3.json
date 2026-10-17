@@ -1,7 +1,7 @@
 {
   // v3 (7/8 of the bike store chain): a registered customer (customer-onboarding) → store, product, quantity, delivery →
-  // bike-load-order-info (amount = list price × quantity) → credit check → finance / manager / express review or auto
-  // approval → bike-create-order (orders + order_items, status 1) → starts order-fulfillment. Rejected: no order.
+  // db-query + set (amount = list price × quantity) → credit check → finance / manager / express review or auto
+  // approval → entity-create (orders + order_items, status 1) → starts order-fulfillment. Rejected: no order.
   // Instances started with v1 / v2 keep running on order-approval.json / order-approval.v2.json.
   // Data keys read by the order views: orderId, customerName, customerType, email, amount, product, deliveryType, note,
   // requestedBy, requestedAt, credit.*, review.*.
@@ -53,8 +53,23 @@
     },
     {
       "key": "pricing", "title": "Fiyatlandırma",
-      "onEntry": [ { "task": "bike-load-order-info", "config": {
-        "customerId": "{{ data.customerId }}", "storeId": "{{ data.storeId }}", "productId": "{{ data.productId }}", "quantity": "{{ data.quantity }}" } } ],
+      "onEntry": [
+        { "task": "db-query", "config": {
+          "sql": "SELECT c.first_name AS firstName, c.last_name AS lastName, c.email AS email, c.active AS customerActive, p.product_name AS product, p.list_price AS listPrice, p.active AS productActive, s.store_name AS storeName, s.active AS storeActive FROM customers c CROSS JOIN products p CROSS JOIN stores s WHERE c.customer_id = {0} AND p.product_id = {1} AND s.store_id = {2}",
+          "parameters": ["{{ data.customerId }}", "{{ data.productId }}", "{{ data.storeId }}"], "into": "orderInfo" } },
+        { "task": "set", "when": "data.orderInfo[0] == null", "config": { "values": { "error": "\"Seçilen müşteri, ürün veya mağaza bulunamadı ya da pasif durumda.\"" } } },
+        { "task": "set", "when": "data.orderInfo[0] != null && data.orderInfo[0].customerActive == 0", "config": { "values": {
+          "error": "\"Müşteri \" + data.orderInfo[0].firstName + \" \" + data.orderInfo[0].lastName + \" pasif durumda.\"" } } },
+        { "task": "set", "when": "data.orderInfo[0] != null && data.orderInfo[0].customerActive != 0 && data.orderInfo[0].productActive == 0", "config": { "values": {
+          "error": "\"\\\"\" + data.orderInfo[0].product + \"\\\" ürünü pasif durumda.\"" } } },
+        { "task": "set", "when": "data.orderInfo[0] != null && data.orderInfo[0].customerActive != 0 && data.orderInfo[0].productActive != 0 && data.orderInfo[0].storeActive == 0", "config": { "values": {
+          "error": "data.orderInfo[0].storeName + \" mağazası pasif durumda.\"" } } },
+        { "task": "set", "when": "data.orderInfo[0] != null && data.orderInfo[0].customerActive != 0 && data.orderInfo[0].productActive != 0 && data.orderInfo[0].storeActive != 0", "config": { "values": {
+          "error": "null", "customerName": "data.orderInfo[0].firstName + \" \" + data.orderInfo[0].lastName",
+          "email": "data.orderInfo[0].email", "product": "data.orderInfo[0].product",
+          "storeName": "data.orderInfo[0].storeName", "listPrice": "data.orderInfo[0].listPrice",
+          "amount": "data.orderInfo[0].listPrice * data.quantity" } } }
+      ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "priced", "target": "credit-check", "trigger": "Automatic", "default": true }
@@ -136,10 +151,21 @@
     },
     {
       "key": "creating-order", "title": "Sipariş oluşturuluyor",
-      "onEntry": [ { "task": "bike-create-order", "config": {
-        "customerId": "{{ data.customerId }}", "storeId": "{{ data.storeId }}", "productId": "{{ data.productId }}",
-        "quantity": "{{ data.quantity }}", "listPrice": "{{ data.listPrice }}",
-        "requiredInDays": "{{ data.deliveryType == \"Ekspres\" ? 2 : 7 }}", "into": "orderId" } } ],
+      "onEntry": [
+        { "task": "db-query", "config": {
+          "sql": "SELECT COALESCE(MIN(CASE WHEN manager_id IS NULL THEN staff_id END), MIN(staff_id)) FROM staffs WHERE store_id = {0} AND active = 1",
+          "parameters": ["{{ data.storeId }}"], "singleValue": true, "into": "staffId" } },
+        { "task": "set", "when": "data.staffId == null", "config": { "values": { "error": "data.storeName + \" mağazasında aktif personel yok: önce personel alımı akışıyla personel ekleyin.\"" } } },
+        { "task": "entity-create", "when": "data.error == null", "config": {
+          "entity": "Order", "into": "orderId", "values": {
+            "CustomerId": "{{ data.customerId }}", "StoreId": "{{ data.storeId }}", "StaffId": "{{ data.staffId }}",
+            "OrderStatus": 1, "OrderDate": "{{ data.requestedAt }}", "RequiredDate": "{{ data.requestedAt }}"
+          },
+          "dateOffsets": { "RequiredDate": "{{ data.deliveryType == \"Ekspres\" ? 2 : 7 }}" },
+          "children": { "OrderItems": [ { "ItemId": 1, "ProductId": "{{ data.productId }}",
+            "Quantity": "{{ data.quantity }}", "ListPrice": "{{ data.listPrice }}", "Discount": 0 } ] }
+        } }
+      ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "created", "target": "approved", "trigger": "Automatic", "default": true }

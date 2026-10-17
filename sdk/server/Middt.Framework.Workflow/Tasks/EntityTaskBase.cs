@@ -1,5 +1,8 @@
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +24,7 @@ public abstract class EntityTaskBase : IWorkflowTask
 {
     private static readonly HashSet<string> ReservedConfigKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "entity", "into", "key", "id", "values", "uniqueBy", "idempotencyKey", "context", "required", "intoEntity", "singleValue", "parameters", "sql", "conflictIf"
+        "entity", "into", "key", "id", "values", "uniqueBy", "idempotencyKey", "context", "required", "intoEntity", "singleValue", "parameters", "sql", "conflictIf", "children", "dateOffsets"
     };
 
     public virtual IEnumerable<string> Validate(TaskDefinition task, WorkflowExpressionEngine expressions) => [];
@@ -86,19 +89,38 @@ public abstract class EntityTaskBase : IWorkflowTask
         return rendered;
     }
 
-    protected static void SetEntityProperties(object instance, IEntityType entityType, JsonObject values)
+    protected static void SetEntityProperties(object instance, IEntityType entityType, JsonObject values, bool isInsert = false)
     {
         foreach (var (propertyName, node) in values)
         {
             var prop = entityType.FindProperty(propertyName)
                 ?? entityType.GetProperties().FirstOrDefault(p => string.Equals(p.Name, propertyName, StringComparison.OrdinalIgnoreCase));
 
-            if (prop?.PropertyInfo is { CanWrite: true })
+            if (prop?.PropertyInfo is not { CanWrite: true } info)
             {
-                var converted = ConvertToPropertyType(node, prop.ClrType);
-                prop.PropertyInfo.SetValue(instance, converted);
+                continue;
             }
+
+            if (prop.IsConcurrencyToken || (prop.IsPrimaryKey() && !isInsert) || !IsPropertyEditable(info, isInsert))
+            {
+                continue;
+            }
+
+            var converted = ConvertToPropertyType(node, prop.ClrType);
+            info.SetValue(instance, converted);
         }
+    }
+
+    private static bool IsPropertyEditable(PropertyInfo property, bool isInsert)
+    {
+        if (property.GetCustomAttribute<ReadOnlyAttribute>() is { IsReadOnly: true })
+        {
+            return false;
+        }
+
+        return property.GetCustomAttribute<EditableAttribute>() is not { } editable
+            || editable.AllowEdit
+            || (isInsert && editable.AllowInitialValue);
     }
 
     protected static object? ConvertToPropertyType(JsonNode? node, Type targetType)

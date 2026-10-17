@@ -1,7 +1,7 @@
 {
   // 3/8 and the lifecycle of a category (one instance per category, business key "category-<id>"): category name +
-  // justification → manager approval → bike-create-category (categories table, publishes CategoryCreated) → "active":
-  // rename requests (bike-update-category) and the close request (bike-set-active false; refused while the category has
+  // justification → manager approval → entity-create (categories table, publishes CategoryCreated) → "active":
+  // rename requests (entity-update) and the close request (entity-update false; refused while the category has
   // active products). Started with a categoryId it adopts that category. Reject → Error; duplicate name → "fix".
   "key": "category-request",
   "version": 2,

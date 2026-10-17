@@ -189,6 +189,10 @@ Akışın ilgili adımına (`onEntry`) doğrudan bir `db-query` görevi eklenere
 SQL sorgusunu her akışa gömmek yerine, veri çekme mantığı **bağımsız ve tekrar kullanılabilir bir Alt Akış (SubFlow)** haline getirilir:
 
 #### 1. Reusable Alt Akış Tanımı (`get-branch-staff.json`)
+
+Bu demo akışı parametreli SQL ve alt akış veri eşlemesini gösterir; **şube yetkilendirmesi yapmaz**. Aşağıdaki
+`branchId` değerini istemciden alıp doğrudan sorguda kullanmak gerçek personel verisi için yeterli değildir. Üretim
+uygulamasında yetkili şube sunucuda doğrulanmış kimlik bilgisinden gelmeli ve sorgudan önce kontrol edilmelidir.
 Bu akış parametre olarak `branchId` alır, doğrular, sorguyu çalıştırır ve sonucu döner:
 
 ```json
@@ -497,28 +501,18 @@ Limit aşımlarında Genel Müdürlük ya da Şube Müdürü ayrımı otomatik a
 Şube müdürü sisteme girdiğinde tüm bankadaki binlerce işlemi değil, sadece kendi şubesinde onay bekleyen EFT'leri görmelidir:
 
 ### A. API Seviyesinde Havuz Filtreleme
-```csharp
-[HttpGet("pending-approvals")]
-public async Task<ActionResult<List<WorkflowInstanceModel>>> GetPendingApprovals(
-    [FromServices] WorkflowEngine engine,
-    [FromServices] ICurrentBranchContext branchContext,
-    CancellationToken ct)
-{
-    // Yöneticiler kendi şubelerine ait veya Genel Müdürlük tüm bekleyenleri listeler
-    var instances = await engine.GetInstancesAsync(
-        workflow: "eft-approval",
-        state: "pending-branch-manager",
-        status: WorkflowInstanceStatus.Active,
-        ct: ct);
 
-    if (!branchContext.IsHeadquarters)
-    {
-        instances = instances.Where(i => i.Data["branchId"]?.GetValue<int>() == branchContext.BranchId).ToList();
-    }
+`WorkflowEngine.ListAsync` iş akışı, durum, iş anahtarı ve tanım sürümünün `roles` / `instanceAccess` kurallarını
+uygular; **şube filtresi sağlamaz**. Bu nedenle `ListAsync` sonucunu bellekte `Data["branchId"]` ile daraltmak doğru
+bir onay havuzu oluşturmaz: yetkisiz kayıtlar sayfalama ve `Count` hesabına girmiş olur.
 
-    return instances;
-}
-```
+Şube havuzu için motora ya da uygulamanın listeleme katmanına **SQL düzeyinde yetkilendirilmiş** bir şube filtresi
+ekleyin. Şube kimliği, istemci parametresinden değil sunucuda doğrulanmış token/oturum bilgisinden gelmeli; filtre
+sayfalama ve `Count` öncesinde uygulanmalıdır. Sorgu, her örneğin saklı tanım sürümüne ait `roles` ve
+`instanceAccess` koşullarını da korumalıdır. Şube kimliği JSON verisindeyse sağlayıcının JSON sorgu desteğini veya
+iş akışı güncellemesiyle tutarlı biçimde güncellenen ayrı bir indeks kolonunu kullanın. Genel Müdürlük istisnasını
+sunucudaki rolle belirleyin. Böyle bir genişletme olmadan yerleşik liste endpoint'ini şube onay havuzu olarak
+kullanmayın.
 
 ---
 

@@ -23,6 +23,7 @@ namespace Middt.Framework.Expressions.Portable;
 /// </summary>
 public sealed partial class PortableExpression
 {
+    private const int MaxCacheSize = 1000;
     private readonly HashSet<string> variables;
     private readonly ConcurrentDictionary<string, Node> cache = new(StringComparer.Ordinal);
 
@@ -108,8 +109,20 @@ public sealed partial class PortableExpression
         return JsonValue.Create(sb.ToString());
     }
 
-    private Node Parse(string expression) =>
-        cache.TryGetValue(expression, out var node) ? node : cache.GetOrAdd(expression, PortableParser.Parse(expression, variables));
+    private Node Parse(string expression)
+    {
+        if (cache.TryGetValue(expression, out var node))
+        {
+            return node;
+        }
+
+        if (cache.Count >= MaxCacheSize)
+        {
+            cache.Clear();
+        }
+
+        return cache.GetOrAdd(expression, e => PortableParser.Parse(e, variables));
+    }
 
     private static IEnumerable<string> Placeholders(JsonNode? template) => template switch
     {

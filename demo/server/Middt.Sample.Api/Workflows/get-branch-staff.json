@@ -1,5 +1,7 @@
 {
   // Reusable subflow: queries active staff members for a specific store/branch.
+  // It demonstrates parameterized SQL, not branch authorization. A production endpoint must derive the allowed
+  // branch from the authenticated user and filter before returning data.
   "key": "get-branch-staff",
   "version": 1,
   "title": "Şube Personel Listesini Getir",

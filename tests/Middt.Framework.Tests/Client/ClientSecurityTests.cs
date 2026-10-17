@@ -174,6 +174,56 @@ public sealed class RefreshSingleFlightTests
 
         tokens.RefreshCalls.Should().Be(2);
     }
+
+    [Fact]
+    public async Task Cancelled_caller_during_refresh_does_not_prevent_cleanup_or_subsequent_refresh()
+    {
+        var refreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRefresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var handler = new FakeHttpHandler(request =>
+            request.Headers.Authorization?.Parameter == "fresh" ? Ok() : new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        using var http = handler.CreateClient();
+        var session = new CountingSessionState("stale", "rt-cancel-test");
+        var tokens = new FakeTokenService(async (_, _) =>
+        {
+            refreshStarted.TrySetResult();
+            await releaseRefresh.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+            return new TokenResponseModel { Result = ResultEnum.Success, access_token = "fresh", refresh_token = "rt-next" };
+        });
+
+        using var callerCts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        var client = new ItemsApiClient(http, session, tokens);
+        var cancelledCall = client.GetAllAsync(callerCts.Token);
+        await refreshStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+
+        await callerCts.CancelAsync();
+        await FluentActions.Invoking(() => cancelledCall).Should().ThrowAsync<OperationCanceledException>();
+
+        releaseRefresh.TrySetResult();
+        // Subsequent call uses the refreshed token cleanly.
+        (await client.GetAllAsync(Ct)).IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(".")]
+    [InlineData("..")]
+    [InlineData("")]
+    public async Task Ui_and_Workflow_clients_reject_dot_and_empty_path_segments(string badSegment)
+    {
+        using var handler = new FakeHttpHandler(_ => Ok());
+        using var http = handler.CreateClient();
+        var session = new CountingSessionState("fresh", "rt");
+        var tokens = new FakeTokenService(_ => new TokenResponseModel());
+        var settings = Options.Create(new ApiSettings { URL = "http://localhost", Version = "1" });
+        var uiClient = new UiApiClient(http, session, tokens, NullLoggers.For<UiApiClient>());
+        var wfClient = new WorkflowApiClient(http, session, tokens, settings, NullLoggers.For<WorkflowApiClient>());
+
+        await FluentActions.Invoking(() => uiClient.GetAsync(badSegment, Ct)).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Invoking(() => uiClient.DeleteAsync(badSegment, 1, Ct)).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Invoking(() => wfClient.GetDefinitionAsync(badSegment, null, Ct)).Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Invoking(() => wfClient.ExecuteTransitionAsync("orders", Guid.NewGuid(), badSegment, null, false, Ct)).Should().ThrowAsync<ArgumentException>();
+        handler.Requests.Should().BeEmpty();
+    }
 }
 
 public sealed class TokenRevocationClientTests

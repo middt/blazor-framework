@@ -250,7 +250,7 @@ internal sealed partial class AuthJourneyService(
         if (instance.View == "totp-setup" && instance.Status == WorkflowInstanceStatus.Active
             && JourneyTask.Text(instance.Data, JourneyData.TotpKeyProtected) is { } protectedKey)
         {
-            var key = protection.CreateProtector(TotpSetupTask.Purpose).Unprotect(protectedKey);
+            var key = protection.CreateProtector(TotpSetupOperation.Purpose).Unprotect(protectedKey);
             var account = JourneyTask.Text(instance.Data, JourneyData.Email) ?? JourneyTask.Text(instance.Data, JourneyData.UserName) ?? "user";
             var issuer = options.Value.AuthenticatorIssuerName;
             data[JourneyData.TotpKey] = string.Join(' ', key.Chunk(4).Select(c => new string(c))).ToLowerInvariant();
@@ -261,10 +261,8 @@ internal sealed partial class AuthJourneyService(
         return data;
     }
 
-    /// <summary>Same rules as <c>IUrlHelper.IsLocalUrl</c>: <c>/path</c> but not <c>//host</c> or <c>/\host</c>.</summary>
-    internal static bool IsLocalUrl(string? url) =>
-        !string.IsNullOrEmpty(url) && url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'))
-        && !url.Any(char.IsControl);
+    /// <summary>Same rules as <see cref="Middt.Framework.Common.Web.LocalUrl.IsLocal"/>: <c>/path</c> but not <c>//host</c> or <c>/\host</c>.</summary>
+    internal static bool IsLocalUrl(string? url) => Middt.Framework.Common.Web.LocalUrl.IsLocal(url);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Authentication journey {JourneyId} failed unexpectedly")]
     private static partial void LogJourneyFailed(ILogger logger, Exception exception, Guid journeyId);

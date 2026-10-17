@@ -81,8 +81,7 @@ public class WorkflowApiClient(
         bool runAsync = false,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(transition);
-        var uri = $"{InstanceRoute(workflow, id)}/transitions/{Uri.EscapeDataString(transition)}";
+        var uri = $"{InstanceRoute(workflow, id)}/transitions/{EscapePathSegment(transition, nameof(transition))}";
         if (runAsync)
         {
             uri += "?async=true";
@@ -101,11 +100,8 @@ public class WorkflowApiClient(
     public virtual Task<BaseResponseDataModel<WorkflowInstanceModel>> RetryAsync(string workflow, Guid id, CancellationToken cancellationToken = default) =>
         SendAsync<BaseResponseDataModel<WorkflowInstanceModel>>(HttpMethod.Post, $"{InstanceRoute(workflow, id)}/retry", null, cancellationToken);
 
-    protected string WorkflowRoute(string workflow)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(workflow);
-        return $"{RoutePrefix.TrimEnd('/')}/{Uri.EscapeDataString(workflow)}";
-    }
+    protected string WorkflowRoute(string workflow) =>
+        $"{RoutePrefix.TrimEnd('/')}/{EscapePathSegment(workflow, nameof(workflow))}";
 
     protected string InstanceRoute(string workflow, Guid id) =>
         $"{WorkflowRoute(workflow)}/instances/{id.ToString("D", CultureInfo.InvariantCulture)}";

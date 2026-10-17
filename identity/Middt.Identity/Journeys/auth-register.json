@@ -57,7 +57,7 @@
             "into": "form",
             "sensitive": [ "password" ]
           },
-          "onExecute": [ { "task": "idp-create-user" } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-create-user" } } ]
         }
       ]
     },
@@ -68,7 +68,7 @@
         {
           "key": "to-verify-email", "target": "verify-email", "trigger": "Automatic",
           "rule": "data.created == true && data.requireConfirmedEmail == true",
-          "onExecute": [ { "task": "idp-send-email-code", "config": { "purpose": "confirm-email" } } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-send-email-code", "purpose": "confirm-email" } } ]
         },
         { "key": "created", "target": "registered", "trigger": "Automatic", "rule": "data.created == true" },
         { "key": "details-retry", "target": "details", "trigger": "Automatic", "default": true }
@@ -94,13 +94,13 @@
             "into": "form",
             "sensitive": [ "code" ]
           },
-          "onExecute": [ { "task": "idp-verify-email-code", "config": { "confirmEmail": true } } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-verify-email-code", "confirmEmail": true } } ]
         },
         {
           "key": "resend-code",
           "title": "Kodu tekrar gönder",
           "target": "$self",
-          "onExecute": [ { "task": "idp-send-email-code", "config": { "purpose": "confirm-email", "resend": true } } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-send-email-code", "purpose": "confirm-email", "resend": true } } ]
         }
       ]
     },

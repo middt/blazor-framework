@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Middt.Framework.Common.Web;
 using Middt.Identity;
 using Middt.Identity.Ui;
 
@@ -15,6 +16,7 @@ using Middt.Identity.Ui;
 var builder = WebApplication.CreateBuilder(args);
 AddConfigFile(builder);
 
+builder.Services.AddMiddtForwardedHeaders(builder.Configuration);
 builder.AddMiddtIdentityServer(o =>
 {
     var section = builder.Configuration.GetSection("Identity");
@@ -42,17 +44,21 @@ builder.Services.AddHealthChecks();
 // With Redis Data Protection keys (cookies, antiforgery) are shared between instances and survive restarts.
 if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
 {
+    var multiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(redis);
+    builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(multiplexer);
     builder.Services.AddStackExchangeRedisCache(o =>
     {
-        o.Configuration = redis;
+        o.ConnectionMultiplexerFactory = () => Task.FromResult<StackExchange.Redis.IConnectionMultiplexer>(multiplexer);
         o.InstanceName = "middt-identity:";
     });
     builder.Services.AddDataProtection()
         .SetApplicationName("middt-identity")
-        .PersistKeysToStackExchangeRedis(StackExchange.Redis.ConnectionMultiplexer.Connect(redis), "middt-identity:dataprotection-keys");
+        .PersistKeysToStackExchangeRedis(multiplexer, "middt-identity:dataprotection-keys");
 }
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (!app.Environment.IsDevelopment())
 {

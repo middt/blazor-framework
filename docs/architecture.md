@@ -17,7 +17,7 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 │ Workflow   (engine; IWorkflowViewRenderer)  │   │ typed CRUD/workflow/layout       │   │ @middt/ui-core: types,         │
 │ Ui.Server  (layout store, REST, schema,     │   │ clients, token refresh, SignalR  │   │ expressions, formats, clients  │
 │            plain C# static HTML renderer)   │   └───────────────▲──────────────────┘   └───────────────▲────────────────┘
-│ Plugins: Redis, Rebus                       │                   │                                      │
+│ Plugins: Redis, Rebus, SyncfusionExport     │                   │                                      │
 └─────────────────────▲───────────────────────┘   ┌──── 4. Blazor frontend ┴──────────┐   ┌──── Angular frontend ─────────┴┐
                       │  HTTPS / JSON (REST,      │ Blazor.Web  BFF auth, pages,      │   │ @middt/angular: widgets as     │
                       │  ProblemDetails)          │             workflow screens      │   │ Angular components, BFF/cookie │
@@ -85,6 +85,28 @@ in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a compone
 5. **Editor**: the layout API is frontend independent; both frontends ship an editor.
 
 For a third frontend (e.g. React) repeat 1–4: reuse `@middt/ui-core` and a BFF host built with `AddMiddtSpaBff()`.
+
+## Workflow execution and recovery
+
+Workflow JSON uses the framework's general task types. The `operation` task delegates named domain actions to an
+explicitly registered `IWorkflowOperationDispatcher`; identity allowlists its password, MFA and OIDC operations there.
+The demo's data flows use `entity-*`, `db-*` and `set` tasks directly. Task definitions remain independent of
+application-specific `IWorkflowTask` implementations.
+
+The engine claims an instance with a conditional `Active`/`Faulted` → `Busy` update and, for transition commands, stores
+its pending transition and persistable input in that claim. The claim is separate from task execution. On success, the
+instance snapshot, history, incidents and follow-up jobs commit together. A claim left Busy beyond `BusyTimeout` is marked Faulted by
+`WorkflowJobProcessor`; the retry endpoint can rerun the saved transition when its required input is available.
+
+Scheduled and asynchronous transitions, child cancellation, parent resumption and event delivery use the workflow
+database's `WorkflowJobs` table. Workers claim due jobs with leases. Child cancellation waits while the child is Busy;
+event handlers may receive duplicates and must be idempotent. A failed job is retried with backoff and, after 20
+attempts, removed with an incident. Task data is copied for each in-process attempt; external side effects
+need an idempotency key. The built-in HTTP task sends `WorkflowTaskContext.IdempotencyKey` as `Idempotency-Key` unless
+the definition supplies that header. An explicit retry is a new command and can use a different key.
+
+Definition versions are retained for running instances. Instance-level access checks and list filters apply each
+instance's stored version of `roles` and `instanceAccess`, rather than the newest definition's rules.
 
 ## Project map
 

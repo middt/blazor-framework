@@ -1,5 +1,5 @@
 {
-  // 1/8 of the bike store chain: store details → manager approval → bike-create-store (stores table) → starts
+  // 1/8 of the bike store chain: store details → manager approval → entity-create (stores table) → starts
   // staff-onboarding for the new store (store pre-selected). Rule violations (duplicate name) go to "fix".
   "key": "store-opening",
   "version": 1,

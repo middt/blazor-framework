@@ -9,6 +9,9 @@
 | Blazor and Angular demos log each other out | cookies ignore ports | unique `MiddtBffOptions.CookieName` per app |
 | Menu never shows layouts | `result === 1` check | `ResultEnum.Success = 0` – use `isSuccess()` |
 | Workflow tables 95 % fragmented | random-order GUID keys in SQL Server | engine's sequential id generator |
+| Recovered workflow is Faulted but cannot retry | Busy claim had no pending command, or required sensitive input was intentionally not persisted | record the pending transition in the claim; use operator remediation for missing sensitive input |
+| Workflow event is delivered twice after a restart | a process can stop after the handler runs but before the job is removed | make `IWorkflowEventHandler` idempotent |
+| Child state is overwritten during parent cancellation | child may still hold a Busy claim | queue cancellation, wait until the child is no longer Busy, and increment its revision |
 | Each search value creates a SQL plan | Dynamic LINQ inlines constants | expression trees with captured values (parameters) |
 | Angular app has two Angular instances / DI errors | linked `file:` packages resolve their own node_modules | `preserveSymlinks: true` in the app |
 | Angular page doesn't update after `await` | zoneless + OnPush | update signals, not plain fields |

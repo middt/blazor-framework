@@ -212,6 +212,7 @@ export class UiFieldEditorComponent {
   protected readonly options = signal<UiOption[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly pickerText = signal<string | null>(null);
+  #pickerValueKey: string | null = null;
 
   protected readonly matcher: ErrorStateMatcher = { isErrorState: () => !!this.error() };
   private readonly inputs = viewChildren(MatInput);
@@ -284,9 +285,14 @@ export class UiFieldEditorComponent {
         }
 
         if (value === null || value === undefined) {
+          this.#pickerValueKey = null;
           this.pickerText.set(null);
-        } else if (field.lookup !== null && this.pickerText() === null && context.interactive) {
-          void this.#loadPickerText(field, value);
+        } else if (field.lookup !== null && context.interactive) {
+          const valueKey = UiFieldJson.key(value);
+          if (this.pickerText() === null || this.#pickerValueKey !== valueKey) {
+            this.#pickerValueKey = valueKey;
+            void this.#loadPickerText(field, value);
+          }
         }
       });
     });
@@ -350,13 +356,16 @@ export class UiFieldEditorComponent {
       .afterClosed()
       .subscribe(row => {
         if (row) {
+          const pickedValue = cloneJson(row[lookup.valueField]);
+          this.#pickerValueKey = pickedValue === null || pickedValue === undefined ? null : UiFieldJson.key(pickedValue);
           this.pickerText.set(UiFieldJson.key(row[lookup.textField]));
-          this.set(cloneJson(row[lookup.valueField]));
+          this.set(pickedValue);
         }
       });
   }
 
   protected clearPick(): void {
+    this.#pickerValueKey = null;
     this.pickerText.set(null);
     this.set(null);
   }

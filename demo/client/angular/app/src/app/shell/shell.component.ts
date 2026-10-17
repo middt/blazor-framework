@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -96,7 +97,7 @@ export class ShellComponent implements OnInit {
   protected readonly year = new Date().getFullYear();
 
   constructor() {
-    inject(BreakpointObserver).observe('(max-width: 800px)').subscribe(state => {
+    inject(BreakpointObserver).observe('(max-width: 800px)').pipe(takeUntilDestroyed()).subscribe(state => {
       this.mobile.set(state.matches);
       this.sidenavOpen.set(!state.matches);
     });

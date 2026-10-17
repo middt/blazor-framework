@@ -3,7 +3,7 @@
 | Level | Command | Notes |
 |---|---|---|
 | CI build | `dotnet build Middt.Framework.slnx -p:ContinuousIntegrationBuild=true` | warnings are errors |
-| .NET tests | `dotnet test --project tests/Middt.Framework.Tests` | ~1,100 tests, < 1 min |
+| .NET tests | `dotnet test --project tests/Middt.Framework.Tests` | complete xunit suite |
 | Contracts | conformance + schema tests (part of the .NET tests) and `node --test` in ui-core | regenerate schema with `MIDDT_UPDATE_SPEC=1` |
 | TypeScript | `cd sdk/client/typescript/ui-core && npm run build && node --test test/` | |
 | Angular | `cd sdk/client/angular && npx ng build middt-angular`, then `cd demo/client/angular/app && npx ng build sample --configuration production` | 0 warnings |
@@ -21,3 +21,7 @@ described in nested `AGENTS.md` files.
 - Use the existing hosts (`TestApiHost`, `WorkflowTestHost`, `UiTestHost`, `SpaBffTestHost`, `BlazorTestHost`).
 - Prefer behaviour over implementation; for security fixes assert the attack fails (e.g. 403/404, no request forwarded).
 - For performance fixes assert the mechanism (e.g. SQL contains parameters, store read count, command count).
+- For workflow changes, use `WorkflowTestHost` and its fake clock. Check both the committed instance and `WorkflowJobs`:
+  a Busy recovery must retain a usable pending transition; child cancellation must wait for a Busy child; undelivered
+  events must survive later state changes. Test list access with multiple definition versions when roles or owner rules
+  change. `WorkflowReliabilityTests` contains focused examples.

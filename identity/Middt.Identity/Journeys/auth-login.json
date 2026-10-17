@@ -58,7 +58,7 @@
             "into": "form",
             "sensitive": [ "password" ]
           },
-          "onExecute": [ { "task": "idp-verify-credentials" } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-verify-credentials" } } ]
         },
         { "key": "register", "title": "Kayıt ol", "target": "to-register", "input": { "set": { "redirect": "\"/account/register\"" } } },
         { "key": "forgot-password", "title": "Şifremi unuttum", "target": "to-forgot-password", "input": { "set": { "redirect": "\"/account/forgot-password\"" } } }
@@ -94,7 +94,7 @@
             "into": "form",
             "sensitive": [ "code" ]
           },
-          "onExecute": [ { "task": "idp-verify-totp" } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-verify-totp" } } ]
         }
       ]
     },
@@ -110,7 +110,7 @@
     {
       "key": "check-consent",
       "title": "İzin kontrolü",
-      "onEntry": [ { "task": "idp-check-consent" } ],
+      "onEntry": [ { "task": "operation", "config": { "operation": "idp-check-consent" } } ],
       "transitions": [
         { "key": "to-consent", "target": "consent", "trigger": "Automatic", "rule": "data.consentRequired == true" },
         { "key": "no-consent-needed", "target": "authenticated", "trigger": "Automatic", "default": true }
@@ -122,7 +122,7 @@
       "step": 3,
       "view": { "component": "consent" },
       "transitions": [
-        { "key": "approve", "title": "İzin ver", "target": "authenticated", "onExecute": [ { "task": "idp-grant-consent" } ] },
+        { "key": "approve", "title": "İzin ver", "target": "authenticated", "onExecute": [ { "task": "operation", "config": { "operation": "idp-grant-consent" } } ] },
         { "key": "deny", "title": "Reddet", "target": "denied", "input": { "set": { "consentDenied": "true" } } }
       ]
     },

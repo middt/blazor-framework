@@ -1,4 +1,6 @@
 {
+  // The built-in HTTP task adds Idempotency-Key automatically unless headers defines it explicitly.
+  // This GET example uses failOnError=false to store a failed response instead of faulting the instance.
   "key": "test-http-tasks",
   "version": 1,
   "title": "Dış Servis ve HTTP Görevleri Test Akışı",

@@ -120,6 +120,7 @@ public static class BffApiProxy
             // Browsers cannot set headers on WebSocket handshakes, but always send Origin.
             return context.Request.Headers.Origin.ToString() is { Length: > 0 } origin
                 && Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                && string.Equals(uri.Scheme, context.Request.Scheme, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(uri.Authority, context.Request.Host.Value, StringComparison.OrdinalIgnoreCase);
         }
 

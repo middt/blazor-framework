@@ -1,7 +1,7 @@
 {
   // 2/8 and the lifecycle of a staff member (one instance per staff member, business key "staff-<id>"): store →
-  // personal details (optional manager) → manager approval → bike-create-staff (staffs table) → "active": change
-  // requests (bike-update-staff) and the close request (bike-set-active false: active = 0, soft delete).
+  // personal details (optional manager) → manager approval → entity-create (staffs table) → "active": change
+  // requests (entity-update) and the close request (entity-update false: active = 0, soft delete).
   // Started by store-opening with { storeId }: the store step is skipped. Started with a staffId it adopts that record.
   "key": "staff-onboarding",
   "version": 2,

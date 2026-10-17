@@ -1,20 +1,18 @@
+using Middt.Framework.Plugin.Rebus;
 using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Middt.Framework.Model.Workflow;
-using Middt.Framework.Tests.Ui;
-using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Tasks;
+using Middt.Framework.Tests.Ui;
 using Middt.Sample.Api.Model.Database;
-using Middt.Sample.Api.Tasks;
 
 namespace Middt.Framework.Tests.Workflow;
 
 /// <summary>
-/// The linked demo workflows (demo/server/Middt.Sample.Api/Workflows) with the bike-* tasks writing a BikeStores
+/// The linked demo workflows (demo/server/Middt.Sample.Api/Workflows) with general tasks writing a BikeStores
 /// database (SQLite in-memory): store → staff, category, product → initial stock, customer, order → fulfillment.
 /// </summary>
 public sealed class BikeStoreWorkflowTests
@@ -47,7 +45,7 @@ public sealed class BikeStoreWorkflowTests
                 o =>
                 {
                     o.UseApplicationDbContext<BikeStoresContext>();
-                    o.AddBikeStoreTasks();
+                    o.AddRebusTasks();
                 },
                 s =>
                 {
@@ -279,6 +277,7 @@ public sealed class BikeStoreWorkflowTests
         var row = await bike.DbAsync(db => db.Orders.Include(o => o.OrderItems).SingleAsync(o => o.OrderId == orderId, TestContext.Current.CancellationToken));
         row.CustomerId.Should().Be(ids.CustomerId);
         row.StaffId.Should().Be(ids.StaffId);
+        row.RequiredDate.Should().Be(row.OrderDate.AddDays(7));
         row.OrderItems.Should().ContainSingle(i => i.ProductId == ids.ProductId && i.Quantity == 3 && i.ListPrice == 1000m);
 
         // Stock was 1: the fulfillment replenished the missing 2 (approved automatically), then reserved 3.
@@ -390,42 +389,6 @@ public sealed class BikeStoreWorkflowTests
     }
 
     [Fact]
-    public async Task Adjust_stock_is_idempotent_and_never_goes_below_zero()
-    {
-        await using var bike = await Bike.StartAsync();
-        await using var scope = bike.Host.Services.CreateAsyncScope();
-        var data = new JsonObject();
-        WorkflowTaskContext Context(int quantity, string operation) => new()
-        {
-            Task = new TaskDefinition
-            {
-                Task = "bike-adjust-stock",
-                Config = new JsonObject { ["storeId"] = bike.Ids.StoreId, ["productId"] = bike.Ids.ProductId, ["quantity"] = quantity, ["operation"] = operation },
-            },
-            Data = data,
-            Scope = new ExpressionScope { Data = data },
-            Expressions = new WorkflowExpressionEngine(),
-            InstanceId = Guid.NewGuid(),
-            Workflow = "test",
-            State = "test",
-            Services = scope.ServiceProvider,
-            Logger = NullLogger.Instance,
-        };
-        var task = new AdjustStockTask();
-
-        await task.ExecuteAsync(Context(5, "added"), TestContext.Current.CancellationToken);
-        await task.ExecuteAsync(Context(5, "added"), TestContext.Current.CancellationToken); // retry: marker present
-        (await bike.StockAsync(bike.Ids.StoreId, bike.Ids.ProductId)).Should().Be(6);
-        data["added"]!["quantity"]!.GetValue<int>().Should().Be(6);
-
-        await task.ExecuteAsync(Context(-7, "taken"), TestContext.Current.CancellationToken);
-
-        data["error"]!.GetValue<string>().Should().Be("Stok yetersiz: Merkez mağazasında \"Domane\" için 6 adet var, 7 adet gerekiyor.");
-        data.ContainsKey("taken").Should().BeFalse();
-        (await bike.StockAsync(bike.Ids.StoreId, bike.Ids.ProductId)).Should().Be(6);
-    }
-
-    [Fact]
     public async Task Stock_list_rows_carry_store_and_product_names_and_filter_by_store()
     {
         await using var bike = await Bike.StartAsync();
@@ -437,6 +400,25 @@ public sealed class BikeStoreWorkflowTests
 
         result.Count.Should().Be(1);
         result.Data.Should().ContainSingle(s => s.StoreName == "Merkez" && s.ProductName == "Domane" && s.Quantity == 1);
+    }
+
+    [Fact]
+    public async Task Replenishment_with_a_business_key_does_not_add_stock_twice()
+    {
+        await using var bike = await Bike.StartAsync();
+        var data = new { storeId = bike.Ids.StoreId, productId = bike.Ids.ProductId, quantity = 2 };
+
+        var first = await bike.Host.StartWithFlagAsync("stock-replenishment", null, key: "replenish-once", user: Alice);
+        first.Created.Should().BeTrue();
+        await bike.Host.TransitionAsync(first.Instance.Id, "submit", data, Alice);
+        var approved = await bike.Host.TransitionAsync(first.Instance.Id, "approve", null, Boss);
+        approved.Status.Should().Be(WorkflowInstanceStatus.Completed);
+        approved.Data["replenishedStock"]!["quantity"]!.GetValue<int>().Should().Be(3);
+
+        var second = await bike.Host.StartWithFlagAsync("stock-replenishment", null, key: "replenish-once", user: Alice);
+        second.Created.Should().BeFalse();
+        second.Instance.Id.Should().Be(first.Instance.Id);
+        (await bike.StockAsync(bike.Ids.StoreId, bike.Ids.ProductId)).Should().Be(3);
     }
 
     [Fact]
@@ -457,24 +439,6 @@ public sealed class BikeStoreWorkflowTests
         customers[0].LastName.Should().Be("Öztürk");
         customers.Select(c => c.CustomerId).Should().BeInDescendingOrder();
         products[0].ProductName.Should().Be("Yeni");
-    }
-
-    [Theory]
-    [InlineData("""{ "storeId": 1, "productId": 1, "quantity": 1 }""", "'operation' is required.")]
-    [InlineData("""{ "storeId": 1, "productId": 1, "quantity": 1, "operation": "a b" }""", "'operation' must be a data path (letters, digits, dots).")]
-    public void Adjust_stock_config_is_validated_when_definitions_load(string config, string error)
-    {
-        var task = new TaskDefinition { Task = "bike-adjust-stock", Config = JsonNode.Parse(config)!.AsObject() };
-
-        new AdjustStockTask().Validate(task, new WorkflowExpressionEngine()).Should().Contain(error);
-    }
-
-    [Fact]
-    public void Order_status_must_be_known()
-    {
-        var task = new TaskDefinition { Task = "bike-set-order-status", Config = new JsonObject { ["orderId"] = 1, ["status"] = 9 } };
-
-        new SetOrderStatusTask().Validate(task, new WorkflowExpressionEngine()).Should().Contain("'status' must be between 1 and 4.");
     }
 
     // ───────────────────────────── lifecycles (change / close / adopt) ─────────────────────────────
@@ -752,6 +716,19 @@ public sealed class BikeStoreWorkflowTests
         }
 
         (await bike.DbAsync(db => db.Categories.Select(c => c.CategoryName).ToListAsync(Ct))).Should().Equal("Road Bikes");
+    }
+
+    [Fact]
+    public async Task Retry_demo_continues_after_two_failed_generic_task_attempts()
+    {
+        await using var bike = await Bike.StartAsync();
+        var host = bike.Host;
+        var instance = await host.StartInstanceAsync("test-retry-tasks", user: Alice);
+
+        var result = await host.TransitionAsync(instance.Id, "run", user: Alice);
+
+        result.Status.Should().Be(WorkflowInstanceStatus.Completed);
+        result.Data["retryPolicyOutcome"]!.GetValue<string>().Should().Be("İki başarısız denemeden sonra devam edildi.");
     }
 
     [Fact]

@@ -9,7 +9,7 @@ using Middt.Framework.Workflow.Persistence;
 namespace Middt.Framework.Workflow.Runtime;
 
 /// <summary>
-/// Processes due jobs (scheduled transitions, timeouts, async transitions, subflow resumes) and recovers instances left
+/// Processes due jobs (scheduled transitions, timeouts, async transitions, subflow work, event delivery) and recovers instances left
 /// Busy by a crashed process. Safe to run on several instances: jobs are claimed with a conditional UPDATE (lease).
 /// </summary>
 public sealed partial class WorkflowJobProcessor(
@@ -140,7 +140,7 @@ public sealed partial class WorkflowJobProcessor(
             // Unexpected failures fault the instance (with an incident and a retryable pending transition).
             LogJobFailed(logger, ex, job.Kind, job.InstanceId);
             error = ex.Message;
-            done = true;
+            done = job.Kind is not (WorkflowJobKind.ResumeParent or WorkflowJobKind.CancelChild or WorkflowJobKind.Event);
         }
 
         db.ChangeTracker.Clear();
@@ -174,15 +174,44 @@ public sealed partial class WorkflowJobProcessor(
     private async Task RecoverStuckInstancesAsync(WorkflowDbContext db, DateTime now, CancellationToken cancellationToken)
     {
         var threshold = now - options.Value.BusyTimeout;
-        var recovered = await db.Instances
+        var candidates = await db.Instances.AsNoTracking()
             .Where(i => i.Status == WorkflowInstanceStatus.Busy && i.BusySince < threshold)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(i => i.Status, WorkflowInstanceStatus.Faulted)
-                .SetProperty(i => i.BusySince, (DateTime?)null)
-                .SetProperty(i => i.Error, "Execution was interrupted (process stopped while the instance was busy)."), cancellationToken);
+            .Select(i => new { i.Id, i.State, i.PendingTransition })
+            .ToListAsync(cancellationToken);
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        const string message = "Execution was interrupted (process stopped while the instance was busy).";
+        var recovered = 0;
+        foreach (var candidate in candidates)
+        {
+            var changed = await db.Instances
+                .Where(i => i.Id == candidate.Id && i.Status == WorkflowInstanceStatus.Busy && i.BusySince < threshold)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(i => i.Status, WorkflowInstanceStatus.Faulted)
+                    .SetProperty(i => i.BusySince, (DateTime?)null)
+                    .SetProperty(i => i.Revision, i => i.Revision + 1)
+                    .SetProperty(i => i.Error, message), cancellationToken);
+            if (changed == 1)
+            {
+                recovered++;
+                db.Incidents.Add(new WorkflowIncident
+                {
+                    InstanceId = candidate.Id,
+                    State = candidate.State,
+                    TransitionKey = candidate.PendingTransition,
+                    Error = message,
+                    Attempts = 1,
+                    CreatedAt = now,
+                });
+            }
+        }
 
         if (recovered > 0)
         {
+            await db.SaveChangesAsync(cancellationToken);
             LogRecovered(logger, recovered);
         }
     }

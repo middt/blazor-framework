@@ -1,5 +1,6 @@
 {
   // Test workflow: demonstrates calling a reusable SubFlow to query branch staff and map results.
+  // The selected branch is a demo input, not an authorization decision; see docs/row-level-security-best-practices.md.
   "key": "test-subflow",
   "version": 1,
   "title": "Alt Akış (SubFlow) Testi",

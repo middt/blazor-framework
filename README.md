@@ -14,7 +14,7 @@ Targets **.NET 10 (LTS)**.
 | Contracts | `Middt.Framework.Model` | Wire contracts: `BaseResponseModel`/`BaseResponseDataModel<T>` (result envelope), `BaseSearchRequestModel<T>`, auth, workflow and SignalR DTOs, settings, `Query*` filter attributes. No dependencies. |
 | Contracts | `Middt.Framework.Expressions` | The **portable expression language** (identical in .NET and TypeScript, verified by `spec/expressions.conformance.json`) and the richer DynamicExpresso evaluator used by workflow rules. |
 | Contracts | `Middt.Framework.Ui.Abstractions` | Server driven UI contract: layout model, widget specs, validator, portable formats, JSON Schema generator. No UI technology. |
-| Backend | `Middt.Framework.Common` | Server side helpers for API and frontend hosts: security headers, forwarded headers, SignalR hub base, e-mail, Syncfusion document export. |
+| Backend | `Middt.Framework.Common` | Server side helpers for API and frontend hosts: security headers, forwarded headers, SignalR hub base, e-mail, document export abstractions. |
 | Backend | `Middt.Framework.Data` | `IBaseRepository<T>` / `BaseCrudRepository<T, TContext>` on EF Core 10, `QueryFilterBuilder` (filter / sort / page). |
 | Backend | `Middt.Framework.Api` | `AddMiddtApi()` / `UseMiddtApi()`, CRUD + token controllers, ProblemDetails, versioning, OpenAPI + Scalar, JWT, rate limiting, HybridCache. |
 | Backend | `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions, tasks, retries, timers, subflows, history – on EF Core, no Dapr. |
@@ -27,6 +27,7 @@ Targets **.NET 10 (LTS)**.
 | Angular | `sdk/client/angular` (`@middt/angular`) | Angular 22 frontend library: BFF auth, layout renderer/widgets/editor, workflow list/detail/wizard, SignalR – see [sdk/client/angular/README.md](sdk/client/angular/README.md). Demo app: `demo/client/angular/app`. |
 | Plugins | `Middt.Framework.Plugin.Redis` | Redis connection, RedLock distributed lock, lock-protected read-through cache. |
 | Plugins | `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
+| Plugins | `Middt.Framework.Plugin.SyncfusionExport` | Excel, Word and PDF document export on Syncfusion (`AddMiddtSyncfusionExport()`). |
 
 **Middt Identity** (`identity/Middt.Identity`, not a package): the OAuth 2.0 / OpenID Connect server of Middt
 applications – one service, configured by appsettings / environment (database, issuer, certificate, clients, users).
@@ -43,7 +44,7 @@ frontend technology.
 sdk/                              the framework (NuGet / npm packages)
   shared/                         Model · Expressions · Ui.Abstractions         contracts, no UI technology
   server/                         Common · Data · Api · Workflow · Ui.Server    backend, no frontend dependencies
-    plugins/                      Plugin.Redis · Plugin.Rebus
+    plugins/                      Plugin.Redis · Plugin.Rebus · Plugin.SyncfusionExport
   client/
     dotnet/                       Client                                        .NET client SDK (typed API clients)
     typescript/ui-core/           @middt/ui-core                                TypeScript contract, expressions, API clients
@@ -193,7 +194,6 @@ builder.Services.AddMiddtWorkflow(o =>
     o.UseDbContext(db => db.UseSqlServer(connectionString)); // any EF Core relational provider
     o.AutoCreateSchema = true;                               // creates the "wf" tables (use migrations in production)
     o.AddDefinitionsFromDirectory("Workflows");              // *.json, validated at startup
-    o.AddTask<NotifyCustomerTask>("notify-customer");        // application tasks (IWorkflowTask)
 });
 app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
 ```
@@ -229,11 +229,17 @@ A definition ([full example](demo/server/Middt.Sample.Api/Workflows/order-approv
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
 | Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [order-approval.v2.json](demo/server/Middt.Sample.Api/Workflows/order-approval.v2.json) |
 | Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "name" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
-| Tasks | `onEntry`, `onExit`, `onExecute`; built-ins `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `setKey` (gives the instance its business key once it is known, e.g. `category-{{ data.categoryId }}`; a start with that key then returns the instance); custom `IWorkflowTask`; `when` condition |
+| Tasks | `onEntry`, `onExit`, `onExecute`; general `entity-*`, `db-*`, `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `setKey` (gives the instance its business key once it is known, e.g. `category-{{ data.categoryId }}`; a start with that key then returns the instance), and `operation` (dispatches an explicitly allowed application operation); `when` condition |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
 | Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
-| Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), one transaction per command, data snapshot + history per transition, incidents, idempotent start by business key, async transitions (202), durable timers with leases (multi-instance safe), crash recovery of Busy instances, `IWorkflowEventHandler` notifications after commit |
+| Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), atomic final state + history + follow-up jobs, incidents, idempotent start by business key, async transitions (202), durable timers and follow-up jobs with leases (multi-instance safe), crash recovery of Busy instances, queued `IWorkflowEventHandler` notifications after commit |
+
+The engine first records a Busy claim with the pending transition and persistable input. It then runs tasks and commits the resulting instance data, history, incidents and follow-up jobs together. If execution is interrupted, the job processor marks a stale Busy instance Faulted; `POST …/retry` reruns its pending transition. Input fields declared `sensitive` are excluded from persisted input. If a recovered transition requires those fields, the retry endpoint cannot reconstruct them and the instance needs operator remediation. Instances retain their definition version; list permissions use each instance's version, including its `roles` and `instanceAccess` settings.
+
+Task attempts use separate data snapshots. A failed attempt cannot leave partial data in the next attempt. Custom tasks receive `WorkflowTaskContext.IdempotencyKey`, which stays the same during the attempts of one command; the built-in HTTP task sends it as `Idempotency-Key` unless the definition supplies that header. External systems must deduplicate with this key if retries could repeat a side effect. Configure a stable business key for `startWorkflow` when the same child must not be started twice. A later explicit retry of a faulted instance is a new command and may use a different key.
+
+Child cancellation, parent resumption and event delivery are written as jobs in the same commit as the state change. The engine tries them after commit for prompt results; the background processor handles work left by failures or restarts. Event delivery can repeat, so handlers should be idempotent. A job that still fails after 20 attempts is removed and recorded as a workflow incident for investigation; delivery is not guaranteed after that point.
 
 REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are ProblemDetails):
 `GET /api/workflows`, `GET /{workflow}`, `POST /{workflow}/instances`, `GET /{workflow}/instances`,
@@ -285,8 +291,9 @@ the screens themselves stay compiled, type checked Razor (no runtime compilation
 - Sample: `demo/shared/Middt.Sample.Views` (`order-review`, `order-result`, `reject-reason`) is shared by the API and the UI.
 
 Compared to vNext this engine intentionally leaves out the separate execution host, Dapr (jobs, locks, pub/sub, state),
-inbox/outbox relays, Roslyn C# scripts, schema-per-flow storage, views/functions/extensions and long polling; tasks run
-in-process and side effects should be idempotent (at-least-once on retries).
+an external inbox/outbox relay, Roslyn C# scripts, schema-per-flow storage, views/functions/extensions and long polling.
+Follow-up work uses the workflow database's job table. Tasks run in-process, so their external side effects must be
+idempotent across retries.
 
 ## Server driven UI (JSON layouts)
 
@@ -501,7 +508,7 @@ and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference: <ht
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
 
 **Linked workflows of the sample.** Every "new record" of the bike store goes through a workflow that writes the
-real BikeStores tables with application tasks (`bike-*`, `demo/server/Middt.Sample.Api/Tasks`). In logical order:
+real BikeStores tables with the framework's general `entity-*`, `db-*`, `set` and messaging tasks. In logical order:
 
 | # | Workflow | Steps | Writes / links |
 |---|---|---|---|
@@ -514,8 +521,11 @@ real BikeStores tables with application tasks (`bike-*`, `demo/server/Middt.Samp
 | 7 | `order-approval` v3 Sipariş onayı | registered customer → store, product, quantity → credit check → finance/manager/express review | `orders` + `order_items` (status 1); starts `order-fulfillment` |
 | 8 | `order-fulfillment` Sipariş karşılama | stock check (missing stock → `stock-replenishment` subflow) → reserve → picking → shipping → delivered | `stocks` (−quantity), order status 2 → 4, shipped date; cancel returns the stock (status 3) |
 
+The “Test Akışları” menu contains small framework examples for core, entity, HTTP, messaging and subflow tasks.
+`test-retry-tasks` uses a deliberately failing read to demonstrate two attempts and the `Continue` error policy.
+
 Rule violations a user can fix (duplicate e-mail, store without staff, not enough stock) do not fault the instance:
-the task writes the Turkish message to `data.error` and the workflow moves to a "Düzeltme gerekli" step
+general tasks write a Turkish message to `data.error` and the workflow moves to a "Düzeltme gerekli" step
 (layout `bike-task-error`) that leads back to the form.
 
 **One lifecycle per record.** Stores, staff, categories, products and customers change only through their workflow
@@ -525,10 +535,10 @@ the business key `store-12`, `staff-3`, `category-8`, `product-41` or `customer-
 (`active`, current values in `data.store` / `data.staff` / …):
 
 - `request-change` "Değişiklik talebi" (inline form prefilled with the current values) → `change-approval` (manager:
-  `approve-change` → `bike-update-*` → back to `active` with the new values; `reject-change` / `withdraw-change` → `active`
+  `approve-change` → `entity-update` → back to `active` with the new values; `reject-change` / `withdraw-change` → `active`
   unchanged; a rule violation → `change-fix` "Düzeltme gerekli" → `back-to-record`).
 - `request-close` "Kapatma talebi" (reason) → `close-approval` (manager `approve-close` / `reject-close`) →
-  `bike-set-active` false → final state `closed` "Kapatıldı". Closing is a **soft delete** (`active = 0`): existing
+  `entity-update` sets `active` false → final state `closed` "Kapatıldı". Closing is a **soft delete** (`active = 0`): existing
   orders keep the record, lookups (`getall`, the selects of forms and filters) offer active records only, lists
   (`getitems`) show all with a "Durum" column and filter; new orders, staff of a closed store and products of a closed
   category are refused with a "… pasif durumda." message. A category with active products cannot be closed.

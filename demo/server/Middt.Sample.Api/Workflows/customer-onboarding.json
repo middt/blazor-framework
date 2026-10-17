@@ -1,6 +1,6 @@
 {
   // 6/8: Bireysel / Kurumsal → identity (TCKN) or company (tax number) → contact & address → verification by a manager →
-  // bike-create-customer (customers table). Registered customers are then chosen in order-approval.
+  // entity-create (customers table). Registered customers are then chosen in order-approval.
   "key": "customer-onboarding",
   "version": 1,
   "title": "Müşteri kaydı",

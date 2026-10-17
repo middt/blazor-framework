@@ -19,7 +19,7 @@
         }
       }
     },
-    "onExecute": [ { "task": "idp-totp-setup" } ]
+    "onExecute": [ { "task": "operation", "config": { "operation": "idp-totp-setup" } } ]
   },
   "states": [
     {
@@ -42,7 +42,7 @@
             "into": "form",
             "sensitive": [ "code" ]
           },
-          "onExecute": [ { "task": "idp-enable-totp" } ]
+          "onExecute": [ { "task": "operation", "config": { "operation": "idp-enable-totp" } } ]
         }
       ]
     },

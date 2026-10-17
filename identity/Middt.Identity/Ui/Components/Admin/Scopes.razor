@@ -49,7 +49,7 @@
                 var manager = sp.GetRequiredService<IOpenIddictScopeManager>();
                 var total = (int)await manager.CountAsync();
                 var page = new List<ScopeRow>();
-                await foreach (var scope in manager.ListAsync(args.Top ?? 20, args.Skip ?? 0))
+                foreach (var scope in await manager.ListAsync(args.Top ?? 20, args.Skip ?? 0).ToListAsync())
                 {
                     page.Add(new ScopeRow(
                         await manager.GetIdAsync(scope) ?? string.Empty,

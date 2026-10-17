@@ -62,6 +62,8 @@ public static class QueryFilterBuilder
         return properties.TryGetValue(sortProperty, out var name) ? name : null;
     }
 
+    private static readonly ConcurrentDictionary<Type, Func<object, MemberExpression>> HolderCache = new();
+
     /// <summary>
     /// Builds <c>x =&gt; x.Target op holder.Value</c>. The value is read from a holder object (like a C# closure), so EF Core
     /// sends it as a SQL parameter: one cached query / SQL plan per filter shape instead of one per distinct search value.
@@ -80,8 +82,13 @@ public static class QueryFilterBuilder
                 _ => Operator.Contains,
             },
             DateTime d when d == default => null,
+            DateTimeOffset d when d == default => null,
+            DateOnly d when d == default => null,
             DateTime or DateTimeOffset or DateOnly => Compare(property.DateSearchType ?? DateSearchType.Equal),
+            Guid g when g == Guid.Empty => null,
+            Guid => Operator.Equal,
             bool => Operator.Equal,
+            Enum => NumberOperator(property, Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture)),
             _ when IsNumber(value) => NumberOperator(property, value),
             _ => null,
         };
@@ -96,8 +103,7 @@ public static class QueryFilterBuilder
         var memberType = Nullable.GetUnderlyingType(member.Type) ?? member.Type;
         var converted = value!.GetType() == memberType ? value : ConvertValue(value, memberType, property.Target);
 
-        var holder = Activator.CreateInstance(typeof(ValueHolder<>).MakeGenericType(memberType), converted)!;
-        Expression operand = Expression.Property(Expression.Constant(holder), nameof(ValueHolder<int>.Value));
+        Expression operand = CreateOperand(memberType, converted);
         if (operand.Type != member.Type)
         {
             operand = Expression.Convert(operand, member.Type);
@@ -118,6 +124,16 @@ public static class QueryFilterBuilder
         return Expression.Lambda<Func<T, bool>>(body, parameter);
     }
 
+    private static MemberExpression CreateOperand(Type memberType, object value) =>
+        HolderCache.GetOrAdd(memberType, static type =>
+            typeof(QueryFilterBuilder)
+                .GetMethod(nameof(CreateHolderOperand), BindingFlags.NonPublic | BindingFlags.Static)!
+                .MakeGenericMethod(type)
+                .CreateDelegate<Func<object, MemberExpression>>())(value);
+
+    private static MemberExpression CreateHolderOperand<TValue>(object value) =>
+        Expression.Property(Expression.Constant(new ValueHolder<TValue>((TValue)value)), nameof(ValueHolder<TValue>.Value));
+
     private static object ConvertValue(object value, Type targetType, string target)
     {
         try
@@ -127,10 +143,11 @@ public static class QueryFilterBuilder
                 DateTime d when targetType == typeof(DateTimeOffset) => new DateTimeOffset(d),
                 DateTime d when targetType == typeof(DateOnly) => DateOnly.FromDateTime(d),
                 DateTimeOffset d when targetType == typeof(DateTime) => d.UtcDateTime,
+                _ when targetType.IsEnum => Enum.ToObject(targetType, value),
                 _ => Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture),
             };
         }
-        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
         {
             throw new InvalidOperationException($"Filter value of type {value.GetType().Name} cannot be compared with '{target}' ({targetType.Name}).", ex);
         }

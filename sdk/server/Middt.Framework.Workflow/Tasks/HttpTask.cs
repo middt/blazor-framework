@@ -109,6 +109,11 @@ public sealed class HttpTask : IWorkflowTask
             }
         }
 
+        if (!string.IsNullOrEmpty(context.IdempotencyKey) && !request.Headers.Contains("Idempotency-Key"))
+        {
+            request.Headers.TryAddWithoutValidation("Idempotency-Key", context.IdempotencyKey);
+        }
+
         // Apply request body
         var contentType = config["contentType"]?.GetValue<string>() ?? "application/json";
         if (config["body"] is not null)

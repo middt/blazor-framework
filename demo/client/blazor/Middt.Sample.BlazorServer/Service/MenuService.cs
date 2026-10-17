@@ -32,6 +32,7 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
         ("test-http-tasks", "Dış Servis / HTTP Testi", "http"),
         ("test-messaging-tasks", "Mesajlaşma Testi", "send"),
         ("test-subflow", "Alt Akış (SubFlow) Testi", "call_split"),
+        ("test-retry-tasks", "Yeniden Deneme Testi", "replay"),
     ];
 
     private static readonly MenuItem Designer = new() { Name = "Ekran Tasarımı", Path = "/ui-admin", Icon = "dashboard_customize", Title = "Ekran Tasarımı" };
@@ -56,10 +57,16 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
     };
 
     private IReadOnlyList<MenuItem> layoutItems = [];
+    private bool canDesign;
 
     public event Action? Changed;
 
-    public IReadOnlyList<MenuItem> MenuItems => [Home, workflowGroup, testWorkflowGroup, .. layoutItems, Designer];
+    public IReadOnlyList<MenuItem> MenuItems => canDesign
+        ? [Home, workflowGroup, testWorkflowGroup, .. layoutItems, Designer]
+        : [Home, workflowGroup, testWorkflowGroup, .. layoutItems];
+
+    /// <summary>Shows or hides the layout editor entry (<c>/ui-admin</c>) based on the <c>ui-admin</c> role.</summary>
+    public void SetCanDesign(bool value) => canDesign = value;
 
     /// <summary>Route of the generic workflow page.</summary>
     public static string WorkflowPath(string key) => $"/workflow/{key}";

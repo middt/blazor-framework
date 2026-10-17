@@ -58,6 +58,12 @@ public sealed class WorkflowRegistry
 
     public IEnumerable<WorkflowDefinition> Latest => Definitions.Values.Select(v => v.Values[^1]);
 
+    /// <summary>All registered versions of one workflow, for version-specific instance access checks.</summary>
+    public IReadOnlyList<WorkflowDefinition> GetVersions(string key) =>
+        Definitions.TryGetValue(key, out var versions)
+            ? versions.Values.ToArray()
+            : throw new WorkflowNotFoundException($"Workflow '{key}' does not exist.");
+
     public WorkflowDefinition GetLatest(string key) =>
         Definitions.TryGetValue(key, out var versions)
             ? versions.Values[^1]
@@ -135,6 +141,7 @@ public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
         ["rabbit-publish"] = typeof(RabbitMqTask),
         ["rabbitPublish"] = typeof(RabbitMqTask),
         ["publish"] = typeof(PublishTask),
+        ["operation"] = typeof(OperationTask),
         ["startWorkflow"] = typeof(StartWorkflowTask),
         ["start-workflow"] = typeof(StartWorkflowTask),
         ["setKey"] = typeof(SetKeyTask),

@@ -41,6 +41,7 @@ export const TEST_WORKFLOW_MENU: MenuGroup = {
     { name: 'Dış Servis / HTTP Testi', path: '/workflow/test-http-tasks', icon: 'http' },
     { name: 'Mesajlaşma Testi', path: '/workflow/test-messaging-tasks', icon: 'send' },
     { name: 'Alt Akış (SubFlow) Testi', path: '/workflow/test-subflow', icon: 'call_split' },
+    { name: 'Yeniden Deneme Testi', path: '/workflow/test-retry-tasks', icon: 'replay' },
   ],
 };
 

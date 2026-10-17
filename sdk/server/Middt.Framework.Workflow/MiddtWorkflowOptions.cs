@@ -15,7 +15,7 @@ public sealed class MiddtWorkflowOptions
     /// <summary>Creates the workflow tables at startup when they do not exist (use EF migrations for production).</summary>
     public bool AutoCreateSchema { get; set; }
 
-    /// <summary>Runs the background processor for timers, timeouts and async transitions.</summary>
+    /// <summary>Runs the background processor for timers, async transitions, follow-up jobs and Busy recovery.</summary>
     public bool EnableJobProcessor { get; set; } = true;
 
     public TimeSpan JobPollingInterval { get; set; } = TimeSpan.FromSeconds(5);

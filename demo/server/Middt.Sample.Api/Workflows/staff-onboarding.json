@@ -1,5 +1,5 @@
 {
-  // 2/8: store → personal details (optional manager) → manager approval → bike-create-staff (staffs table).
+  // 2/8: store → personal details (optional manager) → manager approval → entity-create (staffs table).
   // Started by store-opening with data { storeId, storeName, source: "store-opening" }: the store step is skipped.
   "key": "staff-onboarding",
   "version": 1,

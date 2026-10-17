@@ -62,7 +62,7 @@
     private static Dictionary<string, string?> QueryValues(string uri)
     {
         var query = new Uri(uri).Query;
-        return QueryHelpers.ParseQuery(query).ToDictionary(p => p.Key, p => (string?)p.Value.LastOrDefault(), StringComparer.Ordinal);
+        return QueryHelpers.ParseQuery(query).ToDictionary(p => p.Key, p => (string?)p.Value.FirstOrDefault(), StringComparer.Ordinal);
     }
 
     private void OnSelected(WorkflowInstanceModel instance) => selectedId = instance.Id;

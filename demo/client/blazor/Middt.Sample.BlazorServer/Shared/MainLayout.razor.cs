@@ -70,12 +70,15 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
             return Task.CompletedTask;
         });
 
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        MenuService.SetCanDesign(authState.User.IsInRole("ui-admin"));
+
         // The menu loaded while prerendering is handed over to the circuit, so it is not requested twice per page load.
         if (ApplicationState.TryTakeFromJson<List<MenuItem>>(MenuStateKey, out var items) && items is not null)
         {
             MenuService.Restore(items);
         }
-        else if ((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User.Identity?.IsAuthenticated == true)
+        else if (authState.User.Identity?.IsAuthenticated == true)
         {
             await MenuService.RefreshAsync();
         }

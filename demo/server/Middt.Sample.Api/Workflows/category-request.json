@@ -1,5 +1,5 @@
 {
-  // 3/8: category name + justification → manager approval → bike-create-category (categories table, publishes
+  // 3/8: category name + justification → manager approval → entity-create (categories table, publishes
   // CategoryCreated like the Category API). Reject → Error; duplicate name → "fix".
   "key": "category-request",
   "version": 1,

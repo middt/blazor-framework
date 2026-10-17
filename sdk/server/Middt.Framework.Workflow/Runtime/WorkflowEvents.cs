@@ -11,7 +11,7 @@ public enum WorkflowEventType
     Faulted,
 }
 
-/// <summary>Raised after the change was committed. Handlers run in-process; failures are logged and do not affect the instance.</summary>
+/// <summary>Queued with the state change and delivered after commit; handlers may receive it again after failure or restart.</summary>
 public sealed record WorkflowEvent(
     WorkflowEventType Type,
     Guid InstanceId,

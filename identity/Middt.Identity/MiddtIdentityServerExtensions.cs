@@ -17,6 +17,7 @@ using Middt.Identity.Journeys;
 using Middt.Identity.Seeding;
 using Middt.Framework.Workflow;
 using Middt.Framework.Workflow.DependencyInjection;
+using Middt.Framework.Workflow.Tasks;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Middt.Identity;
@@ -206,6 +207,7 @@ public static class MiddtIdentityServerExtensions
 
     private static void AddJourneys(IServiceCollection services, MiddtIdentityOptions options, IHostEnvironment environment)
     {
+        services.AddScoped<IWorkflowOperationDispatcher, IdentityJourneyOperationDispatcher>();
         var overrides = new List<(string Key, string Json, string Source)>();
         foreach (var directory in options.JourneyDirectories)
         {
@@ -239,17 +241,6 @@ public static class MiddtIdentityServerExtensions
             {
                 workflow.AddDefinition(json, source);
             }
-
-            workflow.AddTask<VerifyCredentialsTask>("idp-verify-credentials")
-                .AddTask<VerifyTotpTask>("idp-verify-totp")
-                .AddTask<CheckConsentTask>("idp-check-consent")
-                .AddTask<GrantConsentTask>("idp-grant-consent")
-                .AddTask<CreateUserTask>("idp-create-user")
-                .AddTask<SendEmailCodeTask>("idp-send-email-code")
-                .AddTask<VerifyEmailCodeTask>("idp-verify-email-code")
-                .AddTask<ResetPasswordTask>("idp-reset-password")
-                .AddTask<TotpSetupTask>("idp-totp-setup")
-                .AddTask<EnableTotpTask>("idp-enable-totp");
 
             foreach (var configureWorkflow in options.WorkflowConfigurations)
             {

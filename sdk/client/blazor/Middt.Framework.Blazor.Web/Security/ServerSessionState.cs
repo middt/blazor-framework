@@ -39,7 +39,13 @@ public sealed class ServerSessionState(
             return;
         }
 
-        await tokenStore.SetAsync(sessionId, new SaveTokenResponseModel(tokenResponseModel) { expire_datetime = existing.expire_datetime });
+        var updated = new SaveTokenResponseModel(tokenResponseModel) { expire_datetime = existing.expire_datetime };
+        if (Bff.Oidc.OidcTokens.GetIdToken(updated) is null && Bff.Oidc.OidcTokens.GetIdToken(existing) is { } idToken)
+        {
+            Bff.Oidc.OidcTokens.SetIdToken(updated, idToken);
+        }
+
+        await tokenStore.SetAsync(sessionId, updated);
     }
 
     public async Task ClearToken()

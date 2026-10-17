@@ -18,7 +18,7 @@ public sealed class DbSqlTask : EntityTaskBase
         {
             yield return "db-sql: 'sql' is required.";
         }
-        foreach (var err in expressions.ValidateTemplate(task.Config["sql"]))
+        foreach (var err in expressions.ValidateTemplate(task.Config["parameters"]))
         {
             yield return "db-sql: " + err;
         }
@@ -27,8 +27,7 @@ public sealed class DbSqlTask : EntityTaskBase
     public override async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
     {
         var db = ResolveDbContext(context);
-        var rawSql = context.Config["sql"]!.GetValue<string>();
-        var sql = context.Expressions.RenderText(rawSql, context.Scope) ?? rawSql;
+        var sql = context.Config["sql"]!.GetValue<string>();
 
         var parametersList = new List<object>();
         if (context.Config["parameters"] is JsonArray arr)

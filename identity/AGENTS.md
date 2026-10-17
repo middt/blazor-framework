@@ -8,6 +8,8 @@ project; the demo's settings live in `demo/server/identity.json`. Full reference
 - Journeys (`Journeys/auth-*.json`) are workflow definitions; passwords and codes are `input.sensitive` (never
   persisted). Every journey call is bound to the browser (`middt.idp.journey` cookie, hashed in the instance) and a
   succeeded journey is consumed once (`/account/journey/{id}/complete` signs in).
+- Journey definitions use the framework's general `operation` task. Identity operations are allowlisted in
+  `IdentityJourneyOperationDispatcher`; keep password, code and OIDC rules in the identity service.
 - Account pages are static SSR (they set cookies) – keep `[ExcludeFromInteractiveRouting]`; admin pages are
   interactive and open a DI scope per operation. Keep the ids `Input_Username` / `Input_Password` (E2E).
 - SQL Server has no MARS in the demo: materialize OpenIddict/EF async streams before per-row queries. Tests use SQLite

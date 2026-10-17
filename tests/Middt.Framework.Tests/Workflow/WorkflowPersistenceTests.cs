@@ -48,9 +48,10 @@ public sealed class WorkflowPersistenceTests
         response.EnsureSuccessStatusCode();
         // Engine: read + claim + delete left-state jobs + save (SQLite runs the update/inserts as separate commands; SQL Server
         // batches them). No second read of the instance and no job query for the response (formerly 11 commands here).
-        // The test host's RecordingEventHandler adds one SELECT of its own.
+        // The test host's RecordingEventHandler adds one SELECT of its own. Durable event delivery adds one job insert
+        // in the state transaction and one delete after successful delivery.
         var log = string.Join(Environment.NewLine, counter.Texts);
-        counter.Commands.Should().BeLessThanOrEqualTo(7, log);
+        counter.Commands.Should().BeLessThanOrEqualTo(9, log);
         counter.Texts.Count(t => t.StartsWith("SELECT", StringComparison.Ordinal) && t.Contains("FROM \"WorkflowInstances\"", StringComparison.Ordinal))
             .Should().Be(2, log);
         counter.Texts.Should().NotContain(t => t.StartsWith("SELECT", StringComparison.Ordinal) && t.Contains("FROM \"WorkflowJobs\"", StringComparison.Ordinal), log);

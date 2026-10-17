@@ -75,8 +75,8 @@ public static class WorkflowUi
         var result = new JsonObject();
         foreach (var name in StartPrefillParameters(schema, list.Select(v => v.Key)))
         {
-            // the last value wins when a parameter is repeated
-            var text = list.Last(v => v.Key == name).Value;
+            // the first value wins when a parameter is repeated (same as @middt/ui-core workflowStartQuery)
+            var text = list.First(v => v.Key == name).Value;
             if (QueryValue(text, SchemaType(properties[name]!.AsObject())) is { } node)
             {
                 result[name] = node;

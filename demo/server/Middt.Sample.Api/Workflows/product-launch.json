@@ -1,6 +1,6 @@
 {
   // 4/8: category, brand, name, model year, list price (+ optional initial stock) → price approval by a manager above
-  // 5.000 TL (automatic below) → bike-create-product (products table) → starts stock-replenishment for the initial
+  // 5.000 TL (automatic below) → entity-create (products table) → starts stock-replenishment for the initial
   // stock when a store and a quantity > 0 were given.
   "key": "product-launch",
   "version": 1,

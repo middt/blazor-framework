@@ -1,8 +1,8 @@
 {
   // 4/8 and the lifecycle of a product (one instance per product, business key "product-<id>"): category, brand, name,
   // model year, list price (+ optional initial stock) → price approval by a manager above 5.000 TL (automatic below) →
-  // bike-create-product (products table) → starts stock-replenishment for the initial stock when a store and a
-  // quantity > 0 were given → "active": change requests (bike-update-product) and the close request (bike-set-active
+  // entity-create (products table) → starts stock-replenishment for the initial stock when a store and a
+  // quantity > 0 were given → "active": change requests (entity-update) and the close request (entity-update
   // false, soft delete: orders keep the product). Started with a productId it adopts that product.
   "key": "product-launch",
   "version": 2,

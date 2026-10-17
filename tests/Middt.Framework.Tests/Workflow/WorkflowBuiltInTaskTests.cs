@@ -142,6 +142,7 @@ public sealed class WorkflowBuiltInTaskTests
         request.Uri.AbsoluteUri.Should().Be("https://scoring.test/api/customers/c-1/score?amount=12.5");
         request.Headers["X-Static"].Should().Be("yes");
         request.Headers["X-Customer"].Should().Be("c-1");
+        request.Headers["Idempotency-Key"].Should().StartWith(instance.Id.ToString("N"));
         request.Headers["Content-Type"].Should().StartWith("application/json");
         var body = JsonNode.Parse(request.Body!)!;
         body["customer"]!.GetValue<string>().Should().Be("c-1");

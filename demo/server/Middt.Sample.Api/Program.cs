@@ -13,7 +13,6 @@ using Middt.Sample.Api;
 using Middt.Sample.Api.Handlers;
 using Middt.Sample.Api.Model.Database;
 using Middt.Sample.Api.Repository.Bike;
-using Middt.Sample.Api.Tasks;
 using Middt.Sample.Common.Messages;
 using Middt.Sample.Views;
 
@@ -66,7 +65,7 @@ builder.Services.AddMiddtWorkflow(workflow =>
     // Raw task errors only in Development (production callers get a generic text; details stay in the logs).
     workflow.ExposeErrorDetails = builder.Environment.IsDevelopment();
     workflow.AddDefinitionsFromDirectory("Workflows");
-    workflow.AddBikeStoreTasks(); // bike-* tasks: the linked demo workflows write the BikeStores tables through them
+    workflow.AddRebusTasks();
     workflow.UseViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>().Views); // server driven UI (validated + HTML rendering)
 });
 builder.Services.AddSingleton<IWorkflowMessagePublisher, RebusWorkflowMessagePublisher>();

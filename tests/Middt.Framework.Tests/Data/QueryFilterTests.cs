@@ -179,4 +179,12 @@ public sealed class QueryFilterTests : IDisposable
     {
         QueryFilterBuilder.ResolveSortProperty<Product>(input).Should().Be(expected);
     }
+
+    [Fact]
+    public async Task Guid_DateOnly_and_Enum_properties_filter_when_non_default()
+    {
+        (await FilterIds(new Product { ExternalId = SqliteTestDatabase.AppleExternalId })).Should().Equal(1);
+        (await FilterIds(new Product { ReleaseDate = new DateOnly(2024, 2, 15) })).Should().Equal(2);
+        (await FilterIds(new Product { Kind = ProductKind.Dried })).Should().Equal(2);
+    }
 }

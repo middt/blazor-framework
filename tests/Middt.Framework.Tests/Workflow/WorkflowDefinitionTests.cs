@@ -1,9 +1,9 @@
+using Middt.Framework.Plugin.Rebus;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Workflow.DependencyInjection;
 using Middt.Framework.Workflow.Runtime;
-using Middt.Sample.Api.Tasks;
 
 namespace Middt.Framework.Tests.Workflow;
 
@@ -38,7 +38,7 @@ public sealed class WorkflowDefinitionTests
             }
 
             o.AddTask<RecordTask>("record");
-            o.AddBikeStoreTasks(); // the demo definitions use the bike-* tasks
+            o.AddRebusTasks();
         });
         services.AddSingleton<TaskLog>();
 
@@ -104,7 +104,7 @@ public sealed class WorkflowDefinitionTests
             "store-opening", "staff-onboarding", "category-request", "product-launch", "stock-replenishment",
             "customer-onboarding", "order-approval", "order-fulfillment", "credit-check",
             "test-core-tasks", "test-entity-tasks", "test-http-tasks", "test-messaging-tasks",
-            "get-branch-staff", "test-subflow");
+            "get-branch-staff", "test-subflow", "test-retry-tasks");
         registry.GetLatest("credit-check").Version.Should().Be(2);
 
         // Master data lifecycles: v2 keeps the record's instance in "active" (change / close), v1 stays for running instances.
@@ -122,7 +122,7 @@ public sealed class WorkflowDefinitionTests
     [Fact]
     public void Sample_definitions_validate_like_at_api_startup()
     {
-        // Same registrations as demo/server/Middt.Sample.Api/Program.cs: bike-* tasks and the Razor state views.
+        // Same registrations as demo/server/Middt.Sample.Api/Program.cs: general tasks and the Razor state views.
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddMiddtWorkflow(o =>
@@ -130,14 +130,14 @@ public sealed class WorkflowDefinitionTests
             o.UseDbContext(db => db.UseSqlite("DataSource=:memory:"));
             o.EnableJobProcessor = false;
             o.AddDefinitionsFromDirectory(Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows"));
-            o.AddBikeStoreTasks();
+            o.AddRebusTasks();
             o.UseViews(Middt.Framework.Workflow.Razor.WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>().Views);
         });
 
         var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();
 
         registry.Invoking(r => r.EnsureLoaded()).Should().NotThrow();
-        registry.Latest.Should().HaveCount(15);
+        registry.Latest.Should().HaveCount(16);
     }
 
     [Fact]

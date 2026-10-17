@@ -167,7 +167,8 @@ after `MaxJourneyAttempts` failures (`attemptsExceeded`) it moves to `failed`.
   Protection) in the instance until confirmed; `totpKey`/`totpUri` are only added to the UI data in the `setup` state.
   Completion re-issues the session cookie (enabling MFA changes the security stamp).
 
-Tasks (registered by the package): `idp-verify-credentials` (lockout aware; sets `authenticated`, `userId`,
+Each journey uses the framework's general `operation` task. Its `config.operation` selects one of the identity service's
+explicitly allowed operations; unknown names are rejected. The identity operations are `idp-verify-credentials` (lockout aware; sets `authenticated`, `userId`,
 `userName`, `displayName`, `mfaRequired`), `idp-verify-totp` (`mfaPassed`), `idp-check-consent` (sets
 `consentRequired`, `clientName`, `scopeDetails`), `idp-grant-consent` (permanent OpenIddict authorization),
 `idp-create-user` (`created`), `idp-send-email-code` / `idp-verify-email-code` (6 digits, only a salted SHA-256 + expiry

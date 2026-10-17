@@ -26,7 +26,7 @@ public partial class JsonSchemaForm : ComponentBase, IDisposable
 
     private const int LongTextThreshold = 200;
     private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
-    private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.CultureInvariant, PatternTimeout);
+    private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+$", RegexOptions.CultureInvariant, PatternTimeout);
 
     private readonly List<SchemaField> fields = [];
     private readonly Dictionary<string, IRadzenFormComponent> inputs = new(StringComparer.Ordinal);
@@ -107,7 +107,7 @@ public partial class JsonSchemaForm : ComponentBase, IDisposable
                 var items = cache is null
                     ? throw new InvalidOperationException("UiLookupCache is not registered (AddMiddtUi).")
                     : await cache.GetAllAsync(lookup.Entity, cancellation.Token);
-                state = new LookupState { Options = [.. items.Select(i => new UiOption(i[lookup.ValueField]?.DeepClone(), UiFieldJson.Key(i[lookup.TextField])))] };
+                state = new LookupState { Options = BuildLookupOptions(lookup, items) };
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
@@ -125,6 +125,26 @@ public partial class JsonSchemaForm : ComponentBase, IDisposable
 
             lookups[field.Name] = state;
         }
+    }
+
+    private static List<UiOption> BuildLookupOptions(SchemaLookup lookup, List<JsonObject> items)
+    {
+        var options = new List<UiOption>(items.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            var rawValue = item[lookup.ValueField];
+            var key = UiFieldJson.Key(rawValue);
+            if (key.Length == 0 || !seen.Add(key))
+            {
+                continue;
+            }
+
+            var text = UiFieldJson.Key(item[lookup.TextField]);
+            options.Add(new UiOption(rawValue?.DeepClone(), text.Length == 0 ? key : text));
+        }
+
+        return options;
     }
 
     /// <summary>Options of a lookup select; a prefilled value missing from the loaded items stays selectable (shown as is).</summary>

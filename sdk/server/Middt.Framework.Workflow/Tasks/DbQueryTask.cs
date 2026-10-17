@@ -23,13 +23,16 @@ public sealed class DbQueryTask : EntityTaskBase
         {
             yield return "db-query: 'into' is required.";
         }
+        foreach (var err in expressions.ValidateTemplate(task.Config["parameters"]))
+        {
+            yield return "db-query: " + err;
+        }
     }
 
     public override async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
     {
         var db = ResolveDbContext(context);
-        var rawSql = context.Config["sql"]!.GetValue<string>();
-        var sql = context.Expressions.RenderText(rawSql, context.Scope) ?? rawSql;
+        var sql = context.Config["sql"]!.GetValue<string>();
         var into = context.Config["into"]!.GetValue<string>();
         var isSingleValue = context.Config["singleValue"]?.GetValue<bool>() ?? false;
 

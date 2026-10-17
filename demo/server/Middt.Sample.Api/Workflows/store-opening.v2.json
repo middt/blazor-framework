@@ -1,7 +1,7 @@
 {
   // 1/8 of the bike store chain and the lifecycle of a store (one instance per store, business key "store-<id>"):
-  // store details → manager approval → bike-create-store (stores table) → starts staff-onboarding for the new store →
-  // "active": change requests (approval → bike-update-store) and the close request (approval → bike-set-active false,
+  // store details → manager approval → entity-create (stores table) → starts staff-onboarding for the new store →
+  // "active": change requests (approval → entity-update) and the close request (approval → entity-update false,
   // soft delete). Started with an existing storeId it adopts that store. Rule violations go to "fix" / "change-fix".
   "key": "store-opening",
   "version": 2,
@@ -84,7 +84,8 @@
     },
     {
       // Own hop after the insert: next link of the chain, hire the first staff member of the new store. The child gets
-      // its own business key ("staff-<id>") once the staff member exists; the guard keeps a retry from starting another.
+      // its own business key ("staff-<id>") once the staff member exists. The guard handles repeats after the parent
+      // data commits; a crash before that commit can start another child, so production flows need reconciliation.
       "key": "opening", "title": "Mağaza açılıyor",
       "onEntry": [
         { "task": "set", "config": { "values": { "openedAt": "now" } } },

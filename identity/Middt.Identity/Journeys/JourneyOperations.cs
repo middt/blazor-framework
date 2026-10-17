@@ -11,8 +11,13 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace Middt.Identity.Journeys;
 
+internal interface IIdentityJourneyOperation
+{
+    Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken);
+}
+
 /// <summary>
-/// Helpers shared by the journey tasks. Business failures (wrong password/code) never throw: they set <c>data.error</c>
+/// Helpers shared by the journey operations. Business failures (wrong password/code) never throw: they set <c>data.error</c>
 /// and flags, and the journey's automatic transitions route back to the step (an exception would fault the journey).
 /// </summary>
 internal static class JourneyTask
@@ -59,14 +64,14 @@ internal static class JourneyTask
 /// (wrong passwords count via <c>AccessFailedAsync</c>). Sets <c>authenticated</c>, <c>userId</c>, <c>userName</c>,
 /// <c>displayName</c>, <c>mfaRequired</c>; on failure <c>error</c>, <c>failedAttempts</c>, <c>attemptsExceeded</c>.
 /// </summary>
-internal sealed class VerifyCredentialsTask(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options) : IWorkflowTask
+internal sealed class VerifyCredentialsOperation(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["authenticated"] = false;
-        var user = await JourneyTask.FindUserAsync(users, JourneyTask.Text(context.Scope.Input, "userName"));
-        var password = JourneyTask.Secret(context.Scope.Input, "password") ?? string.Empty;
+        var user = await JourneyTask.FindUserAsync(users, JourneyTask.Text(context.Input, "userName"));
+        var password = JourneyTask.Secret(context.Input, "password") ?? string.Empty;
 
         if (user is null)
         {
@@ -108,9 +113,9 @@ internal sealed class VerifyCredentialsTask(UserManager<MiddtIdentityUser> users
 }
 
 /// <summary><c>idp-verify-totp</c>: verifies <c>input.code</c> against the authenticator of <c>data.userId</c> (counts for lockout). Sets <c>mfaPassed</c>.</summary>
-internal sealed class VerifyTotpTask(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options) : IWorkflowTask
+internal sealed class VerifyTotpOperation(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["mfaPassed"] = false;
@@ -128,7 +133,7 @@ internal sealed class VerifyTotpTask(UserManager<MiddtIdentityUser> users, IOpti
             return;
         }
 
-        var code = JourneyTask.Secret(context.Scope.Input, "code")?.Replace(" ", string.Empty, StringComparison.Ordinal) ?? string.Empty;
+        var code = JourneyTask.Secret(context.Input, "code")?.Replace(" ", string.Empty, StringComparison.Ordinal) ?? string.Empty;
         if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, code))
         {
             await users.AccessFailedAsync(user);
@@ -147,12 +152,12 @@ internal sealed class VerifyTotpTask(UserManager<MiddtIdentityUser> users, IOpti
 /// <c>consentRequired</c> (explicit/systematic consent clients without a permanent authorization covering the scopes, or
 /// <c>data.forceConsent</c>).
 /// </summary>
-internal sealed class CheckConsentTask(
+internal sealed class CheckConsentOperation(
     IOpenIddictApplicationManager applications,
     IOpenIddictAuthorizationManager authorizations,
-    IOpenIddictScopeManager scopes) : IWorkflowTask
+    IOpenIddictScopeManager scopes) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["consentRequired"] = false;
@@ -212,9 +217,9 @@ internal sealed class CheckConsentTask(
 }
 
 /// <summary><c>idp-grant-consent</c>: stores a permanent authorization of <c>data.userId</c> for <c>data.clientId</c>/<c>data.scopes</c>.</summary>
-internal sealed class GrantConsentTask(IOpenIddictApplicationManager applications, IOpenIddictAuthorizationManager authorizations) : IWorkflowTask
+internal sealed class GrantConsentOperation(IOpenIddictApplicationManager applications, IOpenIddictAuthorizationManager authorizations) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         var subject = JourneyTask.Text(data, JourneyData.UserId) ?? throw new InvalidOperationException("The journey has no user.");
@@ -237,9 +242,9 @@ internal sealed class GrantConsentTask(IOpenIddictApplicationManager application
 /// <c>idp-create-user</c>: creates the user from <c>input.userName/email/displayName/password</c> (password policy applies).
 /// Sets <c>created</c>, <c>userId</c>, <c>email</c> or <c>error</c>. Honours <c>AllowRegistration</c> and <c>RequireConfirmedEmail</c>.
 /// </summary>
-internal sealed class CreateUserTask(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options, TimeProvider time) : IWorkflowTask
+internal sealed class CreateUserOperation(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options, TimeProvider time) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["created"] = false;
@@ -249,7 +254,7 @@ internal sealed class CreateUserTask(UserManager<MiddtIdentityUser> users, IOpti
             return;
         }
 
-        var input = context.Scope.Input;
+        var input = context.Input;
         var user = new MiddtIdentityUser
         {
             UserName = JourneyTask.Text(input, "userName"),
@@ -280,15 +285,15 @@ internal sealed class CreateUserTask(UserManager<MiddtIdentityUser> users, IOpti
 /// <c>purpose</c> = <c>confirm-email</c> (user <c>data.userId</c>) or <c>reset-password</c> (address <c>input.email</c>; nothing is
 /// sent for unknown addresses but the journey behaves the same), <c>resend: true</c> for repeated requests (limited).
 /// </summary>
-internal sealed class SendEmailCodeTask(
+internal sealed class SendEmailCodeOperation(
     UserManager<MiddtIdentityUser> users,
     IIdentityMessageSender sender,
     IOptions<MiddtIdentityOptions> options,
-    TimeProvider time) : IWorkflowTask
+    TimeProvider time) : IIdentityJourneyOperation
 {
     private const int MaxResends = 5;
 
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         if (context.Config["resend"] is JsonValue resend && resend.TryGetValue<bool>(out var isResend) && isResend)
@@ -306,7 +311,7 @@ internal sealed class SendEmailCodeTask(
         string? email;
         if (context.Config["purpose"]?.GetValue<string>() == "reset-password")
         {
-            email = JourneyTask.Text(context.Scope.Input, "email") ?? JourneyTask.Text(data, "codeSentTo");
+            email = JourneyTask.Text(context.Input, "email") ?? JourneyTask.Text(data, "codeSentTo");
             user = email is null ? null : await users.FindByEmailAsync(email);
         }
         else
@@ -337,13 +342,13 @@ internal sealed class SendEmailCodeTask(
 /// <c>idp-verify-email-code</c>: compares <c>input.code</c> with the stored hash (constant time, expiry, single use). Sets
 /// <c>codeValid</c>; with config <c>confirmEmail: true</c> the user's e-mail is marked confirmed.
 /// </summary>
-internal sealed class VerifyEmailCodeTask(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options, TimeProvider time) : IWorkflowTask
+internal sealed class VerifyEmailCodeOperation(UserManager<MiddtIdentityUser> users, IOptions<MiddtIdentityOptions> options, TimeProvider time) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["codeValid"] = false;
-        var code = JourneyTask.Secret(context.Scope.Input, "code")?.Trim() ?? string.Empty;
+        var code = JourneyTask.Secret(context.Input, "code")?.Trim() ?? string.Empty;
         var expires = JourneyTask.Text(data, JourneyData.CodeExpiresAt) is { } text && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
             ? at
             : DateTimeOffset.MinValue;
@@ -375,9 +380,9 @@ internal sealed class VerifyEmailCodeTask(UserManager<MiddtIdentityUser> users, 
 }
 
 /// <summary><c>idp-reset-password</c>: after a verified code sets <c>input.password</c> (policy applies), unlocks the account. Sets <c>passwordReset</c>.</summary>
-internal sealed class ResetPasswordTask(UserManager<MiddtIdentityUser> users) : IWorkflowTask
+internal sealed class ResetPasswordOperation(UserManager<MiddtIdentityUser> users) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["passwordReset"] = false;
@@ -389,7 +394,7 @@ internal sealed class ResetPasswordTask(UserManager<MiddtIdentityUser> users) : 
         }
 
         var token = await users.GeneratePasswordResetTokenAsync(user);
-        var result = await users.ResetPasswordAsync(user, token, JourneyTask.Secret(context.Scope.Input, "password") ?? string.Empty);
+        var result = await users.ResetPasswordAsync(user, token, JourneyTask.Secret(context.Input, "password") ?? string.Empty);
         if (!result.Succeeded)
         {
             data[JourneyData.Error] = JourneyTexts.Describe(result.Errors, users.Options);
@@ -414,11 +419,11 @@ internal sealed class ResetPasswordTask(UserManager<MiddtIdentityUser> users) : 
 /// <c>idp-totp-setup</c>: creates a new authenticator key for <c>data.userId</c>, stored encrypted (Data Protection) in the
 /// journey until it is confirmed; the UI gets <c>totpKey</c>/<c>totpUri</c> only while the journey shows the setup view.
 /// </summary>
-internal sealed class TotpSetupTask(UserManager<MiddtIdentityUser> users, IDataProtectionProvider protection) : IWorkflowTask
+internal sealed class TotpSetupOperation(UserManager<MiddtIdentityUser> users, IDataProtectionProvider protection) : IIdentityJourneyOperation
 {
     internal const string Purpose = "Middt.Identity.Journeys.TotpKey";
 
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         var user = JourneyTask.Text(data, JourneyData.UserId) is { } id ? await users.FindByIdAsync(id) : null;
@@ -435,14 +440,14 @@ internal sealed class TotpSetupTask(UserManager<MiddtIdentityUser> users, IDataP
 }
 
 /// <summary><c>idp-enable-totp</c>: verifies <c>input.code</c> against the pending key, stores the key and enables two-factor sign-in. Sets <c>totpEnabled</c>.</summary>
-internal sealed class EnableTotpTask(
+internal sealed class EnableTotpOperation(
     UserManager<MiddtIdentityUser> users,
     IUserStore<MiddtIdentityUser> store,
     IDataProtectionProvider protection,
     IOptions<MiddtIdentityOptions> options,
-    TimeProvider time) : IWorkflowTask
+    TimeProvider time) : IIdentityJourneyOperation
 {
-    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowOperationContext context, CancellationToken cancellationToken)
     {
         var data = context.Data;
         data["totpEnabled"] = false;
@@ -455,8 +460,8 @@ internal sealed class EnableTotpTask(
             return;
         }
 
-        var key = protection.CreateProtector(TotpSetupTask.Purpose).Unprotect(protectedKey);
-        if (!Totp.Verify(key, JourneyTask.Secret(context.Scope.Input, "code"), time.GetUtcNow()))
+        var key = protection.CreateProtector(TotpSetupOperation.Purpose).Unprotect(protectedKey);
+        if (!Totp.Verify(key, JourneyTask.Secret(context.Input, "code"), time.GetUtcNow()))
         {
             JourneyTask.Fail(data, JourneyTexts.InvalidTotp, options.Value);
             return;

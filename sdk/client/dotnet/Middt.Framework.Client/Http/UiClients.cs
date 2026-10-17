@@ -25,20 +25,20 @@ public class UiApiClient(
         SendAsync<BaseResponseDataModel<List<UiLayoutSummary>>>(HttpMethod.Get, $"{RoutePrefix}/layouts{(kind is null ? null : "?kind=" + Uri.EscapeDataString(kind))}", null, cancellationToken);
 
     public virtual Task<BaseResponseDataModel<UiLayoutDocument>> GetAsync(string key, CancellationToken cancellationToken = default) =>
-        SendAsync<BaseResponseDataModel<UiLayoutDocument>>(HttpMethod.Get, $"{RoutePrefix}/layouts/{Uri.EscapeDataString(key)}", null, cancellationToken);
+        SendAsync<BaseResponseDataModel<UiLayoutDocument>>(HttpMethod.Get, $"{RoutePrefix}/layouts/{EscapePathSegment(key, nameof(key))}", null, cancellationToken);
 
     public virtual Task<BaseResponseDataModel<UiValidationResult>> ValidateAsync(UiLayoutDocument layout, CancellationToken cancellationToken = default) =>
         SendAsync<BaseResponseDataModel<UiValidationResult>>(HttpMethod.Post, $"{RoutePrefix}/layouts/validate", layout, cancellationToken);
 
     /// <summary>Creates or updates <paramref name="layout"/>; <see cref="UiLayoutDocument.Version"/> must be the loaded version (0 for a new layout).</summary>
     public virtual Task<BaseResponseDataModel<UiLayoutDocument>> SaveAsync(UiLayoutDocument layout, CancellationToken cancellationToken = default) =>
-        SendAsync<BaseResponseDataModel<UiLayoutDocument>>(HttpMethod.Put, $"{RoutePrefix}/layouts/{Uri.EscapeDataString(layout.Key)}", layout, cancellationToken);
+        SendAsync<BaseResponseDataModel<UiLayoutDocument>>(HttpMethod.Put, $"{RoutePrefix}/layouts/{EscapePathSegment(layout.Key, nameof(layout.Key))}", layout, cancellationToken);
 
     public virtual Task<BaseResponseModel> DeleteAsync(string key, int? version = null, CancellationToken cancellationToken = default) =>
-        SendAsync<BaseResponseModel>(HttpMethod.Delete, $"{RoutePrefix}/layouts/{Uri.EscapeDataString(key)}{(version is { } v ? "?version=" + v.ToString(CultureInfo.InvariantCulture) : null)}", null, cancellationToken);
+        SendAsync<BaseResponseModel>(HttpMethod.Delete, $"{RoutePrefix}/layouts/{EscapePathSegment(key, nameof(key))}{(version is { } v ? "?version=" + v.ToString(CultureInfo.InvariantCulture) : null)}", null, cancellationToken);
 
     public virtual Task<BaseResponseDataModel<List<UiLayoutRevisionModel>>> RevisionsAsync(string key, CancellationToken cancellationToken = default) =>
-        SendAsync<BaseResponseDataModel<List<UiLayoutRevisionModel>>>(HttpMethod.Get, $"{RoutePrefix}/layouts/{Uri.EscapeDataString(key)}/revisions", null, cancellationToken);
+        SendAsync<BaseResponseDataModel<List<UiLayoutRevisionModel>>>(HttpMethod.Get, $"{RoutePrefix}/layouts/{EscapePathSegment(key, nameof(key))}/revisions", null, cancellationToken);
 
     public virtual Task<BaseResponseDataModel<List<UiWidgetSpecModel>>> WidgetsAsync(CancellationToken cancellationToken = default) =>
         SendAsync<BaseResponseDataModel<List<UiWidgetSpecModel>>>(HttpMethod.Get, $"{RoutePrefix}/widgets", null, cancellationToken);

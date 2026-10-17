@@ -407,7 +407,29 @@ export interface SchemaField {
 }
 
 const LONG_TEXT_THRESHOLD = 200;
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const EMAIL = /^[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+$/;
+const MAX_PATTERN_CACHE_SIZE = 256;
+const patternCache = new Map<string, RegExp | null>();
+
+function getPatternRegex(pattern: string): RegExp | null {
+  if (patternCache.has(pattern)) {
+    return patternCache.get(pattern) ?? null;
+  }
+
+  let regex: RegExp | null = null;
+  try {
+    regex = new RegExp(pattern);
+  } catch {
+    regex = null; // invalid pattern: leave it to the server
+  }
+
+  if (patternCache.size >= MAX_PATTERN_CACHE_SIZE) {
+    patternCache.clear();
+  }
+
+  patternCache.set(pattern, regex);
+  return regex;
+}
 
 const getString = (obj: WorkflowData, name: string): string | null => (typeof obj[name] === 'string' ? (obj[name] as string) : null);
 const getNumber = (obj: WorkflowData, name: string): number | null => (typeof obj[name] === 'number' && Number.isFinite(obj[name]) ? (obj[name] as number) : null);
@@ -684,13 +706,7 @@ export function validateSchemaField(field: SchemaField, value: SchemaFieldValue 
       }
 
       if (field.pattern !== null && field.pattern !== '') {
-        let regex: RegExp | null = null;
-        try {
-          regex = new RegExp(field.pattern);
-        } catch {
-          regex = null; // invalid pattern: leave it to the server
-        }
-
+        const regex = getPatternRegex(field.pattern);
         if (regex !== null && !regex.test(text)) {
           return 'Geçersiz biçim.';
         }

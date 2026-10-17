@@ -39,6 +39,7 @@ public sealed partial class ExpressionEvaluator
         .Reference(typeof(Math))
         .Reference(typeof(TimeSpan));
 
+    private const int MaxCacheSize = 1000;
     private readonly ConcurrentDictionary<string, Lambda> cache = new(StringComparer.Ordinal);
 
     /// <param name="objectVariables">Variables holding JSON objects (member access: <c>data.customer.name</c>; missing → null).</param>
@@ -182,9 +183,21 @@ public sealed partial class ExpressionEvaluator
         _ => [],
     };
 
-    private Lambda Compile(string expression) =>
-        cache.GetOrAdd(expression, e => interpreter.Parse(e, parameters));
+    private Lambda Compile(string expression)
+    {
+        if (cache.TryGetValue(expression, out var cached))
+        {
+            return cached;
+        }
 
-    [GeneratedRegex(@"\{\{\s*(.+?)\s*\}\}", RegexOptions.CultureInvariant)]
+        if (cache.Count >= MaxCacheSize)
+        {
+            cache.Clear();
+        }
+
+        return cache.GetOrAdd(expression, e => interpreter.Parse(e, parameters));
+    }
+
+    [GeneratedRegex(@"\{\{\s*(.+?)\s*\}\}", RegexOptions.CultureInvariant | RegexOptions.Singleline)]
     private static partial Regex PlaceholderRegex();
 }

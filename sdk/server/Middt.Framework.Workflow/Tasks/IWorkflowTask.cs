@@ -31,6 +31,9 @@ public sealed class WorkflowTaskContext
 
     public required Guid InstanceId { get; init; }
 
+    /// <summary>Stable across attempts of this task execution; send it to external systems that support idempotency.</summary>
+    public string IdempotencyKey { get; init; } = string.Empty;
+
     public required string Workflow { get; init; }
 
     public required string State { get; init; }

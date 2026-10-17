@@ -300,6 +300,9 @@ public sealed class UiLayoutValidatorTests
     [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "search": [ { "field": "a.b" } ] }""", "body[0](grid).search[0].field: invalid field name 'a.b'.")]
     [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "filter": { "x y": "1" } }""", "body[0](grid).filter.x y: invalid field name.")]
     [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "search": [ { "field": "c", "type": "picker", "lookup": { "entity": "C$", "valueField": "id", "textField": "n" } } ] }""", "body[0](grid).search[0].lookup.entity: must be a controller name (letters and digits).")]
+    [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "search": [ { "field": "c", "type": "picker", "lookup": { "entity": "C", "valueField": "a-b", "textField": "n" } } ] }""", "body[0](grid).search[0].lookup.valueField: invalid field name 'a-b'.")]
+    [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "search": [ { "field": "c", "type": "picker", "lookup": { "entity": "C", "valueField": "id", "textField": "a.b" } } ] }""", "body[0](grid).search[0].lookup.textField: invalid field name 'a.b'.")]
+    [InlineData("""{ "widget": "grid", "entity": "A", "columns": [], "search": [ { "field": "c", "type": "picker", "lookup": { "entity": "C", "valueField": "id", "textField": "n", "columns": [ { "field": "x-y" } ] } } ] }""", "body[0](grid).search[0].lookup.columns[0].field: invalid field name 'x-y'.")]
     public void Entity_and_field_names_are_restricted(string node, string expected) =>
         Errors($"[ {node} ]").Should().Equal(expected);
 

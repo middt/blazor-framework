@@ -21,6 +21,9 @@ public sealed class TestCustomerEntity
     public string Name { get; set; } = string.Empty;
     public string? Email { get; set; }
     public bool IsActive { get; set; }
+
+    [System.ComponentModel.ReadOnly(true)]
+    public string? InternalNote { get; set; }
 }
 
 public sealed class WorkflowEntityTasksTests
@@ -289,6 +292,54 @@ public sealed class WorkflowEntityTasksTests
         updated.Should().NotBeNull();
         updated!.Name.Should().Be("Güncel İsim");
         updated.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EntityUpdateTask_ignores_primary_key_and_read_only_properties()
+    {
+        const string attemptProtectedUpdateWf = """
+            {
+              "key": "update-protected-wf",
+              "start": { "key": "start", "target": "updating", "input": { "schema": { "type": "object" } } },
+              "states": [
+                {
+                  "key": "updating",
+                  "onEntry": [
+                    {
+                      "task": "entity-update",
+                      "config": {
+                        "entity": "TestCustomerEntity",
+                        "key": "{{ data.customerId }}",
+                        "values": {
+                          "Id": 9999,
+                          "Name": "Safe Update",
+                          "InternalNote": "overwritten"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        var ct = TestContext.Current.CancellationToken;
+        await using var setup = await CreateHostAsync(attemptProtectedUpdateWf);
+        var entityId = await setup.DbAsync(async db =>
+        {
+            var entity = new TestCustomerEntity { Name = "Original", InternalNote = "protected", IsActive = true };
+            db.Customers.Add(entity);
+            await db.SaveChangesAsync(ct);
+            return entity.Id;
+        });
+
+        await setup.Host.StartInstanceAsync("update-protected-wf", new JsonObject { ["customerId"] = entityId });
+
+        var updated = await setup.DbAsync(db => db.Customers.FindAsync([entityId], ct).AsTask());
+        updated.Should().NotBeNull();
+        updated!.Id.Should().Be(entityId);
+        updated.Name.Should().Be("Safe Update");
+        updated.InternalNote.Should().Be("protected");
     }
 
     [Fact]

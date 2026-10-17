@@ -1,6 +1,6 @@
 {
   // 5/8: store + product + quantity → manager approval (automatic after 1 minute; immediately when the order-fulfillment
-  // workflow asks for the missing quantity) → bike-adjust-stock (+quantity, stocks table).
+  // workflow asks for the missing quantity) → db-sql (+quantity, stocks table).
   // Started with data { storeId, productId, quantity, requestedBy } by product-launch (initial stock) and as a subflow
   // of order-fulfillment: the form step is skipped.
   "key": "stock-replenishment",
@@ -67,8 +67,22 @@
     },
     {
       "key": "replenishing", "title": "Stok güncelleniyor",
-      "onEntry": [ { "task": "bike-adjust-stock", "config": {
-        "storeId": "{{ data.storeId }}", "productId": "{{ data.productId }}", "quantity": "{{ data.quantity }}", "operation": "replenishedStock" } } ],
+      "onEntry": [
+        { "task": "db-sql", "when": "data.replenishedStock == null", "config": {
+          "sql": "UPDATE stocks SET quantity = COALESCE(quantity, 0) + {2} WHERE store_id = {0} AND product_id = {1}",
+          "parameters": ["{{ data.storeId }}", "{{ data.productId }}", "{{ data.quantity }}"], "into": "stockRowsChanged" } },
+        { "task": "db-sql", "when": "data.replenishedStock == null && data.stockRowsChanged == 0", "config": {
+          "sql": "INSERT INTO stocks (store_id, product_id, quantity) SELECT {0}, {1}, {2} WHERE NOT EXISTS (SELECT 1 FROM stocks WHERE store_id = {0} AND product_id = {1})",
+          "parameters": ["{{ data.storeId }}", "{{ data.productId }}", "{{ data.quantity }}"], "into": "stockRowsChanged" } },
+        { "task": "set", "when": "data.replenishedStock == null && data.stockRowsChanged == 0", "config": { "values": {
+          "error": "\"Stok eşzamanlı değişti; işlemi yeniden deneyin.\"" } } },
+        { "task": "db-query", "when": "data.replenishedStock == null && data.stockRowsChanged > 0", "config": {
+          "sql": "SELECT quantity FROM stocks WHERE store_id = {0} AND product_id = {1}",
+          "parameters": ["{{ data.storeId }}", "{{ data.productId }}"], "singleValue": true, "into": "stockAvailable" } },
+        { "task": "set", "when": "data.replenishedStock == null && data.stockRowsChanged > 0", "config": { "values": {
+          "error": "null", "replenishedStock.storeId": "data.storeId", "replenishedStock.productId": "data.productId",
+          "replenishedStock.delta": "data.quantity", "replenishedStock.quantity": "data.stockAvailable" } } }
+      ],
       "transitions": [
         { "key": "failed", "target": "fix", "trigger": "Automatic", "rule": "data.error != null" },
         { "key": "done", "target": "completed", "trigger": "Automatic", "default": true }

@@ -1,4 +1,6 @@
 {
+  // Sends real messages. A task can be repeated after a crash or retry; consumers must deduplicate by a stable
+  // business identifier such as orderId. The workflow's in-command idempotency key alone is not a durable inbox.
   "key": "test-messaging-tasks",
   "version": 1,
   "title": "Mesajlaşma Görevleri Test Akışı (RabbitMQ, Rebus, Publish)",

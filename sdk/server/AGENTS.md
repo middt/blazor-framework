@@ -21,8 +21,12 @@ Common · Data · Api · Workflow · Ui.Server · plugins (Redis, Rebus). **Must
   (`WorkflowDefinitionValidator`) – add validation for every new definition property.
 - `WorkflowEngine` runs transitions with an optimistic claim (Busy + revision), automatic chains, subflows, jobs
   (`WorkflowJobProcessor`), history and incidents. Keep round trips low (there is a test pinning the command count).
+- Persist the pending command in the Busy claim. Final state, history and follow-up jobs commit together; event
+  delivery, parent resume and child cancellation are replayable jobs. Do not delete pending event jobs when an instance
+  finishes. Handlers and external task side effects must be idempotent; task attempts share an idempotency key but an
+  explicit later retry can get a new one. Never persist `input.sensitive` values.
 - Access: definition `roles`, transition `roles`, `instanceAccess` (owner mode + supervisor roles). Every instance-level
-  entry point must go through `EnsureCanAccess`.
+  entry point must go through `EnsureCanAccess`; list filtering uses each instance's stored definition version.
 - Errors shown to callers are hidden unless `ExposeErrorDetails`; the `http` task never follows redirects and honours
   `AllowedHttpHosts` – keep both.
 - Static view HTML: `IWorkflowViewRenderer` implementations (Razor components via `UseViews`, layouts via the host).

@@ -25,7 +25,7 @@ A .NET 10 framework for line-of-business apps with **two interchangeable fronten
 sdk/                              the framework (NuGet + npm packages)
   shared/                         Model · Expressions · Ui.Abstractions        contracts, NO UI technology / ASP.NET
   server/                         Common · Data · Api · Workflow · Ui.Server    backend, NO frontend dependencies
-    plugins/                      Plugin.Redis · Plugin.Rebus
+    plugins/                      Plugin.Redis · Plugin.Rebus · Plugin.SyncfusionExport
   client/
     dotnet/                       Middt.Framework.Client                        typed API clients (.NET)
     typescript/ui-core/           @middt/ui-core                                TS twin of the contracts + API clients
@@ -104,7 +104,7 @@ docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083
 - Browsers don't separate cookies by port: each BFF app on the same host needs its own `CookieName`.
 - SQL Server sorts `uniqueidentifier` by bytes 10–15: use the engine's sequential id generator, not random/v7 GUIDs.
 - Seeds (`demo/server/…/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
-- E2E (Playwright) suites are not in the repo yet; see `docs/ai/testing.md`.
+- E2E (Playwright) suites live in `tests/e2e`; see `docs/ai/testing.md`.
 - Identity admin pages run on SQL Server without MARS: materialize an `IAsyncEnumerable` from OpenIddict/EF before
   querying per row (SQLite in the tests does not catch "open DataReader").
 - Radzen grids with `LoadData` lose the initial load across prerendering: call `grid.Reload()` in

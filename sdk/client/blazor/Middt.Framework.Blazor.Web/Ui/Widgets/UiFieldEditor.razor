@@ -74,6 +74,7 @@
     private UiField? optionsField;
     private List<JsonObject>? optionsSource;
     private string? pickerText;
+    private string? pickerValueKey;
     private string? loadError;
     private readonly CancellationTokenSource cancellation = new();
 
@@ -126,6 +127,7 @@
         if (Field.Type == "picker" && Target[Field.Field] is null)
         {
             pickerText = null;
+            pickerValueKey = null;
         }
 
         if (Field.Type == "select")
@@ -170,11 +172,16 @@
                 optionsSource = null;
             }
         }
-        else if (Field.Type == "picker" && Field.Lookup is { } lookup && Target[Field.Field] is { } value && pickerText is null && Context.Interactive)
+        else if (Field.Type == "picker" && Field.Lookup is { } lookup && Target[Field.Field] is { } value && Context.Interactive)
         {
-            // Editing an existing record: show the text of the stored value.
-            var response = await DataClient.GetByIdAsync(lookup.Entity, UiFieldJson.Key(value), cancellation.Token);
-            pickerText = response.IsSuccess && response.Data is { } item ? UiFieldJson.Key(item[lookup.TextField]) : UiFieldJson.Key(value);
+            var valueKey = UiFieldJson.Key(value);
+            if (pickerText is null || pickerValueKey != valueKey)
+            {
+                // Editing an existing record (or switched to a different record): show the text of the stored value.
+                pickerValueKey = valueKey;
+                var response = await DataClient.GetByIdAsync(lookup.Entity, valueKey, cancellation.Token);
+                pickerText = response.IsSuccess && response.Data is { } item ? UiFieldJson.Key(item[lookup.TextField]) : valueKey;
+            }
         }
     }
 
@@ -221,14 +228,17 @@
 
         if (result is JsonObject row)
         {
+            var pickedValue = row[lookup.ValueField]?.DeepClone();
+            pickerValueKey = pickedValue is null ? null : UiFieldJson.Key(pickedValue);
             pickerText = UiFieldJson.Key(row[lookup.TextField]);
-            await SetAsync(row[lookup.ValueField]?.DeepClone());
+            await SetAsync(pickedValue);
         }
     }
 
     private Task ClearPickAsync()
     {
         pickerText = null;
+        pickerValueKey = null;
         return SetAsync(null);
     }
 
