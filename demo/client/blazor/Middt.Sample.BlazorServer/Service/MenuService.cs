@@ -11,28 +11,14 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
 {
     private static readonly MenuItem Home = new() { Name = "Home", Path = "/", Icon = "home", Title = "Middt Sample" };
 
-    /// <summary>Demo workflows in process order (key, menu text, icon); the E2E suites rely on the texts and order.</summary>
+    /// <summary>Demo workflows showcasing JSON document persistence and all workflow engine capabilities.</summary>
     public static readonly IReadOnlyList<(string Key, string Name, string Icon)> Workflows =
     [
-        ("store-opening", "Mağaza açılışı", "storefront"),
-        ("staff-onboarding", "Personel alımı", "badge"),
-        ("category-request", "Kategori talebi", "category"),
-        ("product-launch", "Ürün lansmanı", "new_releases"),
-        ("stock-replenishment", "Stok ikmali", "inventory_2"),
-        ("customer-onboarding", "Müşteri kaydı", "person_add"),
-        ("order-approval", "Sipariş Onayı", "shopping_cart"),
-        ("order-fulfillment", "Sipariş karşılama", "local_shipping"),
-    ];
-
-    /// <summary>Test workflows covering all workflow tasks (core, entity, http, messaging).</summary>
-    public static readonly IReadOnlyList<(string Key, string Name, string Icon)> TestWorkflows =
-    [
-        ("test-core-tasks", "Temel Görevler Testi", "play_arrow"),
-        ("test-entity-tasks", "Entity / DB Testi", "storage"),
-        ("test-http-tasks", "Dış Servis / HTTP Testi", "http"),
-        ("test-messaging-tasks", "Mesajlaşma Testi", "send"),
-        ("test-subflow", "Alt Akış (SubFlow) Testi", "call_split"),
-        ("test-retry-tasks", "Yeniden Deneme Testi", "replay"),
+        ("customer-onboarding", "Müşteri Kaydı & KYC", "person_add"),
+        ("credit-allocation", "Kredi Tahsis & 4-Göz Onay", "account_balance"),
+        ("order-payment-orchestration", "Sipariş & Ödeme Orkestrasyonu", "shopping_cart"),
+        ("sla-escalation", "SLA & Eskalasyon Yönetimi", "timer"),
+        ("risk-limit-eval", "Risk & Limit Servisi (SubFlow)", "verified_user"),
     ];
 
     private static readonly MenuItem Designer = new() { Name = "Ekran Tasarımı", Path = "/ui-admin", Icon = "dashboard_customize", Title = "Ekran Tasarımı" };
@@ -47,23 +33,14 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
         Children = [.. Workflows.Select(w => new MenuItem { Name = w.Name, Path = WorkflowPath(w.Key), Icon = w.Icon, Title = w.Name })],
     };
 
-    private readonly MenuItem testWorkflowGroup = new()
-    {
-        Name = "Test Akışları",
-        Path = "/workflow/test-core-tasks",
-        Icon = "science",
-        Expanded = true,
-        Children = [.. TestWorkflows.Select(w => new MenuItem { Name = w.Name, Path = WorkflowPath(w.Key), Icon = w.Icon, Title = w.Name })],
-    };
-
     private IReadOnlyList<MenuItem> layoutItems = [];
     private bool canDesign;
 
     public event Action? Changed;
 
     public IReadOnlyList<MenuItem> MenuItems => canDesign
-        ? [Home, workflowGroup, testWorkflowGroup, .. layoutItems, Designer]
-        : [Home, workflowGroup, testWorkflowGroup, .. layoutItems];
+        ? [Home, workflowGroup, .. layoutItems, Designer]
+        : [Home, workflowGroup, .. layoutItems];
 
     /// <summary>Shows or hides the layout editor entry (<c>/ui-admin</c>) based on the <c>ui-admin</c> role.</summary>
     public void SetCanDesign(bool value) => canDesign = value;

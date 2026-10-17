@@ -42,8 +42,10 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        var provider = Database.ProviderName ?? string.Empty;
         // SQLite has no schemas.
-        var schema = Database.ProviderName?.Contains("Sqlite", StringComparison.Ordinal) == true ? null : workflowOptions.Value.Schema;
+        var schema = provider.Contains("Sqlite", StringComparison.Ordinal) ? null : workflowOptions.Value.Schema;
+        var isPostgres = provider.Contains("Npgsql", StringComparison.Ordinal);
 
         modelBuilder.Entity<WorkflowInstance>(e =>
         {
@@ -56,6 +58,11 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.PendingTransition).HasMaxLength(128);
             e.Property(x => x.StartedBy).HasMaxLength(256);
             e.Property(x => x.LastExecutedBy).HasMaxLength(256);
+            if (isPostgres)
+            {
+                e.Property(x => x.Data).HasColumnType("jsonb");
+            }
+
             e.Property(x => x.Revision).IsConcurrencyToken();
             e.Ignore(x => x.IsTerminal);
             e.HasIndex(x => new { x.WorkflowKey, x.BusinessKey }).IsUnique();
@@ -79,6 +86,13 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.ToState).HasMaxLength(128);
             e.Property(x => x.Trigger).HasMaxLength(16);
             e.Property(x => x.ExecutedBy).HasMaxLength(256);
+            if (isPostgres)
+            {
+                e.Property(x => x.Input).HasColumnType("jsonb");
+                e.Property(x => x.Data).HasColumnType("jsonb");
+                e.Property(x => x.Tasks).HasColumnType("jsonb");
+            }
+
             e.HasIndex(x => x.InstanceId);
         });
 
@@ -90,6 +104,11 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.TransitionKey).HasMaxLength(128);
             e.Property(x => x.State).HasMaxLength(128);
             e.Property(x => x.RequestedBy).HasMaxLength(256);
+            if (isPostgres)
+            {
+                e.Property(x => x.Payload).HasColumnType("jsonb");
+            }
+
             e.HasIndex(x => x.DueAt);
             e.HasIndex(x => x.InstanceId);
         });

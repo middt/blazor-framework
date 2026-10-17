@@ -856,6 +856,7 @@ public sealed partial class WorkflowEngine(
 
             for (var attempt = 1; ; attempt++)
             {
+                using var childStartLock = new SemaphoreSlim(1, 1);
                 var attemptData = (JsonObject)run.Data.DeepClone();
                 var originalBusinessKey = run.Instance.BusinessKey;
                 var context = new WorkflowTaskContext
@@ -870,7 +871,18 @@ public sealed partial class WorkflowEngine(
                     State = run.Instance.State,
                     Services = services,
                     Logger = logger,
-                    StartWorkflow = async (workflow, data, key, ct) => (await StartChildAsync(workflow, data, key, run.Instance.Id, run.User, ct)).Id,
+                    StartWorkflow = async (workflow, data, key, ct) =>
+                    {
+                        await childStartLock.WaitAsync(ct);
+                        try
+                        {
+                            return (await StartChildAsync(workflow, data, key, run.Instance.Id, run.User, ct)).Id;
+                        }
+                        finally
+                        {
+                            childStartLock.Release();
+                        }
+                    },
                     BusinessKey = run.Instance.BusinessKey,
                     SetBusinessKey = (key, ct) => SetBusinessKeyAsync(run, key, ct),
                 };

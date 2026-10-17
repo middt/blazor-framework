@@ -1,0 +1,239 @@
+{
+  "key": "sla-escalation",
+  "version": 1,
+  "title": "SLA & Eskalasyon Yönetimi",
+  "timeout": {
+    "after": "PT24H",
+    "target": "expired"
+  },
+  "start": {
+    "key": "start",
+    "target": "triage",
+    "input": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [ "ticketTitle", "severity", "slaDuration" ],
+        "properties": {
+          "ticketTitle": { "type": "string", "minLength": 3, "maxLength": 150, "title": "Talep / Çağrı Başlığı", "default": "Kurumsal Ödeme Geçidi Gecikmesi" },
+          "customerName": { "type": "string", "maxLength": 120, "title": "Müşteri / Kurum", "default": "Anadolu Lojistik A.Ş." },
+          "amount": { "type": "number", "minimum": 0, "title": "Etkilenen Tutar (₺)", "default": 45000 },
+          "severity": {
+            "type": "string",
+            "title": "Öncelik Seviyesi",
+            "enum": [ "Normal", "Yüksek", "Kritik" ],
+            "default": "Yüksek"
+          },
+          "slaDuration": {
+            "type": "string",
+            "title": "Dinamik SLA Süresi (HH:mm:ss)",
+            "default": "00:02:00"
+          }
+        }
+      }
+    },
+    "onExecute": [
+      {
+        "task": "set",
+        "config": {
+          "values": {
+            "requestedBy": "user.Name",
+            "requestedAt": "now",
+            "heartbeatCount": "0"
+          }
+        }
+      }
+    ]
+  },
+  "states": [
+    {
+      "key": "triage",
+      "title": "Otomatik Triyaj (Zincirleme Adım 1)",
+      "step": 1,
+      "onEntry": [
+        {
+          "task": "set",
+          "config": {
+            "values": {
+              "assignedQueue": "data.severity == \"Kritik\" ? \"Kriz Masası\" : (data.severity == \"Yüksek\" ? \"Kıdemli Operasyon\" : \"Standart Destek\")",
+              "triagedAt": "now"
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "to-routing",
+          "target": "priority-routing",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "priority-routing",
+      "title": "Öncelik Yönlendirme (Zincirleme Adım 2)",
+      "step": 1,
+      "transitions": [
+        {
+          "key": "critical-immediate-escalation",
+          "target": "escalated",
+          "trigger": "Automatic",
+          "rule": "data.severity == \"Kritik\"",
+          "onExecute": [
+            {
+              "task": "set",
+              "config": {
+                "values": {
+                  "escalatedReason": "\"Kritik öncelikli çağrı doğrudan eskale edildi.\"",
+                  "escalatedAt": "now"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "key": "to-waiting-agent",
+          "target": "waiting-agent",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "waiting-agent",
+      "title": "Uzman Yanıtı Bekleniyor (Dinamik SLA Timer)",
+      "step": 2,
+      "subType": "Human",
+      "onEntry": [
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "SLA sayacı başlatıldı ({{ data.slaDuration }}): {{ data.ticketTitle }}"
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "resolve",
+          "title": "Çözümlendi Olarak Kapat",
+          "target": "resolved",
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "resolutionNote" ],
+              "properties": {
+                "resolutionNote": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Çözüm Açıklaması", "default": "Sorun giderildi ve servis normale döndü." }
+              }
+            },
+            "set": {
+              "resolvedBy": "user.Name",
+              "resolvedAt": "now"
+            }
+          }
+        },
+        {
+          "key": "heartbeat-ping",
+          "title": "İlerleme Notu Ekle ($self, Timer Korunur)",
+          "target": "$self",
+          "reenter": false,
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "progressNote" ],
+              "properties": {
+                "progressNote": { "type": "string", "minLength": 2, "maxLength": 300, "title": "İlerleme Notu", "default": "Log kayıtları inceleniyor, müdahale devam ediyor." }
+              }
+            },
+            "set": {
+              "heartbeatCount": "data.heartbeatCount + 1",
+              "lastHeartbeatAt": "now"
+            }
+          }
+        },
+        {
+          "key": "extend-sla",
+          "title": "SLA Süresini Yenile ($self + Reenter)",
+          "target": "$self",
+          "reenter": true,
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "slaDuration" ],
+              "properties": {
+                "slaDuration": { "type": "string", "title": "Yeni SLA Süresi (HH:mm:ss)", "default": "00:05:00" }
+              }
+            }
+          }
+        },
+        {
+          "key": "auto-escalate",
+          "target": "escalated",
+          "trigger": "Scheduled",
+          "after": "{{ data.slaDuration }}",
+          "onExecute": [
+            {
+              "task": "set",
+              "config": {
+                "values": {
+                  "escalatedReason": "\"Dinamik SLA süresi (\" + data.slaDuration + \") dolduğu için otomatik eskale edildi.\"",
+                  "escalatedAt": "now"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "escalated",
+      "title": "Eskale Edildi (Yönetici Müdahalesi)",
+      "step": 3,
+      "subType": "Human",
+      "view": { "layout": "order-escalated" },
+      "transitions": [
+        {
+          "key": "manager-resolve",
+          "title": "Yönetici Kararıyla Çözümle",
+          "target": "resolved",
+          "roles": [ "manager" ],
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "resolutionNote" ],
+              "properties": {
+                "resolutionNote": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Yönetici Çözüm Notu", "default": "Yönetici eskalasyon kararı ile çözümlendi." }
+              }
+            },
+            "set": {
+              "resolvedBy": "user.Name",
+              "resolvedAt": "now"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "resolved",
+      "title": "Çözümlendi",
+      "step": 4,
+      "type": "Finish",
+      "subType": "Success"
+    },
+    {
+      "key": "expired",
+      "title": "Zaman Aşımı (Timeout)",
+      "step": 4,
+      "type": "Finish",
+      "subType": "Timeout"
+    }
+  ]
+}

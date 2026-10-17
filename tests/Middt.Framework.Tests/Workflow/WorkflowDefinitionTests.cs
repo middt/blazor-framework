@@ -72,16 +72,16 @@ public sealed class WorkflowDefinitionTests
     [Fact]
     public void Sample_definitions_load_without_errors()
     {
-        var (registry, errors) = Load(SampleDefinition("order-approval.json"), SampleDefinition("credit-check.json"));
+        var (registry, errors) = Load(SampleDefinition("credit-allocation.json"), SampleDefinition("risk-limit-eval.json"));
 
         errors.Should().BeEmpty();
-        var order = registry!.GetLatest("order-approval");
-        order.Version.Should().Be(1);
-        order.Start.Target.Should().Be("credit-check");
-        order.FindState("credit-check")!.Type.Should().Be(StateType.SubFlow);
-        order.FindState("manager-review")!.Transitions.Should().Contain(t => t.Key == "escalate" && t.Trigger == TriggerType.Scheduled);
-        order.SharedTransitions.Should().ContainSingle(t => t.Key == "cancel" && t.AvailableIn.Contains("*"));
-        registry.Latest.Select(d => d.Key).Should().BeEquivalentTo("order-approval", "credit-check");
+        var credit = registry!.GetLatest("credit-allocation");
+        credit.Version.Should().Be(1);
+        credit.Start.Target.Should().Be("load-customer");
+        credit.FindState("risk-subflow")!.Type.Should().Be(StateType.SubFlow);
+        credit.FindState("risk-subflow")!.SubFlow!.ForwardTransitions.Should().BeTrue();
+        credit.FindState("stage2-approval")!.Transitions.Should().Contain(t => t.Key == "approve-stage2-four-eyes" && t.DenyRoles.Contains("$previousUser"));
+        registry.Latest.Select(d => d.Key).Should().BeEquivalentTo("credit-allocation", "risk-limit-eval");
     }
 
     [Fact]
@@ -94,29 +94,20 @@ public sealed class WorkflowDefinitionTests
         var (registry, errors) = Load(files);
 
         errors.Should().BeEmpty();
-        var latest = registry!.GetLatest("order-approval");
-        latest.Version.Should().Be(3);
-        latest.Start.Target.Should().Be("customer");
-        latest.States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4 });
-        registry.Get("order-approval", 2).States.Where(s => s.Step is not null).Select(s => s.Step).Distinct().Should().BeEquivalentTo(new int?[] { 1, 2, 3, 4, 5 });
-        registry.Get("order-approval", 1).Start.Target.Should().Be("credit-check", "running v1 instances keep their definition");
-        registry.Latest.Select(d => d.Key).Should().BeEquivalentTo(
-            "store-opening", "staff-onboarding", "category-request", "product-launch", "stock-replenishment",
-            "customer-onboarding", "order-approval", "order-fulfillment", "credit-check",
-            "test-core-tasks", "test-entity-tasks", "test-http-tasks", "test-messaging-tasks",
-            "get-branch-staff", "test-subflow", "test-retry-tasks");
-        registry.GetLatest("credit-check").Version.Should().Be(2);
+        registry!.Latest.Select(d => d.Key).Should().BeEquivalentTo(
+            "customer-onboarding",
+            "credit-allocation",
+            "order-payment-orchestration",
+            "sla-escalation",
+            "risk-limit-eval");
 
-        // Master data lifecycles: v2 keeps the record's instance in "active" (change / close), v1 stays for running instances.
-        foreach (var key in new[] { "store-opening", "staff-onboarding", "category-request", "product-launch", "customer-onboarding" })
-        {
-            var lifecycle = registry.GetLatest(key);
-            lifecycle.Version.Should().Be(2, key);
-            lifecycle.Start.Input!.Schema.Should().NotBeNull(key);
-            lifecycle.FindState("active")!.Transitions.Select(t => t.Key).Should().Equal(["request-change", "request-close"], key);
-            lifecycle.FindState("closed")!.IsFinal.Should().BeTrue(key);
-            registry.Get(key, 1).States.Should().NotContain(s => s.Key == "active", key);
-        }
+        var customer = registry.GetLatest("customer-onboarding");
+        customer.DataSchema.Should().NotBeNull();
+        customer.FindState("active")!.Transitions.Select(t => t.Key).Should().Equal(["update-income", "close-account"]);
+        customer.FindState("closed")!.IsFinal.Should().BeTrue();
+
+        var sla = registry.GetLatest("sla-escalation");
+        sla.FindState("waiting-agent")!.Transitions.Should().Contain(t => t.Key == "auto-escalate" && t.Trigger == TriggerType.Scheduled && t.After == "{{ data.slaDuration }}");
     }
 
     [Fact]
@@ -137,14 +128,14 @@ public sealed class WorkflowDefinitionTests
         var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();
 
         registry.Invoking(r => r.EnsureLoaded()).Should().NotThrow();
-        registry.Latest.Should().HaveCount(16);
+        registry.Latest.Should().HaveCount(5);
     }
 
     [Fact]
     public void Sample_with_subflow_fails_when_child_workflow_is_missing()
     {
-        Errors(SampleDefinition("order-approval.json"))
-            .Should().ContainSingle(e => e.Contains("subflow workflow 'credit-check' is not defined", StringComparison.Ordinal));
+        Errors(SampleDefinition("credit-allocation.json"))
+            .Should().ContainSingle(e => e.Contains("subflow workflow 'risk-limit-eval' is not defined", StringComparison.Ordinal));
     }
 
     [Fact]

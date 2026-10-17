@@ -22,12 +22,6 @@ if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
 }
 
 // Typed API clients (IHttpClientFactory + standard resilience pipeline).
-builder.Services.AddMiddtApiClient<CategoryService>();
-builder.Services.AddMiddtApiClient<CustomerService>();
-builder.Services.AddMiddtApiClient<ProductService>();
-builder.Services.AddMiddtApiClient<StaffService>();
-builder.Services.AddMiddtApiClient<StoreService>();
-builder.Services.AddMiddtApiClient<ViewOrderService>();
 builder.Services.AddMiddtApiClient<WorkflowApiClient>();
 builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>());
 builder.Services.AddMiddtUi(); // server driven UI: JSON layouts (/ui/{key}, workflow state layouts, /ui-admin editor)

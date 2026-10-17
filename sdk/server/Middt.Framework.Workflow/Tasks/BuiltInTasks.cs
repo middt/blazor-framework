@@ -147,7 +147,7 @@ public sealed class SetKeyTask : IWorkflowTask
         }
     }
 
-    public Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
     {
         var key = context.RenderText("key")?.Trim();
         if (string.IsNullOrEmpty(key))
@@ -160,8 +160,108 @@ public sealed class SetKeyTask : IWorkflowTask
             throw new WorkflowTaskException($"setKey: the key is longer than {MaxKeyLength} characters.");
         }
 
-        return context.SetBusinessKey is { } setKey
-            ? setKey(key, cancellationToken)
-            : throw new InvalidOperationException("setKey runs inside the workflow engine only.");
+        if (context.SetBusinessKey is not { } setKey)
+        {
+            throw new InvalidOperationException("setKey runs inside the workflow engine only.");
+        }
+
+        if (context.Config["ensureUnique"]?.GetValue<bool>() == true)
+        {
+            if (!string.IsNullOrEmpty(context.BusinessKey))
+            {
+                return;
+            }
+
+            var db = context.Services.GetRequiredService<Persistence.WorkflowDbContext>();
+            var exists = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(db.Instances),
+                i => i.WorkflowKey == context.Workflow && i.BusinessKey == key && i.Id != context.InstanceId,
+                cancellationToken);
+            if (exists)
+            {
+                var suffix = "-" + context.InstanceId.ToString("N")[..6].ToUpperInvariant();
+                key = (key.Length + suffix.Length <= MaxKeyLength ? key : key[..(MaxKeyLength - suffix.Length)]) + suffix;
+            }
+        }
+
+        await setKey(key, cancellationToken);
     }
 }
+
+/// <summary>
+/// <c>loadWorkflow</c>: loads another workflow instance's JSON <c>Data</c> (and metadata) from <see cref="Persistence.WorkflowDbContext"/>
+/// by business <c>key</c> or instance <c>id</c> into the current instance's data:
+/// <code>{ "workflow": "customer-onboarding", "key": "{{ data.customerKey }}", "into": "customer" }</code>
+/// </summary>
+public sealed class LoadWorkflowTask : IWorkflowTask
+{
+    public IEnumerable<string> Validate(TaskDefinition task, WorkflowExpressionEngine expressions)
+    {
+        if (task.Config["workflow"]?.GetValue<string>() is not { Length: > 0 })
+        {
+            yield return "loadWorkflow: 'workflow' is required.";
+        }
+
+        var hasKey = task.Config["key"]?.GetValue<string>() is { Length: > 0 };
+        var hasId = task.Config["id"]?.GetValue<string>() is { Length: > 0 };
+        if (!hasKey && !hasId)
+        {
+            yield return "loadWorkflow: either 'key' or 'id' is required.";
+        }
+
+        if (task.Config["into"]?.GetValue<string>() is not { Length: > 0 })
+        {
+            yield return "loadWorkflow: 'into' is required.";
+        }
+
+        foreach (var error in expressions.ValidateTemplate(task.Config["key"]).Concat(expressions.ValidateTemplate(task.Config["id"])))
+        {
+            yield return "loadWorkflow: " + error;
+        }
+    }
+
+    public async Task ExecuteAsync(WorkflowTaskContext context, CancellationToken cancellationToken)
+    {
+        var db = context.Services.GetRequiredService<Persistence.WorkflowDbContext>();
+        var workflow = context.Config["workflow"]!.GetValue<string>();
+        var into = context.Config["into"]!.GetValue<string>();
+        var key = context.RenderText("key")?.Trim();
+        var idText = context.RenderText("id")?.Trim();
+
+        Persistence.WorkflowInstance? instance = null;
+        if (Guid.TryParse(idText, out var id))
+        {
+            instance = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(db.Instances),
+                i => i.Id == id && i.WorkflowKey == workflow,
+                cancellationToken);
+        }
+        else if (!string.IsNullOrEmpty(key))
+        {
+            instance = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(db.Instances),
+                i => i.WorkflowKey == workflow && i.BusinessKey == key,
+                cancellationToken);
+        }
+
+        if (instance is null)
+        {
+            JsonPath.Set(context.Data, into, new JsonObject
+            {
+                ["id"] = idText,
+                ["key"] = key,
+                ["found"] = false,
+            });
+            return;
+        }
+
+        var loaded = JsonNode.Parse(string.IsNullOrWhiteSpace(instance.Data) ? "{}" : instance.Data) as JsonObject ?? [];
+        loaded["id"] = instance.Id.ToString("D");
+        loaded["key"] = instance.BusinessKey;
+        loaded["state"] = instance.State;
+        loaded["status"] = instance.Status.ToString();
+        loaded["found"] = true;
+        JsonPath.Set(context.Data, into, loaded);
+    }
+}
+

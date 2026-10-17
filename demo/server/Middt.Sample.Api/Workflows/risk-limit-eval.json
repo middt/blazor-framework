@@ -1,0 +1,145 @@
+{
+  "key": "risk-limit-eval",
+  "version": 1,
+  "title": "Risk & Limit Değerlendirme Servisi",
+  "start": {
+    "key": "start",
+    "target": "evaluate",
+    "input": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "customerKey": { "type": "string", "title": "Müşteri Anahtarı", "default": "CUST-12345678901" },
+          "amount": { "type": "number", "minimum": 0, "title": "Talep Edilen Tutar (₺)", "default": 250000 },
+          "checkType": { "type": "string", "title": "Kontrol Tipi", "default": "Kredi Limit Analizi" },
+          "requireUnderwriting": { "type": "boolean", "title": "Yüksek Tutarda Uzman Onayı İste", "default": false }
+        }
+      }
+    }
+  },
+  "states": [
+    {
+      "key": "evaluate",
+      "title": "Otomatik Risk & Limit Analizi",
+      "step": 1,
+      "onEntry": [
+        {
+          "task": "set",
+          "config": {
+            "values": {
+              "amount": "data.amount != null ? data.amount : 100000",
+              "checkType": "data.checkType != null ? data.checkType : \"Genel Risk Kontrolü\"",
+              "recommendedLimit": "data.amount * 1.25",
+              "evaluatedAt": "now"
+            }
+          }
+        },
+        {
+          "task": "cache",
+          "config": {
+            "key": "risk-eval:{{ data.customerKey }}-{{ data.checkType }}",
+            "ttl": "00:15:00",
+            "into": "riskScore",
+            "subTask": {
+              "task": "set",
+              "config": {
+                "values": {
+                  "riskScore": "data.amount > 500000 ? 640 : 810"
+                }
+              }
+            }
+          }
+        },
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "Risk değerlendirmesi çalıştı: {{ data.checkType }}, Tutar={{ data.amount }}, Skor={{ data.riskScore }}"
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "to-underwriting",
+          "target": "manual-underwriting",
+          "trigger": "Automatic",
+          "rule": "data.requireUnderwriting == true && data.amount > 500000"
+        },
+        {
+          "key": "to-rejected",
+          "target": "rejected",
+          "trigger": "Automatic",
+          "rule": "data.amount > 5000000"
+        },
+        {
+          "key": "to-approved",
+          "target": "approved",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "manual-underwriting",
+      "title": "Tahsis Uzmanı İncelemesi (Alt Akış)",
+      "step": 2,
+      "subType": "Human",
+      "transitions": [
+        {
+          "key": "approve-underwriting",
+          "title": "Alt Akış Limitini Onayla",
+          "target": "approved",
+          "roles": [ "manager" ],
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "underwriterNote": { "type": "string", "maxLength": 300, "title": "Tahsis Uzmanı Notu", "default": "Tahsis uzmanı incelemesi olumlu." }
+              }
+            },
+            "set": {
+              "underwrittenBy": "user.Name",
+              "underwrittenAt": "now"
+            }
+          }
+        },
+        {
+          "key": "reject-underwriting",
+          "title": "Alt Akış Limitini Reddet",
+          "target": "rejected",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reason" ],
+              "properties": {
+                "reason": { "type": "string", "minLength": 3, "maxLength": 300, "title": "Red Nedeni", "default": "Risk skoru ve limit kriterleri sağlanamadı." }
+              }
+            },
+            "set": {
+              "underwrittenBy": "user.Name",
+              "underwrittenAt": "now"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "approved",
+      "title": "Risk Onaylandı",
+      "step": 3,
+      "type": "Finish",
+      "subType": "Success"
+    },
+    {
+      "key": "rejected",
+      "title": "Risk Reddedildi",
+      "step": 3,
+      "type": "Finish",
+      "subType": "Error"
+    }
+  ]
+}

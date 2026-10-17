@@ -1,0 +1,280 @@
+{
+  "key": "credit-allocation",
+  "version": 1,
+  "title": "Kredi Tahsis & 4-Göz Onay",
+  "instanceAccess": {
+    "mode": "all"
+  },
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "customerKey": { "type": "string", "title": "Müşteri Anahtarı" },
+      "amount": { "type": "number", "title": "Kredi Tutarı" },
+      "termMonths": { "type": "integer", "title": "Vade (Ay)" },
+      "collateralAmount": { "type": "number", "title": "Teminat Tutarı" },
+      "ltvRatio": { "type": "number", "title": "Kredi / Teminat Oranı (%)" },
+      "iban": {
+        "type": "string",
+        "title": "Ödeme IBAN",
+        "x-mask": { "pattern": "last4", "exceptRoles": [ "manager", "idp-admin" ] }
+      },
+      "committeeSecretNote": {
+        "type": "string",
+        "title": "Komite Gizli Değerlendirme Notu",
+        "x-roles": [ "manager" ]
+      }
+    }
+  },
+  "start": {
+    "key": "start",
+    "target": "load-customer",
+    "input": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [ "customerKey", "amount", "termMonths", "collateralAmount", "iban" ],
+        "properties": {
+          "customerKey": {
+            "type": "string",
+            "title": "Müşteri Seçiniz (Workflow JSON Lookup)",
+            "default": "CUST-12345678901",
+            "x-lookup": {
+              "entity": "CustomerOnboarding",
+              "valueField": "key",
+              "textField": "fullName"
+            }
+          },
+          "amount": { "type": "number", "minimum": 10000, "maximum": 10000000, "title": "Talep Edilen Kredi (₺)", "default": 350000 },
+          "termMonths": { "type": "integer", "minimum": 3, "maximum": 60, "title": "Vade (Ay)", "default": 24 },
+          "collateralAmount": { "type": "number", "minimum": 0, "title": "Teminat Değeri (₺)", "default": 500000 },
+          "iban": { "type": "string", "minLength": 10, "maxLength": 34, "title": "Aktarım IBAN", "default": "TR330006100519786457841326" },
+          "requireUnderwriting": { "type": "boolean", "title": "500.000 ₺ Üzerinde Alt Akış Uzman Onayı Bekle", "default": false }
+        }
+      }
+    },
+    "onExecute": [
+      {
+        "task": "set",
+        "config": {
+          "values": {
+            "requestedBy": "user.Name",
+            "requestedAt": "now",
+            "committeeSecretNote": "\"Komite iç değerlendirme kaydı oluşturuldu.\""
+          }
+        }
+      }
+    ]
+  },
+  "states": [
+    {
+      "key": "load-customer",
+      "title": "Müşteri JSON Verisi Yükleniyor",
+      "step": 1,
+      "onEntry": [
+        {
+          "task": "loadWorkflow",
+          "config": {
+            "workflow": "customer-onboarding",
+            "key": "{{ data.customerKey }}",
+            "into": "customer"
+          }
+        },
+        {
+          "task": "set",
+          "config": {
+            "values": {
+              "customerName": "data.customer != null && data.customer.fullName != null ? data.customer.fullName : data.customerKey",
+              "error": "null"
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "to-risk-subflow",
+          "target": "risk-subflow",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "risk-subflow",
+      "title": "Alt Akış: Risk & Limit Servisi",
+      "step": 2,
+      "type": "SubFlow",
+      "subFlow": {
+        "workflow": "risk-limit-eval",
+        "input": {
+          "customerKey": "data.customerKey",
+          "amount": "data.amount",
+          "checkType": "\"Kredi Tahsis Limit Kontrolü\"",
+          "requireUnderwriting": "data.requireUnderwriting ?? false"
+        },
+        "outputInto": "riskResult",
+        "forwardTransitions": true
+      },
+      "transitions": [
+        {
+          "key": "risk-passed",
+          "target": "stage1-approval",
+          "trigger": "Automatic",
+          "rule": "child.subType == \"Success\""
+        },
+        {
+          "key": "risk-failed",
+          "target": "rejected",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "stage1-approval",
+      "title": "1. Onay: Tahsis Yetkilisi",
+      "step": 3,
+      "subType": "Human",
+      "onEntry": [
+        {
+          "task": "set",
+          "config": {
+            "values": {
+              "ltvRatio": "data.collateralAmount > 0 ? Math.Round((data.amount * 100.0) / data.collateralAmount, 2) : 100.0"
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "approve-stage1",
+          "title": "1. Onayı Ver (Komiteye Gönder)",
+          "target": "stage2-approval",
+          "roles": [ "manager" ],
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "stage1Comment": { "type": "string", "maxLength": 300, "title": "1. Onaycı Görüşü", "default": "1. aşama tahsis kontrolü uygun." }
+              }
+            },
+            "set": {
+              "stage1ApprovedBy": "user.Name",
+              "stage1ApprovedAt": "now"
+            }
+          }
+        },
+        {
+          "key": "update-collateral",
+          "title": "Teminat Güncelle ($self + Reenter)",
+          "target": "$self",
+          "reenter": true,
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "collateralAmount" ],
+              "properties": {
+                "collateralAmount": { "type": "number", "minimum": 1, "title": "Yeni Teminat Değeri (₺)", "default": 750000 }
+              }
+            }
+          }
+        },
+        {
+          "key": "reject-stage1",
+          "title": "Reddet",
+          "target": "rejected",
+          "roles": [ "manager" ],
+          "view": { "component": "reject-reason" },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reason" ],
+              "properties": {
+                "reason": { "type": "string", "minLength": 3, "maxLength": 500, "title": "Red Nedeni", "default": "Teminat oranı yetersiz." }
+              }
+            },
+            "set": {
+              "rejectedBy": "user.Name",
+              "rejectedAt": "now"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "stage2-approval",
+      "title": "2. Onay: Kredi Komitesi (4-Göz İlkesi)",
+      "step": 4,
+      "subType": "Human",
+      "transitions": [
+        {
+          "key": "approve-stage2-four-eyes",
+          "title": "2. Onayı Ver (4-Göz: Farklı Yönetici)",
+          "target": "disbursed",
+          "roles": [ "manager" ],
+          "denyRoles": [ "$previousUser" ],
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "stage2Comment": { "type": "string", "maxLength": 300, "title": "2. Onaycı (4-Göz) Karar Notu", "default": "4-Göz komite onayı verildi." }
+              }
+            },
+            "set": {
+              "stage2ApprovedBy": "user.Name",
+              "stage2ApprovedAt": "now",
+              "disbursedAt": "now"
+            }
+          }
+        },
+        {
+          "key": "executive-override",
+          "title": "Üst Komite Onayı (Tek Kullanıcı Demo)",
+          "target": "disbursed",
+          "roles": [ "idp-admin" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "overrideReason": { "type": "string", "maxLength": 300, "title": "Üst Komite Onay Açıklaması", "default": "Üst komite onayı ile kullandırıldı." }
+              }
+            },
+            "set": {
+              "stage2ApprovedBy": "user.Name",
+              "stage2ApprovedAt": "now",
+              "disbursedAt": "now"
+            }
+          }
+        },
+        {
+          "key": "return-to-stage1",
+          "title": "1. Onaya İade Et",
+          "target": "stage1-approval",
+          "roles": [ "manager" ]
+        }
+      ]
+    },
+    {
+      "key": "disbursed",
+      "title": "Kredi Kullandırıldı",
+      "step": 5,
+      "type": "Finish",
+      "subType": "Success",
+      "view": { "component": "order-result" }
+    },
+    {
+      "key": "rejected",
+      "title": "Kredi Reddedildi",
+      "step": 5,
+      "type": "Finish",
+      "subType": "Error",
+      "view": { "component": "order-result" }
+    }
+  ]
+}

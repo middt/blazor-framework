@@ -15,33 +15,16 @@ export interface MenuGroup {
   items: readonly MenuItem[];
 }
 
-/** The demo workflows, in process order (store → staff → catalog → stock → customers → orders). */
+/** The 5 demo workflows showcasing JSON document persistence and all workflow engine capabilities. */
 export const WORKFLOW_MENU: MenuGroup = {
   name: 'İş Akışları',
   icon: 'account_tree',
   items: [
-    { name: 'Mağaza açılışı', path: '/workflow/store-opening', icon: 'storefront' },
-    { name: 'Personel alımı', path: '/workflow/staff-onboarding', icon: 'badge' },
-    { name: 'Kategori talebi', path: '/workflow/category-request', icon: 'category' },
-    { name: 'Ürün lansmanı', path: '/workflow/product-launch', icon: 'new_releases' },
-    { name: 'Stok ikmali', path: '/workflow/stock-replenishment', icon: 'inventory_2' },
-    { name: 'Müşteri kaydı', path: '/workflow/customer-onboarding', icon: 'person_add' },
-    { name: 'Sipariş Onayı', path: '/workflow/order-approval', icon: 'shopping_cart' },
-    { name: 'Sipariş karşılama', path: '/workflow/order-fulfillment', icon: 'local_shipping' },
-  ],
-};
-
-/** Test workflows covering all framework workflow tasks. */
-export const TEST_WORKFLOW_MENU: MenuGroup = {
-  name: 'Test Akışları',
-  icon: 'science',
-  items: [
-    { name: 'Temel Görevler Testi', path: '/workflow/test-core-tasks', icon: 'play_arrow' },
-    { name: 'Entity / DB Testi', path: '/workflow/test-entity-tasks', icon: 'storage' },
-    { name: 'Dış Servis / HTTP Testi', path: '/workflow/test-http-tasks', icon: 'http' },
-    { name: 'Mesajlaşma Testi', path: '/workflow/test-messaging-tasks', icon: 'send' },
-    { name: 'Alt Akış (SubFlow) Testi', path: '/workflow/test-subflow', icon: 'call_split' },
-    { name: 'Yeniden Deneme Testi', path: '/workflow/test-retry-tasks', icon: 'replay' },
+    { name: 'Müşteri Kaydı & KYC', path: '/workflow/customer-onboarding', icon: 'person_add' },
+    { name: 'Kredi Tahsis & 4-Göz Onay', path: '/workflow/credit-allocation', icon: 'account_balance' },
+    { name: 'Sipariş & Ödeme Orkestrasyonu', path: '/workflow/order-payment-orchestration', icon: 'shopping_cart' },
+    { name: 'SLA & Eskalasyon Yönetimi', path: '/workflow/sla-escalation', icon: 'timer' },
+    { name: 'Risk & Limit Servisi (SubFlow)', path: '/workflow/risk-limit-eval', icon: 'verified_user' },
   ],
 };
 
@@ -54,7 +37,6 @@ export class MenuService {
 
   readonly layoutItems = this.#layoutItems.asReadonly();
   readonly workflowGroup = WORKFLOW_MENU;
-  readonly testWorkflowGroup = TEST_WORKFLOW_MENU;
 
   /** Recomputed only when the user (roles) changes, not on every change detection pass. */
   readonly fixedItems = computed<MenuItem[]>(() => [

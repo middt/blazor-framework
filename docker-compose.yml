@@ -70,7 +70,7 @@ services:
       dockerfile: demo/server/Middt.Sample.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__BikeStores: "Server=db_server,1433;Database=BikeStores;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)};TrustServerCertificate=True"
+      ConnectionStrings__WorkflowDb: "Server=db_server,1433;Database=MiddtWorkflow;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)};TrustServerCertificate=True"
       ConnectionStrings__redis: redis:6379
       ConnectionStrings__messaging: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@mq:5672
       # Access tokens are issued by the identity provider (audience middt-api); keys come from its discovery document.
@@ -154,30 +154,15 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: *sql-password
     volumes:
-      - ./data:/scripts:ro
       - mssql-data:/var/opt/mssql
     ports:
       - "127.0.0.1:1433:1433"
     healthcheck:
-      # Healthy only after the BikeStores seed script has run.
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1 FROM sys.databases WHERE name = 'BikeStores'\" -h -1 | grep -q 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -h -1 | grep -q 1"]
       interval: 10s
       retries: 30
-      start_period: 20s
-    command:
-      - /bin/bash
-      - -c
-      - |
-        /opt/mssql/bin/sqlservr &
-        until /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" > /dev/null 2>&1; do
-          echo "Waiting for SQL Server..."; sleep 3
-        done
-        if ! /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -h -1 -Q "SET NOCOUNT ON; SELECT name FROM sys.databases WHERE name = 'BikeStores'" | grep -q BikeStores; then
-          for script in /scripts/*.sql; do
-            /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -i "$$script"
-          done
-        fi
-        wait
+      start_period: 15s
+
 
 networks:
   backend:

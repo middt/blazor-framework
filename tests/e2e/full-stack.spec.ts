@@ -12,7 +12,7 @@ async function signIn(page: Page): Promise<void> {
 }
 
 for (const [name, base] of [['Blazor', blazor], ['Angular', angular]] as const) {
-  test(`${name}: signed-in page uses the identity provider`, async ({ page }) => {
+  test(`${name}: signed-in page uses the identity provider and renders JSON-backed workflows & layouts`, async ({ page }) => {
     await page.goto(base);
     await signIn(page);
     const approve = page.getByRole('button', { name: 'İzin ver' });
@@ -23,18 +23,20 @@ for (const [name, base] of [['Blazor', blazor], ['Angular', angular]] as const) 
       expect(user.ok()).toBeTruthy();
       expect((await user.json()).isAuthenticated).toBe(true);
     }
-    await page.goto(`${base}/workflow/order-approval`);
+    await page.goto(`${base}/workflow/customer-onboarding`);
     await expect(page.locator('.middt-wf-layout')).toBeVisible();
-    await page.goto(`${base}/workflow/order-approval?start=1`);
+    await page.goto(`${base}/workflow/credit-allocation?start=1`);
     await expect(page.getByRole('dialog', { name: /Yeni başlat/ })).toBeVisible();
     await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).click();
+    await page.goto(`${base}/ui/customer-directory`);
+    await expect(page.locator('.middt-ui-page-header, .middt-ui-grid').first()).toBeVisible();
     await page.goto(`${base}/ui-admin`);
     await expect(page.locator('#ui-layout-json')).toBeVisible();
   });
 
   if (name === 'Angular') {
     test(`${name}: anonymous API call does not redirect to login`, async ({ request }) => {
-      const response = await request.get(`${base}/api/v1/Product/getall`, { maxRedirects: 0, headers: { 'X-CSRF': '1' } });
+      const response = await request.get(`${base}/api/v1/CustomerOnboarding/getall`, { maxRedirects: 0, headers: { 'X-CSRF': '1' } });
       expect(response.status()).toBe(401);
     });
   }
@@ -50,47 +52,186 @@ test('SQL Server backed identity admin loads and searches users', async ({ page 
   await expect(page.getByText('user@test.com').first()).toBeVisible();
 });
 
-test('Workflow API returns ETag / 304 Not Modified and task-level execution trace in history', async ({ page }) => {
+test('JSON-backed workflows execute end-to-end with ETag/304, task trace, SubFlow forwarding, $self, and FanOut', async ({ page }) => {
   await page.goto(angular);
   await signIn(page);
   const approve = page.getByRole('button', { name: 'İzin ver' });
   if (await approve.isVisible()) await approve.click();
   await expect.poll(() => new URL(page.url()).origin, { timeout: 30_000 }).toBe(angular);
 
-  const uniqueCode = `E2E-${Date.now()}`;
-  const startRes = await page.request.post(`${angular}/api/workflows/test-core-tasks/instances`, {
+  // 1. Start customer-onboarding (stored in WorkflowInstances.Data JSON)
+  const tcNo = String(10000000000 + Math.floor(Math.random() * 89999999999));
+  const custStart = await page.request.post(`${angular}/api/workflows/customer-onboarding/instances`, {
     headers: { 'X-CSRF': '1' },
-    data: { data: { code: uniqueCode, amount: 1000 } },
+    data: {
+      data: {
+        fullName: 'E2E JSON Müşteri',
+        identityNumber: tcNo,
+        email: 'e2e@json.com',
+        phone: '05321112233',
+        segment: 'Bireysel',
+        monthlyIncome: 75000,
+      },
+    },
   });
-  expect(startRes.ok()).toBeTruthy();
-  const startBody = await startRes.json();
-  const instance = startBody.data;
-  expect(instance.id).toBeTruthy();
-  expect(instance.state).toBe('completed');
+  expect(custStart.ok()).toBeTruthy();
+  const custInstance = (await custStart.json()).data;
+  expect(custInstance.state).toBe('active');
+  expect(custInstance.key).toBe(`CUST-${tcNo}`);
 
-  const getRes = await page.request.get(`${angular}/api/workflows/test-core-tasks/instances/${instance.id}`, {
+  // 2. Query WorkflowDataController (/api/v1/CustomerOnboarding/getall) backed purely by WorkflowDbContext JSON
+  const custListRes = await page.request.get(`${angular}/api/v1/CustomerOnboarding/getall`, {
+    headers: { 'X-CSRF': '1' },
+  });
+  expect(custListRes.ok()).toBeTruthy();
+  const custList = (await custListRes.json()).data as Array<Record<string, unknown>>;
+  expect(custList.some((c) => c.key === `CUST-${tcNo}` && c.fullName === 'E2E JSON Müşteri')).toBe(true);
+
+  // 3. ETag & 304 Not Modified + Task-level execution trace on customer-onboarding
+  const getRes = await page.request.get(`${angular}/api/workflows/customer-onboarding/instances/${custInstance.id}`, {
     headers: { 'X-CSRF': '1' },
   });
   expect(getRes.status()).toBe(200);
   const etag = getRes.headers()['etag'];
   expect(etag).toBeTruthy();
 
-  const notModifiedRes = await page.request.get(`${angular}/api/workflows/test-core-tasks/instances/${instance.id}`, {
+  const notModifiedRes = await page.request.get(`${angular}/api/workflows/customer-onboarding/instances/${custInstance.id}`, {
     headers: { 'X-CSRF': '1', 'If-None-Match': etag },
   });
   expect(notModifiedRes.status()).toBe(304);
 
-  const historyRes = await page.request.get(`${angular}/api/workflows/test-core-tasks/instances/${instance.id}/history`, {
+  const historyRes = await page.request.get(`${angular}/api/workflows/customer-onboarding/instances/${custInstance.id}/history`, {
     headers: { 'X-CSRF': '1' },
   });
   expect(historyRes.ok()).toBeTruthy();
   const historyBody = await historyRes.json();
   expect(Array.isArray(historyBody.data)).toBe(true);
-  expect(historyBody.data.length).toBeGreaterThanOrEqual(3);
-  const firstStep = historyBody.data[0];
-  expect(Array.isArray(firstStep.tasks)).toBe(true);
-  expect(firstStep.tasks.length).toBe(4);
-  expect(firstStep.tasks.map((t: { taskType: string }) => t.taskType)).toEqual(['log', 'set', 'setKey', 'log']);
-  expect(firstStep.tasks.every((t: { outcome: string; durationMs: number }) => t.outcome === 'Completed' && t.durationMs >= 0)).toBe(true);
-});
+  expect(historyBody.data[0].tasks.length).toBeGreaterThanOrEqual(4);
+  expect(historyBody.data[0].tasks.map((t: { taskType: string }) => t.taskType)).toContain('cache');
 
+  // 4. Start credit-allocation (loadWorkflow + risk-limit-eval SubFlow + $self update-collateral + approve-stage1 + executive-override)
+  const creditStart = await page.request.post(`${angular}/api/workflows/credit-allocation/instances`, {
+    headers: { 'X-CSRF': '1' },
+    data: {
+      data: {
+        customerKey: `CUST-${tcNo}`,
+        amount: 350000,
+        termMonths: 24,
+        collateralAmount: 500000,
+        iban: 'TR330006100519786457841326',
+        requireUnderwriting: false,
+      },
+    },
+  });
+  expect(creditStart.ok()).toBeTruthy();
+  let creditInstance = (await creditStart.json()).data;
+  expect(creditInstance.state).toBe('stage1-approval');
+  expect(creditInstance.data.customerName).toBe('E2E JSON Müşteri');
+
+  const updateCollateralRes = await page.request.post(
+    `${angular}/api/workflows/credit-allocation/instances/${creditInstance.id}/transitions/update-collateral`,
+    {
+      headers: { 'X-CSRF': '1' },
+      data: { collateralAmount: 700000 },
+    },
+  );
+  expect(updateCollateralRes.ok()).toBeTruthy();
+  creditInstance = (await updateCollateralRes.json()).data;
+  expect(creditInstance.state).toBe('stage1-approval');
+  expect(creditInstance.data.ltvRatio).toBe(50);
+
+  const stage1Res = await page.request.post(
+    `${angular}/api/workflows/credit-allocation/instances/${creditInstance.id}/transitions/approve-stage1`,
+    {
+      headers: { 'X-CSRF': '1' },
+      data: { stage1Comment: 'E2E 1. aşama onayı' },
+    },
+  );
+  expect(stage1Res.ok()).toBeTruthy();
+  creditInstance = (await stage1Res.json()).data;
+  expect(creditInstance.state).toBe('stage2-approval');
+
+  const overrideRes = await page.request.post(
+    `${angular}/api/workflows/credit-allocation/instances/${creditInstance.id}/transitions/executive-override`,
+    {
+      headers: { 'X-CSRF': '1' },
+      data: { overrideReason: 'E2E üst komite onayı' },
+    },
+  );
+  expect(overrideRes.ok()).toBeTruthy();
+  creditInstance = (await overrideRes.json()).data;
+  expect(creditInstance.state).toBe('disbursed');
+
+  // 5. Start order-payment-orchestration (fanOut parallel checks + HTTP gateway + cache + RabbitMQ publish)
+  const orderCode = `E2E-${Date.now()}`;
+  const orderStart = await page.request.post(`${angular}/api/workflows/order-payment-orchestration/instances`, {
+    headers: { 'X-CSRF': '1' },
+    data: {
+      data: {
+        orderCode,
+        customerName: 'E2E JSON Müşteri',
+        amount: 18500,
+        paymentMethod: 'Kredi Kartı',
+      },
+    },
+  });
+  expect(orderStart.ok()).toBeTruthy();
+  const orderInstance = (await orderStart.json()).data;
+  expect(orderInstance.state).toBe('completed');
+  expect(orderInstance.key).toBe(`ORD-${orderCode}`);
+
+  // 6. Start sla-escalation (automatic chaining triage -> priority-routing -> waiting-agent, $self heartbeat-ping, resolve)
+  const slaStart = await page.request.post(`${angular}/api/workflows/sla-escalation/instances`, {
+    headers: { 'X-CSRF': '1' },
+    data: {
+      data: {
+        ticketTitle: 'E2E SLA Test Çağrısı',
+        customerName: 'E2E JSON Müşteri',
+        amount: 45000,
+        severity: 'Yüksek',
+        slaDuration: '00:05:00',
+      },
+    },
+  });
+  expect(slaStart.ok()).toBeTruthy();
+  let slaInstance = (await slaStart.json()).data;
+  expect(slaInstance.state).toBe('waiting-agent');
+
+  const heartbeatRes = await page.request.post(
+    `${angular}/api/workflows/sla-escalation/instances/${slaInstance.id}/transitions/heartbeat-ping`,
+    {
+      headers: { 'X-CSRF': '1' },
+      data: { progressNote: 'E2E ilerleme kaydı' },
+    },
+  );
+  expect(heartbeatRes.ok()).toBeTruthy();
+  slaInstance = (await heartbeatRes.json()).data;
+  expect(slaInstance.data.heartbeatCount).toBe(1);
+
+  const resolveRes = await page.request.post(
+    `${angular}/api/workflows/sla-escalation/instances/${slaInstance.id}/transitions/resolve`,
+    {
+      headers: { 'X-CSRF': '1' },
+      data: { resolutionNote: 'E2E çözümlendi' },
+    },
+  );
+  expect(resolveRes.ok()).toBeTruthy();
+  slaInstance = (await resolveRes.json()).data;
+  expect(slaInstance.state).toBe('resolved');
+
+  // 7. Start risk-limit-eval directly
+  const riskStart = await page.request.post(`${angular}/api/workflows/risk-limit-eval/instances`, {
+    headers: { 'X-CSRF': '1' },
+    data: {
+      data: {
+        customerKey: `CUST-${tcNo}`,
+        amount: 250000,
+        checkType: 'E2E Doğrudan Risk Kontrolü',
+        requireUnderwriting: false,
+      },
+    },
+  });
+  expect(riskStart.ok()).toBeTruthy();
+  const riskInstance = (await riskStart.json()).data;
+  expect(riskInstance.state).toBe('approved');
+});

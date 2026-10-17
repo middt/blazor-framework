@@ -266,6 +266,7 @@ public sealed class TestApiHost : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
+            ["Authentication:Authority"] = null,
             ["JwtSettings:Secret"] = Secret,
             ["JwtSettings:Issuer"] = Issuer,
             ["JwtSettings:Audience"] = Audience,

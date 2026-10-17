@@ -168,6 +168,8 @@ public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
         ["fanOut"] = typeof(FanOutTask),
         ["fan-out"] = typeof(FanOutTask),
         ["cache"] = typeof(CacheTask),
+        ["loadWorkflow"] = typeof(LoadWorkflowTask),
+        ["load-workflow"] = typeof(LoadWorkflowTask),
     };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type> runtimeCustomTasks = new(StringComparer.OrdinalIgnoreCase);

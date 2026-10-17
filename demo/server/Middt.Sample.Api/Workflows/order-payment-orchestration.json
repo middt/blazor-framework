@@ -1,0 +1,233 @@
+{
+  "key": "order-payment-orchestration",
+  "version": 1,
+  "title": "Sipariş & Ödeme Orkestrasyonu",
+  "onError": {
+    "maxAttempts": 2,
+    "delay": "00:00:00",
+    "action": "Fault"
+  },
+  "start": {
+    "key": "start",
+    "target": "prepare-checks",
+    "input": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [ "orderCode", "customerName", "amount", "paymentMethod" ],
+        "properties": {
+          "orderCode": { "type": "string", "minLength": 3, "maxLength": 40, "title": "Sipariş Kodu", "default": "ORD-2026-1001" },
+          "customerName": { "type": "string", "minLength": 2, "maxLength": 120, "title": "Müşteri Adı", "default": "Ahmet Yılmaz" },
+          "amount": { "type": "number", "minimum": 1, "title": "Sipariş Tutarı (₺)", "default": 18500 },
+          "paymentMethod": {
+            "type": "string",
+            "title": "Ödeme Yöntemi",
+            "enum": [ "Kredi Kartı", "Havale / FAST", "Kurumsal Açık Hesap" ],
+            "default": "Kredi Kartı"
+          }
+        }
+      }
+    },
+    "onExecute": [
+      {
+        "task": "set",
+        "config": {
+          "values": {
+            "createdBy": "user.Name",
+            "createdAt": "now"
+          }
+        }
+      }
+    ]
+  },
+  "states": [
+    {
+      "key": "prepare-checks",
+      "title": "Paralel Kontroller (FanOut)",
+      "step": 1,
+      "onEntry": [
+        {
+          "task": "setKey",
+          "config": {
+            "key": "ORD-{{ data.orderCode }}",
+            "ensureUnique": true
+          }
+        },
+        {
+          "task": "fanOut",
+          "config": {
+            "items": "new string[] { \"Fraud Kontrolü\", \"Stok & Depo Kontrolü\", \"Limit & Uyum Kontrolü\" }",
+            "maxConcurrency": 3,
+            "into": "parallelChecks",
+            "subTask": {
+              "task": "startWorkflow",
+              "config": {
+                "workflow": "risk-limit-eval",
+                "data": {
+                  "checkType": "{{ item.value }}",
+                  "amount": "{{ data.amount }}"
+                },
+                "into": "checkResult"
+              }
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "checks-completed",
+          "target": "gateway-charge",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "gateway-charge",
+      "title": "Ödeme Tahsilatı (HTTP Smart Retry & RabbitMQ)",
+      "step": 2,
+      "onError": {
+        "maxAttempts": 2,
+        "delay": "00:00:00",
+        "backoffMultiplier": 1.5,
+        "action": "Transition",
+        "transition": "gateway-fallback"
+      },
+      "onEntry": [
+        {
+          "key": "charge-http",
+          "task": "http",
+          "onError": {
+            "maxAttempts": 3,
+            "delay": "00:00:00",
+            "backoffMultiplier": 2.0,
+            "maxDelay": "00:00:04",
+            "useJitter": true,
+            "retryOnStatusCodes": [ "408", "429", "5xx" ],
+            "action": "Transition",
+            "transition": "gateway-fallback"
+          },
+          "config": {
+            "method": "POST",
+            "url": "http://127.0.0.1:8080/api/v1/OrderPaymentOrchestration/ping",
+            "body": {
+              "orderCode": "{{ data.orderCode }}",
+              "amount": "{{ data.amount }}",
+              "paymentMethod": "{{ data.paymentMethod }}"
+            },
+            "into": "gatewayResponse"
+          }
+        },
+        {
+          "task": "cache",
+          "config": {
+            "key": "payment:ORD-{{ data.orderCode }}",
+            "ttl": "00:20:00",
+            "into": "paymentReceipt",
+            "subTask": {
+              "task": "set",
+              "config": {
+                "values": {
+                  "paymentReceipt": "data.gatewayResponse != null && data.gatewayResponse.body != null && data.gatewayResponse.body.referenceCode != null ? data.gatewayResponse.body.referenceCode : \"GW-SIMULATED\""
+                }
+              }
+            }
+          }
+        },
+        {
+          "task": "publish",
+          "config": {
+            "type": "OrderPaymentCaptured",
+            "payload": {
+              "orderCode": "{{ data.orderCode }}",
+              "customerName": "{{ data.customerName }}",
+              "amount": "{{ data.amount }}",
+              "referenceCode": "{{ data.paymentReceipt }}"
+            }
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "high-value-review",
+          "target": "manual-verification",
+          "trigger": "Automatic",
+          "rule": "data.amount >= 50000"
+        },
+        {
+          "key": "payment-succeeded",
+          "target": "completed",
+          "trigger": "Automatic",
+          "default": true
+        },
+        {
+          "key": "gateway-fallback",
+          "title": "Ödeme Servisi Yedek Onaya Düştü",
+          "target": "manual-verification"
+        }
+      ]
+    },
+    {
+      "key": "manual-verification",
+      "title": "Finans Operasyon Onayı",
+      "step": 3,
+      "subType": "Human",
+      "view": { "component": "order-review" },
+      "transitions": [
+        {
+          "key": "confirm-order",
+          "title": "Siparişi Onayla ve Tamamla",
+          "target": "completed",
+          "roles": [ "manager" ],
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "financeNote": { "type": "string", "maxLength": 300, "title": "Finans Operasyon Notu", "default": "Ödeme provizyonu finans tarafından onaylandı." }
+              }
+            },
+            "set": {
+              "verifiedBy": "user.Name",
+              "verifiedAt": "now"
+            }
+          }
+        },
+        {
+          "key": "cancel-order",
+          "title": "Siparişi İptal Et",
+          "target": "cancelled",
+          "roles": [ "manager" ],
+          "view": { "component": "reject-reason" },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reason" ],
+              "properties": {
+                "reason": { "type": "string", "minLength": 3, "maxLength": 300, "title": "İptal Nedeni", "default": "Ödeme doğrulaması iptal edildi." }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "completed",
+      "title": "Sipariş Tamamlandı",
+      "step": 4,
+      "type": "Finish",
+      "subType": "Success",
+      "view": { "component": "order-result" }
+    },
+    {
+      "key": "cancelled",
+      "title": "Sipariş İptal Edildi",
+      "step": 4,
+      "type": "Finish",
+      "subType": "Cancelled",
+      "view": { "component": "order-result" }
+    }
+  ]
+}

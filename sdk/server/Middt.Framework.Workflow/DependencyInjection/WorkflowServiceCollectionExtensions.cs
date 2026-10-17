@@ -40,6 +40,7 @@ public static class WorkflowServiceCollectionExtensions
         services.AddSingleton<WorkflowRegistry>();
         services.AddSingleton<WorkflowJobSignal>();
         services.AddScoped<WorkflowEngine>();
+        services.AddScoped<WorkflowInstanceDataQuery>();
         services.AddScoped<WorkflowViewRenderer>();
         services.AddScoped<IWorkflowViewRenderer, ComponentWorkflowViewRenderer>();
 
@@ -50,6 +51,8 @@ public static class WorkflowServiceCollectionExtensions
         services.TryAddTransient<RabbitMqTask>();
         services.TryAddTransient<PublishTask>();
         services.TryAddTransient<StartWorkflowTask>();
+        services.TryAddTransient<SetKeyTask>();
+        services.TryAddTransient<LoadWorkflowTask>();
         services.TryAddTransient<FanOutTask>();
         services.TryAddTransient<CacheTask>();
         foreach (var taskType in options.TaskTypes.Values)

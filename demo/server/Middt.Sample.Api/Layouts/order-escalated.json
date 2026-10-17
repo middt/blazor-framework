@@ -35,7 +35,7 @@
             { "widget": "badge", "color": "success", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score >= 70" },
             { "widget": "badge", "color": "warning", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score >= 50 && data.credit.score < 70" },
             { "widget": "badge", "color": "danger", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score < 50" },
-            { "widget": "fields", "items": [ { "label": "Kontrol zamanı", "value": "{{ data.credit.checkedAt }}", "format": "g" } ] },
+            { "widget": "fields", "items": [ { "label": "Kontrol zamanı", "value": "{{ data.credit != null ? data.credit.checkedAt : data.escalatedAt }}", "format": "g" } ] },
             { "widget": "alert", "severity": "danger", "text": "Yüksek tutar: ek kontrol önerilir.", "visibleWhen": "data.amount > 20000" }
           ]
         }

@@ -39,31 +39,34 @@
         <dt>Karar veren</dt>
         <dd>@DecidedBy</dd>
         <dt>Karar zamanı</dt>
-        <dd>@ViewFormat.Date(Date("review.decidedAt") ?? Date("approvedAt"))</dd>
+        <dd>@ViewFormat.Date(Date("review.decidedAt") ?? Date("disbursedAt") ?? Date("verifiedAt") ?? Date("approvedAt") ?? Date("rejectedAt"))</dd>
         @if (Approved)
         {
             <dt>Açıklama</dt>
-            <dd>@Text("review.comment")</dd>
+            <dd>@Text("review.comment", Text("stage2Comment", Text("overrideReason", Text("financeNote", Text("paymentReceipt", "-")))))</dd>
         }
         else
         {
             <dt>Red nedeni</dt>
-            <dd>@Text("review.reason", Text("credit.score", "") is { Length: > 0 } score && Number("credit.score") < 50 ? $"Kredi skoru yetersiz ({score})" : "-")</dd>
+            <dd>@Text("review.reason", Text("reason", Text("credit.score", "") is { Length: > 0 } score && Number("credit.score") < 50 ? $"Kredi skoru yetersiz ({score})" : "-"))</dd>
         }
     </dl>
 </article>
 
 @code {
-    // The order row exists only after approval (order-approval v3): before that the request has no number yet.
-    private string OrderTitle => Text("orderId", string.Empty) is { Length: > 0 } id ? $"Sipariş #{id}" : "Sipariş talebi";
+    private string OrderTitle =>
+        Text("orderCode", string.Empty) is { Length: > 0 } code ? $"Sipariş #{code}"
+        : Text("orderId", string.Empty) is { Length: > 0 } id ? $"Sipariş #{id}"
+        : Has("collateralAmount") ? "Kredi tahsis talebi"
+        : "Sipariş talebi";
 
-    private bool Approved => Instance.State == "approved";
+    private bool Approved => Instance.State is "approved" or "disbursed" or "completed" || Instance.StateSubType == "Success";
 
     private bool Has(string path) => Text(path, string.Empty).Length > 0;
 
     private string DecidedBy => Approved
-        ? Text("review.approvedBy", Text("review.changedBy", "Otomatik onay"))
-        : Text("review.rejectedBy", "-");
+        ? Text("review.approvedBy", Text("stage2ApprovedBy", Text("verifiedBy", Text("review.changedBy", "Otomatik onay"))))
+        : Text("review.rejectedBy", Text("rejectedBy", "-"));
 
     private string? ReviewText => Text("review.level", string.Empty) switch
     {

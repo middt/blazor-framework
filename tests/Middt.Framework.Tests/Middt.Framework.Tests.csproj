@@ -38,6 +38,8 @@
     <ProjectReference Include="..\..\sdk\client\blazor\Middt.Framework.Workflow.Razor\Middt.Framework.Workflow.Razor.csproj" />
     <ProjectReference Include="..\..\sdk\server\Middt.Framework.Ui.Server\Middt.Framework.Ui.Server.csproj" />
     <ProjectReference Include="..\..\identity\Middt.Identity\Middt.Identity.csproj" />
+    <ProjectReference Include="..\..\demo\shared\Middt.Sample.Common\Middt.Sample.Common.csproj" />
+    <ProjectReference Include="..\..\demo\shared\Middt.Sample.Views\Middt.Sample.Views.csproj" />
     <ProjectReference Include="..\..\demo\server\Middt.Sample.Api\Middt.Sample.Api.csproj" />
   </ItemGroup>
 

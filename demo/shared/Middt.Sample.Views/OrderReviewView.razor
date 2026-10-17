@@ -46,17 +46,30 @@
             <dt>Müşteri tipi</dt>
             <dd>@Text("customerType")</dd>
         }
+        @if (Has("paymentMethod"))
+        {
+            <dt>Ödeme yöntemi</dt>
+            <dd>@Text("paymentMethod")</dd>
+        }
+        @if (Has("paymentReceipt"))
+        {
+            <dt>Ödeme referansı</dt>
+            <dd>@Text("paymentReceipt")</dd>
+        }
         @if (Has("email"))
         {
             <dt>E-posta</dt>
             <dd>@Text("email")</dd>
         }
         <dt>Talep eden</dt>
-        <dd>@Text("requestedBy")</dd>
+        <dd>@Text("requestedBy", Text("createdBy"))</dd>
         <dt>Talep zamanı</dt>
-        <dd>@ViewFormat.Date(Date("requestedAt"))</dd>
-        <dt>Kredi kontrolü</dt>
-        <dd>@ViewFormat.Date(Date("credit.checkedAt"))</dd>
+        <dd>@ViewFormat.Date(Date("requestedAt") ?? Date("createdAt"))</dd>
+        @if (Has("credit.checkedAt"))
+        {
+            <dt>Kredi kontrolü</dt>
+            <dd>@ViewFormat.Date(Date("credit.checkedAt"))</dd>
+        }
     </dl>
 
     @if (Has("company.taxNumber"))
@@ -103,8 +116,10 @@
 </article>
 
 @code {
-    // The order row exists only after approval (order-approval v3): before that the request has no number yet.
-    private string OrderTitle => Text("orderId", string.Empty) is { Length: > 0 } id ? $"Sipariş #{id}" : "Sipariş talebi";
+    private string OrderTitle =>
+        Text("orderCode", string.Empty) is { Length: > 0 } code ? $"Sipariş #{code}"
+        : Text("orderId", string.Empty) is { Length: > 0 } id ? $"Sipariş #{id}"
+        : "Sipariş talebi";
 
     private bool Has(string path) => Text(path, string.Empty).Length > 0;
 

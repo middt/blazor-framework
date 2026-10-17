@@ -100,7 +100,7 @@ public sealed class UiSampleLayoutTests
         var (registry, errors) = Load(definitions);
 
         errors.Should().BeEmpty();
-        var escalated = registry!.GetLatest("order-approval").States.Single(s => s.Key == "escalated");
+        var escalated = registry!.GetLatest("sla-escalation").States.Single(s => s.Key == "escalated");
         escalated.View!.Layout.Should().Be("order-escalated");
         escalated.View.Component.Should().BeNull();
 
