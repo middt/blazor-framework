@@ -31,6 +31,7 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
         ("test-entity-tasks", "Entity / DB Testi", "storage"),
         ("test-http-tasks", "Dış Servis / HTTP Testi", "http"),
         ("test-messaging-tasks", "Mesajlaşma Testi", "send"),
+        ("test-subflow", "Alt Akış (SubFlow) Testi", "call_split"),
     ];
 
     private static readonly MenuItem Designer = new() { Name = "Ekran Tasarımı", Path = "/ui-admin", Icon = "dashboard_customize", Title = "Ekran Tasarımı" };

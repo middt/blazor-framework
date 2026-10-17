@@ -753,4 +753,30 @@ public sealed class BikeStoreWorkflowTests
 
         (await bike.DbAsync(db => db.Categories.Select(c => c.CategoryName).ToListAsync(Ct))).Should().Equal("Road Bikes");
     }
+
+    [Fact]
+    public async Task Test_subflow_loads_branch_staff_from_database_and_completes_successfully()
+    {
+        await using var bike = await Bike.StartAsync();
+        var host = bike.Host;
+        var ids = bike.Ids;
+
+        var instance = await host.StartInstanceAsync("test-subflow", user: Alice);
+        instance.State.Should().Be("choose-store");
+
+        // Submit store: triggers fetch-staff-subflow which calls get-branch-staff
+        instance = await host.TransitionAsync(instance.Id, "submit-store", new { branchId = ids.StoreId, purpose = "Personel Görevlendirme" }, Alice);
+
+        instance.State.Should().Be("view-staff");
+        instance.Data.Should().ContainKey("availableStaff");
+        var items = instance.Data["availableStaff"]!["items"]!.AsArray();
+        items.Should().NotBeEmpty();
+        items[0]!["id"]!.GetValue<long>().Should().Be(ids.StaffId);
+
+        // Submit staff assignment: finishes the workflow
+        instance = await host.TransitionAsync(instance.Id, "complete", new { assignedStaffId = ids.StaffId, notes = "Görevlendirme tamamlandı" }, Alice);
+
+        instance.State.Should().Be("completed");
+        instance.Status.Should().Be(WorkflowInstanceStatus.Completed);
+    }
 }

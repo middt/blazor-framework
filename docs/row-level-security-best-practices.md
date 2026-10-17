@@ -164,23 +164,108 @@ public override async Task<ActionResult<BaseResponseDataModel<Customer>>> Insert
 
 > **Vaka:** Müşteri ekleme veya hesap açılış akışında, açılır kutudan (dropdown) **yalnızca o şubenin personelleri** seçilebilmelidir.
 
-### Yöntem 1: Akış Adımına Girerken SQL ile Yükleme (`db-query`)
-Akışın ilgili adımına (`onEntry`) bir `db-query` görevi eklenir. Şube ID'si parametrik olarak verilerek liste akış verisine (`data.availableStaffList`) kaydedilir:
+### Yöntem 1: Doğrudan SQL ile Yükleme (`db-query`)
+Akışın ilgili adımına (`onEntry`) doğrudan bir `db-query` görevi eklenerek şube ID'si parametrik olarak sorgulanabilir:
+
+```json
+{
+  "task": "db-query",
+  "config": {
+    "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
+    "parameters": [ "{{ data.branchId }}" ],
+    "into": "availableStaffList"
+  }
+}
+```
+
+> ⚠️ **Uyarı:** Aynı sorguyu birden fazla iş akışında tekrar tekrar yazmak (kredi, müşteri ekleme, hesap açma) **kod tekrarına (DRY ihlali)** ve şema değiştiğinde tüm JSON dosyalarını güncelleme yüküne yol açar. Bu nedenle aşağıdaki **SubFlow (Alt Akış)** deseni tercih edilmelidir.
+
+---
+
+### Yöntem 2: Tekrar Kullanılabilir SubFlow (Alt Akış) Deseni *(Önerilen Yaklaşım)*
+
+SQL sorgusunu her akışa gömmek yerine, veri çekme mantığı **bağımsız ve tekrar kullanılabilir bir Alt Akış (SubFlow)** haline getirilir:
+
+#### 1. Reusable Alt Akış Tanımı (`get-branch-staff.json`)
+Bu akış parametre olarak `branchId` alır, doğrular, sorguyu çalıştırır ve sonucu döner:
+
+```json
+{
+  "key": "get-branch-staff",
+  "version": 1,
+  "title": "Şube Personel Listesini Getir",
+  "start": { "key": "start", "target": "validate" },
+  "states": [
+    {
+      "key": "validate",
+      "title": "Girdi Doğrulama",
+      "transitions": [
+        { "key": "valid", "target": "query", "trigger": "Automatic", "rule": "data.branchId != null && data.branchId > 0" },
+        { "key": "invalid", "target": "failed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    {
+      "key": "query",
+      "title": "Personel Sorgusu",
+      "onEntry": [
+        {
+          "task": "db-query",
+          "config": {
+            "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
+            "parameters": [ "{{ data.branchId }}" ],
+            "into": "items"
+          }
+        }
+      ],
+      "transitions": [
+        { "key": "done", "target": "completed", "trigger": "Automatic", "default": true }
+      ]
+    },
+    { "key": "completed", "title": "Başarılı", "type": "Finish", "subType": "Success" },
+    { "key": "failed", "title": "Geçersiz Şube", "type": "Finish", "subType": "Error" }
+  ]
+}
+```
+
+#### 2. Ebeveyn Akıştan Alt Akışın Çağrılması
+Herhangi bir ana iş akışında (müşteri açılışı, transfer onayı, vb.) tek satır SQL yazmadan bu alt akış bir adım olarak bağlanır:
+
+```json
+{
+  "key": "load-staff",
+  "title": "Şube Personelini Yükle",
+  "type": "SubFlow",
+  "subFlow": {
+    "workflow": "get-branch-staff",
+    "input": {
+      "branchId": "data.branchId"
+    },
+    "outputInto": "availableStaff"
+  },
+  "transitions": [
+    {
+      "key": "staff-loaded",
+      "target": "assign-staff-step",
+      "trigger": "Automatic",
+      "rule": "child.subType == \"Success\""
+    },
+    {
+      "key": "load-failed",
+      "target": "staff-load-error",
+      "trigger": "Automatic",
+      "default": true
+    }
+  ]
+}
+```
+
+#### 3. Ekranda Verinin Kullanılması (`assign-staff-step`)
+Alt akış tamamlandığında veriler ebeveyn akışın `data.availableStaff` alanına yazılır. Formdaki açılır kutu doğrudan bu veriye bağlanır:
 
 ```json
 {
   "key": "assign-staff-step",
   "title": "Müşteri Temsilcisi Atama",
-  "onEntry": [
-    {
-      "task": "db-query",
-      "config": {
-        "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
-        "parameters": [ "{{ data.branchId }}" ],
-        "into": "availableStaffList"
-      }
-    }
-  ],
   "view": {
     "type": "Form",
     "schema": {
@@ -188,8 +273,8 @@ Akışın ilgili adımına (`onEntry`) bir `db-query` görevi eklenir. Şube ID'
       "properties": {
         "selectedStaffId": {
           "type": "integer",
-          "title": "Atanan Temsilci",
-          "enumSource": "data.availableStaffList"
+          "title": "Atanan Müşteri Temsilcisi",
+          "enumSource": "data.availableStaff.items"
         }
       },
       "required": [ "selectedStaffId" ]
@@ -201,7 +286,15 @@ Akışın ilgili adımına (`onEntry`) bir `db-query` görevi eklenir. Şube ID'
 }
 ```
 
-### Yöntem 2: Dinamik Lookup (`x-lookup` + Controller Satır Filtresi)
+#### Neden SubFlow Deseni?
+1. **Sıfır Bekleme Süresi (Senkron Yürütme):** Alt akışın tüm adımları `Automatic` olduğunda, Middt motoru alt akışı başlatır, sorguyu çalıştırır ve ebeveyne geri döner. Ebeveyn akış tek bir tick içinde `assign-staff-step` ekranına geçer; kullanıcı gecikme hissetmez.
+2. **Kapsülleme (Encapsulation):** Tablo adı, kolon adı veya filtre kuralı (`active = 1`, `store_id`) değiştiğinde yalnızca `get-branch-staff.json` dosyası güncellenir; onlarca iş akışına dokunulmaz.
+3. **Versiyonlama Desteği:** İleride `version: 2` çıkartılabilir ve eski çalışan akışlar bozulmadan yeni akışlara entegre edilebilir (`"version": 2`).
+4. **Kolay Zenginleştirme:** Gelecekte alt akışın içine SQL sorgusu öncesinde Redis önbellek kontrolü (`cache-get`) veya harici İK servisinden LDAP kontrolü (`http-request`) eklemek mümkündür.
+
+---
+
+### Yöntem 3: Dinamik Lookup (`x-lookup` + Controller Satır Filtresi)
 Form şemasında `x-lookup` kullanıldığında:
 ```json
 "staffId": {

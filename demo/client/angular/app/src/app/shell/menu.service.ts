@@ -40,6 +40,7 @@ export const TEST_WORKFLOW_MENU: MenuGroup = {
     { name: 'Entity / DB Testi', path: '/workflow/test-entity-tasks', icon: 'storage' },
     { name: 'Dış Servis / HTTP Testi', path: '/workflow/test-http-tasks', icon: 'http' },
     { name: 'Mesajlaşma Testi', path: '/workflow/test-messaging-tasks', icon: 'send' },
+    { name: 'Alt Akış (SubFlow) Testi', path: '/workflow/test-subflow', icon: 'call_split' },
   ],
 };
 

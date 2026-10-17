@@ -103,7 +103,8 @@ public sealed class WorkflowDefinitionTests
         registry.Latest.Select(d => d.Key).Should().BeEquivalentTo(
             "store-opening", "staff-onboarding", "category-request", "product-launch", "stock-replenishment",
             "customer-onboarding", "order-approval", "order-fulfillment", "credit-check",
-            "test-core-tasks", "test-entity-tasks", "test-http-tasks", "test-messaging-tasks");
+            "test-core-tasks", "test-entity-tasks", "test-http-tasks", "test-messaging-tasks",
+            "get-branch-staff", "test-subflow");
         registry.GetLatest("credit-check").Version.Should().Be(2);
 
         // Master data lifecycles: v2 keeps the record's instance in "active" (change / close), v1 stays for running instances.
@@ -136,7 +137,7 @@ public sealed class WorkflowDefinitionTests
         var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();
 
         registry.Invoking(r => r.EnsureLoaded()).Should().NotThrow();
-        registry.Latest.Should().HaveCount(13);
+        registry.Latest.Should().HaveCount(15);
     }
 
     [Fact]

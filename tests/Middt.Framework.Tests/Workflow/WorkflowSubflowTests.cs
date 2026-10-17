@@ -200,6 +200,93 @@ public sealed class WorkflowSubflowTests
         (await host.GetAsync(launcher.Id)).State.Should().Be("done");
     }
 
+    [Fact]
+    public async Task Subflow_can_encapsulate_reusable_database_query_and_return_data_to_parent()
+    {
+        const string subflowDef = """
+            {
+              "key": "get-branch-staff",
+              "start": { "key": "start", "target": "validate" },
+              "states": [
+                {
+                  "key": "validate",
+                  "transitions": [
+                    { "key": "valid", "target": "query", "trigger": "Automatic", "rule": "data.branchId != null && data.branchId > 0" },
+                    { "key": "invalid", "target": "invalid-param", "trigger": "Automatic", "default": true }
+                  ]
+                },
+                {
+                  "key": "query",
+                  "onEntry": [
+                    {
+                      "task": "db-query",
+                      "config": {
+                        "sql": "SELECT 101 AS id, 'Ali Veli' AS name WHERE 1 = {0}",
+                        "parameters": [ "{{ data.branchId }}" ],
+                        "into": "items"
+                      }
+                    }
+                  ],
+                  "transitions": [
+                    { "key": "done", "target": "completed", "trigger": "Automatic", "default": true }
+                  ]
+                },
+                { "key": "completed", "type": "Finish", "subType": "Success" },
+                { "key": "invalid-param", "type": "Finish", "subType": "Error" }
+              ]
+            }
+            """;
+
+        const string parentDef = """
+            {
+              "key": "onboarding-parent",
+              "start": { "key": "start", "target": "fetch-staff",
+                         "input": { "schema": { "type": "object", "properties": { "branchId": { "type": "integer" } } } } },
+              "states": [
+                {
+                  "key": "fetch-staff",
+                  "type": "SubFlow",
+                  "subFlow": {
+                    "workflow": "get-branch-staff",
+                    "input": { "branchId": "data.branchId" },
+                    "outputInto": "availableStaff"
+                  },
+                  "transitions": [
+                    { "key": "ok", "target": "assigned", "trigger": "Automatic", "rule": "child.subType == \"Success\"" },
+                    { "key": "ko", "target": "failed", "trigger": "Automatic", "default": true }
+                  ]
+                },
+                { "key": "assigned", "type": "Finish", "subType": "Success" },
+                { "key": "failed", "type": "Finish", "subType": "Error" }
+              ]
+            }
+            """;
+
+        await using var host = await WorkflowTestHost.StartAsync(
+            [subflowDef, parentDef],
+            configure: options => options.UseApplicationDbContext<WorkflowDbContext>());
+
+        // 1. Success case: valid branchId retrieves data and resumes parent
+        var parent = await host.StartInstanceAsync("onboarding-parent", new { branchId = 1 });
+
+        var children = await ChildrenAsync(host, parent.Id);
+        children.Should().NotBeEmpty();
+        var child = children[0];
+        child.State.Should().Be("completed");
+        child.Status.Should().Be(WorkflowInstanceStatus.Completed);
+
+        parent.State.Should().Be("assigned");
+        parent.Status.Should().Be(WorkflowInstanceStatus.Completed);
+        parent.Data["availableStaff"]!["items"]!.AsArray().Should().HaveCount(1);
+        parent.Data["availableStaff"]!["items"]![0]!["id"]!.GetValue<long>().Should().Be(101);
+        parent.Data["availableStaff"]!["items"]![0]!["name"]!.GetValue<string>().Should().Be("Ali Veli");
+
+        // 2. Failure case: invalid branchId causes child error and parent routes to fallback
+        var failedParent = await host.StartInstanceAsync("onboarding-parent", new { branchId = 0 });
+        failedParent.State.Should().Be("failed");
+        failedParent.Status.Should().Be(WorkflowInstanceStatus.Completed);
+    }
+
     private static string? JsonNodeString(string json, string property) =>
         System.Text.Json.Nodes.JsonNode.Parse(json)![property]?.ToJsonString().Trim('"');
 }

@@ -1,0 +1,134 @@
+{
+  // Test workflow: demonstrates calling a reusable SubFlow to query branch staff and map results.
+  "key": "test-subflow",
+  "version": 1,
+  "title": "Alt Akış (SubFlow) Testi",
+  "start": { "key": "start", "target": "choose-store" },
+  "states": [
+    {
+      "key": "choose-store",
+      "title": "Şube Seçimi",
+      "step": 1,
+      "subType": "Human",
+      "transitions": [
+        {
+          "key": "submit-store",
+          "title": "Personelleri Getir",
+          "target": "fetch-staff-subflow",
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "branchId" ],
+              "properties": {
+                "branchId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "title": "Şube / Mağaza Seçiniz",
+                  "x-lookup": {
+                    "entity": "Store",
+                    "valueField": "storeId",
+                    "textField": "storeName"
+                  }
+                },
+                "purpose": {
+                  "type": "string",
+                  "title": "İşlem Amacı",
+                  "default": "Müşteri Temsilcisi Ataması"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "fetch-staff-subflow",
+      "title": "Alt Akış Yürütülüyor",
+      "type": "SubFlow",
+      "subFlow": {
+        "workflow": "get-branch-staff",
+        "input": {
+          "branchId": "data.branchId"
+        },
+        "outputInto": "availableStaff"
+      },
+      "transitions": [
+        {
+          "key": "staff-loaded",
+          "target": "view-staff",
+          "trigger": "Automatic",
+          "rule": "child.subType == \"Success\""
+        },
+        {
+          "key": "staff-failed",
+          "target": "error-state",
+          "trigger": "Automatic",
+          "default": true
+        }
+      ]
+    },
+    {
+      "key": "view-staff",
+      "title": "Personel Atama",
+      "step": 2,
+      "subType": "Human",
+      "onEntry": [
+        {
+          "task": "log",
+          "config": {
+            "level": "Information",
+            "message": "Alt akış başarıyla tamamlandı. Şube {{ data.branchId }} için personel verisi ana akışa aktarıldı."
+          }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "complete",
+          "title": "İşlemi Tamamla",
+          "target": "completed",
+          "view": { "inline": true },
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "assignedStaffId" ],
+              "properties": {
+                "assignedStaffId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "title": "Personel Seçiniz",
+                  "x-lookup": {
+                    "entity": "Staff",
+                    "valueField": "staffId",
+                    "textField": "name"
+                  }
+                },
+                "notes": {
+                  "type": "string",
+                  "title": "İşlem Notu",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "completed",
+      "title": "İşlem Başarılı",
+      "step": 3,
+      "type": "Finish",
+      "subType": "Success"
+    },
+    {
+      "key": "error-state",
+      "title": "Hata Oluştu",
+      "step": 3,
+      "type": "Finish",
+      "subType": "Error"
+    }
+  ]
+}
