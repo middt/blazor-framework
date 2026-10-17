@@ -55,6 +55,7 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.PendingTransition).HasMaxLength(128);
             e.Property(x => x.StartedBy).HasMaxLength(256);
+            e.Property(x => x.LastExecutedBy).HasMaxLength(256);
             e.Property(x => x.Revision).IsConcurrencyToken();
             e.Ignore(x => x.IsTerminal);
             e.HasIndex(x => new { x.WorkflowKey, x.BusinessKey }).IsUnique();

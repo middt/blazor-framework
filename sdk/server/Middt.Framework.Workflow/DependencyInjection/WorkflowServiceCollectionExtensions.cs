@@ -43,12 +43,15 @@ public static class WorkflowServiceCollectionExtensions
         services.AddScoped<WorkflowViewRenderer>();
         services.AddScoped<IWorkflowViewRenderer, ComponentWorkflowViewRenderer>();
 
+        services.AddMemoryCache();
         services.TryAddTransient<SetTask>();
         services.TryAddTransient<LogTask>();
         services.TryAddTransient<HttpTask>();
         services.TryAddTransient<RabbitMqTask>();
         services.TryAddTransient<PublishTask>();
         services.TryAddTransient<StartWorkflowTask>();
+        services.TryAddTransient<FanOutTask>();
+        services.TryAddTransient<CacheTask>();
         foreach (var taskType in options.TaskTypes.Values)
         {
             services.TryAddTransient(taskType);

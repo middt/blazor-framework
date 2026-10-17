@@ -123,6 +123,17 @@ export interface WorkflowInstanceModel {
   completedAt?: string | null;
   availableTransitions: AvailableTransitionModel[];
   scheduledTransitions: ScheduledTransitionModel[];
+  /** Projected state and available transitions of the active child subflow when `waitingForInstanceId` is set. */
+  activeSubFlow?: WorkflowInstanceModel | null;
+}
+
+export interface WorkflowTaskExecutionModel {
+  taskKey: string;
+  taskType: string;
+  hook: string;
+  attempts: number;
+  durationMs: number;
+  outcome: string;
 }
 
 export interface WorkflowHistoryModel {
@@ -134,6 +145,7 @@ export interface WorkflowHistoryModel {
   startedAt: string;
   finishedAt: string;
   dataVersion: number;
+  tasks?: WorkflowTaskExecutionModel[];
 }
 
 export interface WorkflowIncidentModel {

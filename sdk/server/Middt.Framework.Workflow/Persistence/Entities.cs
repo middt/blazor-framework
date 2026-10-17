@@ -43,6 +43,9 @@ public sealed class WorkflowInstance
 
     public string? StartedBy { get; set; }
 
+    /// <summary>Actor who executed the last manual transition (used by <c>$previousUser</c> role rules).</summary>
+    public string? LastExecutedBy { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -65,6 +68,10 @@ public sealed class WorkflowHistory
     public string? Input { get; set; }
     public int DataVersion { get; set; }
     public string Data { get; set; } = "{}";
+
+    /// <summary>JSON array of <see cref="WorkflowTaskExecutionModel"/> executed during this transition.</summary>
+    public string? Tasks { get; set; }
+
     public DateTime StartedAt { get; set; }
     public DateTime FinishedAt { get; set; }
 }

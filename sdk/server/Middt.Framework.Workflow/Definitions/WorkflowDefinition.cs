@@ -40,6 +40,9 @@ public sealed class WorkflowDefinition
     /// <summary>Default error handling for tasks that do not define their own.</summary>
     public ErrorPolicy? OnError { get; set; }
 
+    /// <summary>Optional schema for instance data projection (<c>x-roles</c> field visibility and <c>x-mask</c> field masking).</summary>
+    public JsonObject? DataSchema { get; set; }
+
     public StateDefinition? FindState(string key) => States.FirstOrDefault(s => s.Key == key);
 }
 
@@ -98,6 +101,9 @@ public sealed class StateDefinition
     /// <summary>Server driven UI: the component that renders an instance while it is in this state.</summary>
     public ViewDefinition? View { get; set; }
 
+    /// <summary>Default error handling for tasks in this state (overrides <see cref="WorkflowDefinition.OnError"/>).</summary>
+    public ErrorPolicy? OnError { get; set; }
+
     [JsonIgnore]
     public bool IsFinal => Type == StateType.Finish;
 }
@@ -124,6 +130,9 @@ public sealed class TransitionDefinition
     /// <summary>Target state key, or <c>$self</c> to stay in the current state (data update).</summary>
     public string Target { get; set; } = string.Empty;
 
+    /// <summary>When <see cref="Target"/> is <c>$self</c>, re-runs <c>onExit</c>, <c>onEntry</c> and resets state timers instead of updating data in place.</summary>
+    public bool Reenter { get; set; }
+
     public TriggerType Trigger { get; set; } = TriggerType.Manual;
 
     public string? Title { get; set; }
@@ -137,11 +146,17 @@ public sealed class TransitionDefinition
     /// <summary>Marks the automatic "else" branch: evaluated last and always taken.</summary>
     public bool Default { get; set; }
 
-    /// <summary>Delay of a scheduled transition (ISO-8601 or TimeSpan).</summary>
+    /// <summary>Delay of a scheduled transition (ISO-8601, TimeSpan, or <c>{{ expression }}</c>).</summary>
     public string? After { get; set; }
 
-    /// <summary>Roles allowed to execute a manual transition. Empty = any user allowed to read the instance.</summary>
+    /// <summary>Target UTC timestamp of a scheduled transition (ISO-8601 or <c>{{ expression }}</c>).</summary>
+    public string? At { get; set; }
+
+    /// <summary>Roles or dynamic grants (<c>$starter</c>, <c>$previousUser</c>, <c>$user:{{...}}</c>, <c>$role:{{...}}</c>) allowed to execute a manual transition. Empty = any user allowed to read the instance.</summary>
     public List<string> Roles { get; set; } = [];
+
+    /// <summary>Roles or dynamic grants (<c>$starter</c>, <c>$previousUser</c>, <c>$user:{{...}}</c>, <c>$role:{{...}}</c>) forbidden from executing a manual transition (evaluated before <see cref="Roles"/>).</summary>
+    public List<string> DenyRoles { get; set; } = [];
 
     /// <summary>States where a shared transition is offered (<c>"*"</c> = all non-final states).</summary>
     public List<string> AvailableIn { get; set; } = [];
@@ -264,8 +279,20 @@ public sealed class ErrorPolicy
     /// <summary>Total attempts (1 = no retry).</summary>
     public int MaxAttempts { get; set; } = 1;
 
-    /// <summary>Delay before the first retry; doubles on each further retry.</summary>
+    /// <summary>Delay before the first retry; multiplied by <see cref="BackoffMultiplier"/> on each further retry.</summary>
     public string Delay { get; set; } = "00:00:01";
+
+    /// <summary>Multiplier applied to <see cref="Delay"/> after each retry attempt (default 2.0).</summary>
+    public double BackoffMultiplier { get; set; } = 2.0;
+
+    /// <summary>Optional cap on retry delay (ISO-8601 or TimeSpan).</summary>
+    public string? MaxDelay { get; set; }
+
+    /// <summary>Adds ±20% randomization to retry delays to prevent thundering herds.</summary>
+    public bool UseJitter { get; set; }
+
+    /// <summary>HTTP status codes (e.g. <c>"502"</c>, <c>"503"</c>, <c>"5xx"</c>, <c>"!400"</c>, <c>"!4xx"</c>) eligible for retry. Empty = retry all errors.</summary>
+    public List<string> RetryOnStatusCodes { get; set; } = [];
 
     public ErrorAction Action { get; set; } = ErrorAction.Fault;
 
@@ -281,6 +308,9 @@ public sealed class SubFlowDefinition
 
     /// <summary>Parent data path the child's final data is stored under (empty = merge into root).</summary>
     public string? OutputInto { get; set; }
+
+    /// <summary>Forwards non-cancellation manual transitions executed on the parent directly to the active child subflow (default <c>true</c>).</summary>
+    public bool ForwardTransitions { get; set; } = true;
 }
 
 public static class WorkflowJson

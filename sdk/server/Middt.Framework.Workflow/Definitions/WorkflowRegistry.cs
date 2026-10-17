@@ -165,6 +165,9 @@ public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
         ["dbExecute"] = typeof(DbSqlTask),
         ["db-query"] = typeof(DbQueryTask),
         ["dbQuery"] = typeof(DbQueryTask),
+        ["fanOut"] = typeof(FanOutTask),
+        ["fan-out"] = typeof(FanOutTask),
+        ["cache"] = typeof(CacheTask),
     };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Type> runtimeCustomTasks = new(StringComparer.OrdinalIgnoreCase);
@@ -208,6 +211,14 @@ internal static class WorkflowDefinitionValidator
         foreach (var error in ValidateViews(wf, views))
         {
             yield return error;
+        }
+
+        if (wf.DataSchema is { } dataSchema)
+        {
+            foreach (var error in Safely(() => JsonSchemaValidator.CheckSchema(dataSchema)))
+            {
+                yield return $"dataSchema {error}";
+            }
         }
 
         if (wf.InstanceAccess is { } access && access.Mode is not (InstanceAccessDefinition.All or InstanceAccessDefinition.Owner))
@@ -261,6 +272,11 @@ internal static class WorkflowDefinitionValidator
         foreach (var state in wf.States)
         {
             var where = $"state '{state.Key}'";
+
+            foreach (var error in ValidatePolicy(state.OnError, $"{where} onError", allTransitionKeys))
+            {
+                yield return error;
+            }
 
             if (state.IsFinal && state.Transitions.Count > 0)
             {
@@ -420,9 +436,58 @@ internal static class WorkflowDefinitionValidator
             case TriggerType.Automatic when !t.Default && string.IsNullOrWhiteSpace(t.Rule):
                 yield return $"{where}: automatic transitions need a 'rule' (or \"default\": true).";
                 break;
-            case TriggerType.Scheduled when !Durations.TryParse(t.After, out _):
-                yield return $"{where}: scheduled transitions need a valid 'after' duration.";
+            case TriggerType.Scheduled:
+                var hasAfter = !string.IsNullOrWhiteSpace(t.After);
+                var hasAt = !string.IsNullOrWhiteSpace(t.At);
+                if (!hasAfter && !hasAt)
+                {
+                    yield return $"{where}: scheduled transitions need a valid 'after' duration.";
+                }
+                else if (hasAfter && hasAt)
+                {
+                    yield return $"{where}: scheduled transitions cannot specify both 'after' and 'at'.";
+                }
+                else if (hasAfter)
+                {
+                    if (t.After!.Contains("{{", StringComparison.Ordinal))
+                    {
+                        foreach (var err in expressions.ValidateTemplate(JsonValue.Create(t.After)))
+                        {
+                            yield return $"{where}: after: {err}";
+                        }
+                    }
+                    else if (!Durations.TryParse(t.After, out _))
+                    {
+                        yield return $"{where}: scheduled transitions need a valid 'after' duration.";
+                    }
+                }
+                else if (hasAt)
+                {
+                    if (t.At!.Contains("{{", StringComparison.Ordinal))
+                    {
+                        foreach (var err in expressions.ValidateTemplate(JsonValue.Create(t.At)))
+                        {
+                            yield return $"{where}: at: {err}";
+                        }
+                    }
+                    else if (!DateTimeOffset.TryParse(t.At, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out _))
+                    {
+                        yield return $"{where}: scheduled transitions need a valid 'at' timestamp.";
+                    }
+                }
+
                 break;
+        }
+
+        foreach (var roleEntry in t.Roles.Concat(t.DenyRoles))
+        {
+            if (roleEntry.Contains("{{", StringComparison.Ordinal))
+            {
+                foreach (var err in expressions.ValidateTemplate(JsonValue.Create(roleEntry)))
+                {
+                    yield return $"{where}: role '{roleEntry}': {err}";
+                }
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(t.Rule) && expressions.Validate(t.Rule) is { } ruleError)
@@ -524,6 +589,16 @@ internal static class WorkflowDefinitionValidator
         if (!Durations.TryParse(policy.Delay, out _))
         {
             yield return $"{where}: delay is not a valid duration.";
+        }
+
+        if (policy.MaxDelay is not null && !Durations.TryParse(policy.MaxDelay, out _))
+        {
+            yield return $"{where}: maxDelay is not a valid duration.";
+        }
+
+        if (policy.BackoffMultiplier < 1.0)
+        {
+            yield return $"{where}: backoffMultiplier must be ≥ 1.0.";
         }
 
         if (policy.Action == ErrorAction.Transition && (policy.Transition is null || !transitionKeys.Contains(policy.Transition)))

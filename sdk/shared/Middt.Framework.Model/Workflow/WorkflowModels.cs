@@ -129,6 +129,20 @@ public sealed class WorkflowInstanceModel
     public DateTime? CompletedAt { get; set; }
     public List<AvailableTransitionModel> AvailableTransitions { get; set; } = [];
     public List<ScheduledTransitionModel> ScheduledTransitions { get; set; } = [];
+
+    /// <summary>Projected state and available transitions of the active child subflow when <see cref="WaitingForInstanceId"/> is set.</summary>
+    public WorkflowInstanceModel? ActiveSubFlow { get; set; }
+}
+
+/// <summary>Execution record of a single task within a transition.</summary>
+public sealed class WorkflowTaskExecutionModel
+{
+    public string TaskKey { get; set; } = string.Empty;
+    public string TaskType { get; set; } = string.Empty;
+    public string Hook { get; set; } = string.Empty;
+    public int Attempts { get; set; }
+    public long DurationMs { get; set; }
+    public string Outcome { get; set; } = string.Empty;
 }
 
 public sealed class WorkflowHistoryModel
@@ -141,6 +155,7 @@ public sealed class WorkflowHistoryModel
     public DateTime StartedAt { get; set; }
     public DateTime FinishedAt { get; set; }
     public int DataVersion { get; set; }
+    public List<WorkflowTaskExecutionModel> Tasks { get; set; } = [];
 }
 
 public sealed class WorkflowIncidentModel

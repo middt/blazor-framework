@@ -43,8 +43,63 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
         }
         else
         {
-            // CreateTables only runs for a new database: add indexes introduced by later framework versions.
+            // CreateTables only runs for a new database: add nullable columns and indexes introduced by later framework versions.
+            await EnsureColumnsAsync(db, cancellationToken);
             await EnsureIndexesAsync(db, cancellationToken);
+        }
+    }
+
+    /// <summary>Adds every nullable column of the model that does not exist yet (idempotent; SQL Server and PostgreSQL).</summary>
+    internal static async Task EnsureColumnsAsync(WorkflowDbContext db, CancellationToken cancellationToken)
+    {
+        foreach (var statement in EnsureColumnStatements(db))
+        {
+#pragma warning disable EF1002 // identifiers and column types come from the EF model, not from user input
+            await db.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+#pragma warning restore EF1002
+        }
+    }
+
+    internal static IEnumerable<string> EnsureColumnStatements(WorkflowDbContext db)
+    {
+        var provider = db.Database.ProviderName ?? string.Empty;
+        var sqlServer = provider.Contains("SqlServer", StringComparison.Ordinal);
+        var npgsql = provider.Contains("Npgsql", StringComparison.Ordinal);
+        if (!sqlServer && !npgsql)
+        {
+            yield break;
+        }
+
+        var sql = db.GetService<ISqlGenerationHelper>();
+        foreach (var entityType in db.GetService<IDesignTimeModel>().Model.GetEntityTypes())
+        {
+            var table = entityType.GetTableName();
+            if (table is null)
+            {
+                continue;
+            }
+
+            var schema = entityType.GetSchema();
+            var tableIdentifier = StoreObjectIdentifier.Table(table, schema);
+            var qualifiedTable = sql.DelimitIdentifier(table, schema);
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.IsPrimaryKey() || !property.IsColumnNullable(tableIdentifier))
+                {
+                    continue;
+                }
+
+                var columnName = property.GetColumnName(tableIdentifier);
+                var columnType = property.GetColumnType(tableIdentifier);
+                if (columnName is null || columnType is null)
+                {
+                    continue;
+                }
+
+                yield return sqlServer
+                    ? $"IF COL_LENGTH(N'{Escape(qualifiedTable)}', N'{Escape(columnName)}') IS NULL ALTER TABLE {qualifiedTable} ADD {sql.DelimitIdentifier(columnName)} {columnType} NULL"
+                    : $"ALTER TABLE {qualifiedTable} ADD COLUMN IF NOT EXISTS {sql.DelimitIdentifier(columnName)} {columnType} NULL";
+            }
         }
     }
 

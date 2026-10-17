@@ -175,7 +175,9 @@ public sealed class HttpTask : IWorkflowTask
 
             if (!accepted && failOnError)
             {
-                throw new WorkflowTaskException($"HTTP {method} {fullUri.GetLeftPart(UriPartial.Path)} returned {(int)response.StatusCode}.");
+                throw new WorkflowTaskException(
+                    $"HTTP {method} {fullUri.GetLeftPart(UriPartial.Path)} returned {(int)response.StatusCode}.",
+                    statusCode: (int)response.StatusCode);
             }
 
             if (!string.IsNullOrEmpty(into))

@@ -70,6 +70,7 @@ public static class WorkflowEndpoints
             var startRequest = request ?? new StartWorkflowRequest();
             startRequest.Data = WorkflowHttpInput.FromHttpContext(http, startRequest.Data);
             var (instance, created) = await engine.StartAsync(workflow, startRequest, WorkflowUser.From(principal), ct);
+            http.Response.Headers.ETag = ComputeInstanceETag(instance);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
             if (created)
             {
@@ -87,15 +88,25 @@ public static class WorkflowEndpoints
             return BaseResponseDataModel<List<WorkflowInstanceModel>>.Success(items, count);
         }).WithName("ListWorkflowInstances");
 
-        group.MapGet("{workflow}/instances/{id:guid}", async (string workflow, Guid id, WorkflowEngine engine, ClaimsPrincipal principal, CancellationToken ct) =>
-            BaseResponseDataModel<WorkflowInstanceModel>.Success(await engine.GetAsync(workflow, id, WorkflowUser.From(principal), ct), 1))
-            .WithName("GetWorkflowInstance");
+        group.MapGet("{workflow}/instances/{id:guid}", async (string workflow, Guid id, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
+        {
+            var instance = await engine.GetAsync(workflow, id, WorkflowUser.From(principal), ct);
+            var etag = ComputeInstanceETag(instance);
+            http.Response.Headers.ETag = etag;
+            if (http.Request.Headers.IfNoneMatch.Any(v => v is not null && v.Split(',', StringSplitOptions.TrimEntries).Any(t => t == "*" || string.Equals(t, etag, StringComparison.Ordinal))))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
+
+            return Results.Ok(BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1));
+        }).WithName("GetWorkflowInstance");
 
         group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
             // The engine checks access and the workflow on the row it loads anyway (no separate read).
             var enrichedInput = WorkflowHttpInput.FromHttpContext(http, input);
             var instance = await engine.ExecuteTransitionAsync(workflow, id, transition, enrichedInput, WorkflowUser.From(principal), async == true, ct);
+            http.Response.Headers.ETag = ComputeInstanceETag(instance);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
             return async == true ? Results.Accepted(null, body) : Results.Ok(body);
         }).WithName("ExecuteWorkflowTransition");
@@ -174,4 +185,7 @@ public static class WorkflowEndpoints
             })
             .ToList(),
     };
+
+    private static string ComputeInstanceETag(WorkflowInstanceModel instance) =>
+        $"\"{instance.Id:N}-v{instance.DataVersion}-{instance.State}-{instance.Status}-{instance.UpdatedAt.Ticks}-{instance.ActiveSubFlow?.DataVersion}-{instance.ActiveSubFlow?.State}\"";
 }

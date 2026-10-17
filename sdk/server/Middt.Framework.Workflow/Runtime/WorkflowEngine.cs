@@ -85,6 +85,7 @@ public sealed partial class WorkflowEngine(
             PendingInput = startPending,
             ParentInstanceId = parentInstanceId,
             StartedBy = user.AuditName,
+            LastExecutedBy = user.AuditName,
             CreatedAt = Now,
             UpdatedAt = Now,
         };
@@ -171,6 +172,15 @@ public sealed partial class WorkflowEngine(
         input = WorkflowHttpInput.EnsureEnvelope(input);
         var snapshot = await FindAccessibleAsync(instanceId, workflow, user, cancellationToken);
         var definition = registry.Get(snapshot.WorkflowKey, snapshot.WorkflowVersion);
+
+        if (snapshot.WaitingForInstanceId is { } waitingChildId &&
+            snapshot.Status == WorkflowInstanceStatus.Active &&
+            definition.FindState(snapshot.State)?.SubFlow?.ForwardTransitions == true &&
+            !AvailableIn(definition, snapshot.State).Any(t => t.Key == transitionKey && t.Trigger == TriggerType.Manual))
+        {
+            await ExecuteTransitionAsync(null, waitingChildId, transitionKey, input, user, runAsync, cancellationToken);
+            return await GetAsync(workflow, instanceId, user, cancellationToken);
+        }
 
         var transition = FindManualTransition(definition, snapshot, transitionKey, user);
         ValidateInput(transition, input);
@@ -380,19 +390,35 @@ public sealed partial class WorkflowEngine(
     internal async Task<List<WorkflowHistoryModel>> HistoryAsync(string? workflow, Guid instanceId, WorkflowUser user, CancellationToken cancellationToken)
     {
         await FindAccessibleAsync(instanceId, workflow, user, cancellationToken);
-        return await db.History.AsNoTracking().Where(h => h.InstanceId == instanceId).OrderBy(h => h.Id)
-            .Select(h => new WorkflowHistoryModel
+        var rows = await db.History.AsNoTracking().Where(h => h.InstanceId == instanceId).OrderBy(h => h.Id)
+            .Select(h => new
             {
-                TransitionKey = h.TransitionKey,
-                FromState = h.FromState,
-                ToState = h.ToState,
-                Trigger = h.Trigger,
-                ExecutedBy = h.ExecutedBy,
-                StartedAt = h.StartedAt,
-                FinishedAt = h.FinishedAt,
-                DataVersion = h.DataVersion,
+                h.TransitionKey,
+                h.FromState,
+                h.ToState,
+                h.Trigger,
+                h.ExecutedBy,
+                h.StartedAt,
+                h.FinishedAt,
+                h.DataVersion,
+                h.Tasks,
             })
             .ToListAsync(cancellationToken);
+
+        return rows.Select(h => new WorkflowHistoryModel
+        {
+            TransitionKey = h.TransitionKey,
+            FromState = h.FromState,
+            ToState = h.ToState,
+            Trigger = h.Trigger,
+            ExecutedBy = h.ExecutedBy,
+            StartedAt = h.StartedAt,
+            FinishedAt = h.FinishedAt,
+            DataVersion = h.DataVersion,
+            Tasks = string.IsNullOrEmpty(h.Tasks)
+                ? []
+                : JsonSerializer.Deserialize<List<WorkflowTaskExecutionModel>>(h.Tasks, WorkflowJson.Options) ?? [],
+        }).ToList();
     }
 
     public Task<List<WorkflowIncidentModel>> IncidentsAsync(Guid instanceId, WorkflowUser user, CancellationToken cancellationToken = default) =>
@@ -439,6 +465,8 @@ public sealed partial class WorkflowEngine(
         public string InitialState { get; } = instance.State;
 
         public JsonObject? Child { get; set; }
+        public WorkflowInstanceModel? ActiveSubFlowModel { get; set; }
+        public List<WorkflowTaskExecutionModel> CurrentHopTasks { get; } = [];
         public List<WorkflowJob> NewJobs { get; } = [];
         public HashSet<string> LeftStates { get; } = new(StringComparer.Ordinal);
         public bool ClearAllJobs { get; set; }
@@ -605,7 +633,9 @@ public sealed partial class WorkflowEngine(
                 continue;
             }
 
-            if (run.Instance.Status != WorkflowInstanceStatus.Busy || run.Instance.WaitingForInstanceId is not null || transition.Target == TransitionDefinition.Self)
+            if (run.Instance.Status != WorkflowInstanceStatus.Busy ||
+                run.Instance.WaitingForInstanceId is not null ||
+                (transition.Target == TransitionDefinition.Self && trigger == nameof(TriggerType.Automatic)))
             {
                 return;
             }
@@ -638,32 +668,37 @@ public sealed partial class WorkflowEngine(
         var definition = run.Definition;
         var from = instance.State;
         var startedAt = Now;
+        run.CurrentHopTasks.Clear();
 
         // Rollback point: a failed hop leaves state and data exactly as they were before it.
         var dataBefore = (JsonObject)run.Data.DeepClone();
         var jobsBefore = run.NewJobs.ToList();
         var leftBefore = run.LeftStates.ToList();
         var waitingBefore = instance.WaitingForInstanceId;
+        var activeSubFlowBefore = run.ActiveSubFlowModel;
         var keyBefore = instance.BusinessKey;
+        var lastExecutedByBefore = instance.LastExecutedBy;
 
         try
         {
+            var currentStatePolicy = definition.FindState(from)?.OnError;
             ApplyInput(run, transition, input);
-            await RunTasksAsync(run, transition.OnExecute, transition.Key, input, cancellationToken);
+            await RunTasksAsync(run, transition.OnExecute, transition.Key, "onExecute", currentStatePolicy, input, cancellationToken);
 
             var target = transition.Target == TransitionDefinition.Self ? from : transition.Target;
-            if (target != from)
+            var isReenter = transition.Target == TransitionDefinition.Self && transition.Reenter && !string.IsNullOrEmpty(from);
+            if (target != from || isReenter)
             {
                 if (definition.FindState(from) is { } leaving)
                 {
-                    await RunTasksAsync(run, leaving.OnExit, transition.Key, input, cancellationToken);
+                    await RunTasksAsync(run, leaving.OnExit, transition.Key, "onExit", leaving.OnError, input, cancellationToken);
                     run.LeftStates.Add(from);
                     run.NewJobs.RemoveAll(j => j.Kind == WorkflowJobKind.Scheduled && j.State == from);
                 }
 
                 instance.State = target;
                 var state = definition.FindState(target)!;
-                await RunTasksAsync(run, state.OnEntry, transition.Key, input, cancellationToken);
+                await RunTasksAsync(run, state.OnEntry, transition.Key, "onEntry", state.OnError, input, cancellationToken);
 
                 if (state.IsFinal)
                 {
@@ -677,7 +712,8 @@ public sealed partial class WorkflowEngine(
                 {
                     foreach (var scheduled in state.Transitions.Where(t => t.Trigger == TriggerType.Scheduled))
                     {
-                        run.NewJobs.Add(NewJob(instance, WorkflowJobKind.Scheduled, scheduled.Key, state.Key, Now + Durations.Parse(scheduled.After!)));
+                        var dueAt = ResolveScheduledDueAt(run, scheduled, input);
+                        run.NewJobs.Add(NewJob(instance, WorkflowJobKind.Scheduled, scheduled.Key, state.Key, dueAt));
                     }
 
                     if (state.Type == StateType.SubFlow)
@@ -691,9 +727,15 @@ public sealed partial class WorkflowEngine(
                         else
                         {
                             instance.WaitingForInstanceId = child.Id;
+                            run.ActiveSubFlowModel = child;
                         }
                     }
                 }
+            }
+
+            if (trigger is nameof(TriggerType.Manual) or "Start")
+            {
+                instance.LastExecutedBy = run.User.AuditName;
             }
 
             AddHistory(run, transition.Key, from, trigger, transition.Input?.Persistable(WorkflowHttpInput.ExtractBody(input, transition.Input?.Schema)) ?? input, startedAt);
@@ -708,6 +750,7 @@ public sealed partial class WorkflowEngine(
         }
         catch (TaskFailure failure)
         {
+            var stateAtFailure = instance.State;
             run.Data = dataBefore;
             run.NewJobs.Clear();
             run.NewJobs.AddRange(jobsBefore);
@@ -717,16 +760,23 @@ public sealed partial class WorkflowEngine(
             instance.Status = WorkflowInstanceStatus.Busy;
             instance.CompletedAt = null;
             instance.WaitingForInstanceId = waitingBefore;
+            run.ActiveSubFlowModel = activeSubFlowBefore;
             instance.BusinessKey = keyBefore;
+            instance.LastExecutedBy = lastExecutedByBefore;
+            run.CurrentHopTasks.Clear();
             run.ClearAllJobs = false;
             run.NotifyParent = false;
 
             AddIncident(run, transition.Key, failure.Task.DisplayKey, failure.InnerException?.Message ?? failure.Message, failure.Attempts);
 
-            if (failure.Policy.Action == ErrorAction.Transition &&
-                ResolveTransition(definition, instance, failure.Policy.Transition!) is { } errorTransition)
+            if (failure.Policy.Action == ErrorAction.Transition)
             {
-                return (HopOutcome.Redirect, errorTransition);
+                var errorTransition = ResolveTransition(definition, instance, failure.Policy.Transition!)
+                    ?? (!string.IsNullOrEmpty(stateAtFailure) ? AvailableIn(definition, stateAtFailure).FirstOrDefault(t => t.Key == failure.Policy.Transition) : null);
+                if (errorTransition is not null)
+                {
+                    return (HopOutcome.Redirect, errorTransition);
+                }
             }
 
             Fault(run, transition, input, failure.Task.DisplayKey, failure.InnerException?.Message ?? failure.Message, incidentAdded: true);
@@ -734,12 +784,44 @@ public sealed partial class WorkflowEngine(
         }
     }
 
-    private async Task RunTasksAsync(Run run, List<TaskDefinition> taskList, string transitionKey, JsonObject? input, CancellationToken cancellationToken)
+    private DateTime ResolveScheduledDueAt(Run run, TransitionDefinition scheduled, JsonObject? input)
+    {
+        if (!string.IsNullOrWhiteSpace(scheduled.After))
+        {
+            var afterText = scheduled.After.Contains("{{", StringComparison.Ordinal)
+                ? expressions.RenderText(scheduled.After, Scope(run, input)).Trim()
+                : scheduled.After;
+            return Durations.TryParse(afterText, out var duration)
+                ? Now + duration
+                : throw new InvalidOperationException($"Scheduled transition '{scheduled.Key}' produced an invalid 'after' duration '{afterText}'.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(scheduled.At))
+        {
+            var atText = scheduled.At.Contains("{{", StringComparison.Ordinal)
+                ? expressions.RenderText(scheduled.At, Scope(run, input)).Trim()
+                : scheduled.At;
+            return DateTimeOffset.TryParse(atText, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var dto)
+                ? dto.UtcDateTime
+                : throw new InvalidOperationException($"Scheduled transition '{scheduled.Key}' produced an invalid 'at' timestamp '{atText}'.");
+        }
+
+        throw new InvalidOperationException($"Scheduled transition '{scheduled.Key}' has neither 'after' nor 'at'.");
+    }
+
+    private async Task RunTasksAsync(
+        Run run,
+        List<TaskDefinition> taskList,
+        string transitionKey,
+        string hook,
+        ErrorPolicy? stateErrorPolicy,
+        JsonObject? input,
+        CancellationToken cancellationToken)
     {
         for (var taskIndex = 0; taskIndex < taskList.Count; taskIndex++)
         {
             var task = taskList[taskIndex];
-            var policy = task.OnError ?? run.Definition.OnError ?? new ErrorPolicy();
+            var policy = task.OnError ?? stateErrorPolicy ?? run.Definition.OnError ?? new ErrorPolicy();
             if (!string.IsNullOrWhiteSpace(task.When))
             {
                 bool shouldRun;
@@ -766,6 +848,11 @@ public sealed partial class WorkflowEngine(
 
             var implementation = tasks.Resolve(services, task.Task);
             var delay = Durations.Parse(policy.Delay);
+            var maxDelayCap = policy.MaxDelay is { } md && Durations.TryParse(md, out var parsedMax)
+                ? Math.Min(parsedMax.Ticks, options.Value.MaxRetryDelay.Ticks)
+                : options.Value.MaxRetryDelay.Ticks;
+            var multiplier = Math.Max(policy.BackoffMultiplier, 1.0);
+            var taskStart = time.GetTimestamp();
 
             for (var attempt = 1; ; attempt++)
             {
@@ -792,22 +879,47 @@ public sealed partial class WorkflowEngine(
                 {
                     await implementation.ExecuteAsync(context, cancellationToken);
                     run.Data = attemptData;
+                    run.CurrentHopTasks.Add(new WorkflowTaskExecutionModel
+                    {
+                        TaskKey = task.DisplayKey,
+                        TaskType = task.Task,
+                        Hook = hook,
+                        Attempts = attempt,
+                        DurationMs = (long)time.GetElapsedTime(taskStart).TotalMilliseconds,
+                        Outcome = "Completed",
+                    });
                     break;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     run.Instance.BusinessKey = originalBusinessKey;
                     LogTaskFailed(logger, ex, task.DisplayKey, run.Instance.Id, attempt, policy.MaxAttempts);
-                    if (attempt < policy.MaxAttempts)
+                    if (attempt < policy.MaxAttempts && ShouldRetry(policy, ex))
                     {
-                        var wait = TimeSpan.FromTicks(Math.Min(delay.Ticks * (1L << Math.Min(attempt - 1, 20)), options.Value.MaxRetryDelay.Ticks));
-                        await Task.Delay(wait, time, cancellationToken);
+                        var factor = Math.Pow(multiplier, Math.Min(attempt - 1, 20));
+                        var waitTicks = (long)Math.Min(delay.Ticks * factor, maxDelayCap);
+                        if (policy.UseJitter && waitTicks > 0)
+                        {
+                            var jitter = 0.8 + (Random.Shared.NextDouble() * 0.4);
+                            waitTicks = (long)Math.Min(waitTicks * jitter, maxDelayCap);
+                        }
+
+                        await Task.Delay(TimeSpan.FromTicks(Math.Max(0, waitTicks)), time, cancellationToken);
                         continue;
                     }
 
                     if (policy.Action == ErrorAction.Continue)
                     {
                         AddIncident(run, transitionKey, task.DisplayKey, ex.Message, attempt);
+                        run.CurrentHopTasks.Add(new WorkflowTaskExecutionModel
+                        {
+                            TaskKey = task.DisplayKey,
+                            TaskType = task.Task,
+                            Hook = hook,
+                            Attempts = attempt,
+                            DurationMs = (long)time.GetElapsedTime(taskStart).TotalMilliseconds,
+                            Outcome = "ContinuedOnError",
+                        });
                         break;
                     }
 
@@ -815,6 +927,68 @@ public sealed partial class WorkflowEngine(
                 }
             }
         }
+    }
+
+    private static bool ShouldRetry(ErrorPolicy policy, Exception ex)
+    {
+        if (policy.RetryOnStatusCodes.Count == 0)
+        {
+            return true;
+        }
+
+        int? statusCode = ex switch
+        {
+            WorkflowTaskException { StatusCode: { } sc } => sc,
+            HttpRequestException { StatusCode: { } hsc } => (int)hsc,
+            _ => null,
+        };
+
+        if (statusCode is null)
+        {
+            return true;
+        }
+
+        var code = statusCode.Value;
+        var hasPositive = false;
+        var matchedPositive = false;
+
+        foreach (var rawRule in policy.RetryOnStatusCodes)
+        {
+            var rule = rawRule.Trim();
+            if (string.IsNullOrEmpty(rule))
+            {
+                continue;
+            }
+
+            if (rule.StartsWith('!'))
+            {
+                if (MatchesStatusCode(rule[1..], code))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                hasPositive = true;
+                if (MatchesStatusCode(rule, code))
+                {
+                    matchedPositive = true;
+                }
+            }
+        }
+
+        return !hasPositive || matchedPositive;
+    }
+
+    private static bool MatchesStatusCode(string pattern, int statusCode)
+    {
+        var codeText = statusCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (pattern.Length == 3 && pattern.EndsWith("xx", StringComparison.OrdinalIgnoreCase) && codeText.Length == 3)
+        {
+            return codeText[0] == pattern[0];
+        }
+
+        return string.Equals(pattern, codeText, StringComparison.Ordinal);
     }
 
     private void ApplyInput(Run run, TransitionDefinition transition, JsonObject? input)
@@ -1200,9 +1374,11 @@ public sealed partial class WorkflowEngine(
             Input = input?.ToJsonString(),
             Data = data,
             DataVersion = run.Instance.DataVersion,
+            Tasks = run.CurrentHopTasks.Count > 0 ? JsonSerializer.Serialize(run.CurrentHopTasks, WorkflowJson.Options) : null,
             StartedAt = startedAt,
             FinishedAt = Now,
         });
+        run.CurrentHopTasks.Clear();
     }
 
     private WorkflowJob NewJob(WorkflowInstance instance, WorkflowJobKind kind, string? transition, string? state, DateTime dueAt, string? payload = null, string? requestedBy = null) => new()

@@ -19,8 +19,11 @@ public sealed class WorkflowValidationException(IReadOnlyList<string> errors)
     public IReadOnlyList<string> Errors { get; } = errors;
 }
 
-/// <summary>Thrown by tasks for business failures (retried/handled by the task's error policy).</summary>
-public class WorkflowTaskException(string message, Exception? inner = null) : Exception(message, inner);
+/// <summary>Thrown by tasks for business or transport failures (retried/handled by the task's error policy).</summary>
+public class WorkflowTaskException(string message, Exception? inner = null, int? statusCode = null) : Exception(message, inner)
+{
+    public int? StatusCode { get; init; } = statusCode;
+}
 
 /// <summary>Invalid workflow definitions found at startup.</summary>
 public sealed class WorkflowDefinitionException(IReadOnlyList<string> errors)

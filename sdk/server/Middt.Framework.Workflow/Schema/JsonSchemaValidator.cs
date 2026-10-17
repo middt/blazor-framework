@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Middt.Framework.Expressions;
 
 namespace Middt.Framework.Workflow.Schema;
 
@@ -15,11 +16,22 @@ namespace Middt.Framework.Workflow.Schema;
 /// tells frontends to render a select whose options come from <c>api/v{version}/{entity}/getitems</c> (same shape as the
 /// layout <c>lookup</c>). Its shape is checked at load time; it does not constrain the submitted value.
 /// </para>
+/// <para>
+/// Data projection extensions: <c>"x-roles": ["admin", "auditor"]</c> strips the property when projecting instance data for
+/// callers lacking those roles; <c>"x-mask": { "pattern": "last4" | "email" | "***", "exceptRoles": ["auditor"] }</c> masks
+/// string properties in the projected response.
+/// </para>
 /// </summary>
 public static partial class JsonSchemaValidator
 {
     /// <summary>Schema keyword of the lookup UI hint.</summary>
     public const string LookupKeyword = "x-lookup";
+
+    /// <summary>Schema keyword restricting field visibility by role.</summary>
+    public const string RolesKeyword = "x-roles";
+
+    /// <summary>Schema keyword masking string field values unless exempted by role.</summary>
+    public const string MaskKeyword = "x-mask";
 
     private static readonly HashSet<string> SupportedKeywords =
     [
@@ -35,6 +47,20 @@ public static partial class JsonSchemaValidator
             if (keyword == LookupKeyword)
             {
                 foreach (var error in CheckLookup(value, $"{path}.{LookupKeyword}"))
+                {
+                    yield return error;
+                }
+            }
+            else if (keyword == RolesKeyword)
+            {
+                foreach (var error in CheckRoles(value, $"{path}.{RolesKeyword}"))
+                {
+                    yield return error;
+                }
+            }
+            else if (keyword == MaskKeyword)
+            {
+                foreach (var error in CheckMask(value, $"{path}.{MaskKeyword}"))
                 {
                     yield return error;
                 }
@@ -71,6 +97,127 @@ public static partial class JsonSchemaValidator
             }
         }
     }
+
+    private static IEnumerable<string> CheckRoles(JsonNode? rolesNode, string path)
+    {
+        if (rolesNode is not JsonArray arr || arr.Count == 0 ||
+            arr.Any(item => item is not JsonValue v || !v.TryGetValue<string>(out var s) || string.IsNullOrWhiteSpace(s)))
+        {
+            yield return $"{path}: must be a non-empty array of role names.";
+        }
+    }
+
+    private static IEnumerable<string> CheckMask(JsonNode? maskNode, string path)
+    {
+        if (maskNode is not JsonObject obj)
+        {
+            yield return $"{path}: must be an object with 'pattern' and optional 'exceptRoles'.";
+            yield break;
+        }
+
+        foreach (var (name, _) in obj)
+        {
+            if (name is not ("pattern" or "exceptRoles"))
+            {
+                yield return $"{path}: unsupported property '{name}'.";
+            }
+        }
+
+        var pattern = obj["pattern"] is JsonValue pv && pv.TryGetValue<string>(out var p) ? p : null;
+        if (pattern is not ("last4" or "email" or "***"))
+        {
+            yield return $"{path}.pattern: must be 'last4', 'email' or '***'.";
+        }
+
+        if (obj["exceptRoles"] is { } exceptNode)
+        {
+            if (exceptNode is not JsonArray arr ||
+                arr.Any(item => item is not JsonValue v || !v.TryGetValue<string>(out var s) || string.IsNullOrWhiteSpace(s)))
+            {
+                yield return $"{path}.exceptRoles: must be an array of role names.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies <c>x-roles</c> field visibility filtering and <c>x-mask</c> string masking to <paramref name="data"/>
+    /// according to <paramref name="schema"/> for <paramref name="user"/>.
+    /// </summary>
+    public static JsonObject ProjectData(JsonObject data, JsonObject? schema, ExpressionUser user)
+    {
+        if (schema is null || user.IsSystem)
+        {
+            return data;
+        }
+
+        var projected = (JsonObject)data.DeepClone();
+        ApplyProjection(projected, schema, user);
+        return projected;
+    }
+
+    private static void ApplyProjection(JsonObject obj, JsonObject schema, ExpressionUser user)
+    {
+        if (schema["properties"] is not JsonObject properties)
+        {
+            return;
+        }
+
+        foreach (var (name, propNode) in properties)
+        {
+            if (propNode is not JsonObject propSchema || !obj.TryGetPropertyValue(name, out var val))
+            {
+                continue;
+            }
+
+            if (propSchema[RolesKeyword] is JsonArray rolesArr && rolesArr.Count > 0)
+            {
+                var allowed = rolesArr
+                    .Select(r => r is JsonValue rv && rv.TryGetValue<string>(out var s) ? s : null)
+                    .OfType<string>()
+                    .Any(user.IsInRole);
+                if (!allowed)
+                {
+                    obj.Remove(name);
+                    continue;
+                }
+            }
+
+            if (propSchema[MaskKeyword] is JsonObject maskObj &&
+                val is JsonValue strVal && strVal.GetValueKind() == JsonValueKind.String && strVal.TryGetValue<string>(out var raw))
+            {
+                var exempted = maskObj["exceptRoles"] is JsonArray exceptArr && exceptArr
+                    .Select(r => r is JsonValue rv && rv.TryGetValue<string>(out var s) ? s : null)
+                    .OfType<string>()
+                    .Any(user.IsInRole);
+
+                if (!exempted)
+                {
+                    var pattern = maskObj["pattern"]?.GetValue<string>() ?? "***";
+                    obj[name] = MaskString(raw, pattern);
+                    continue;
+                }
+            }
+
+            if (val is JsonObject childObj)
+            {
+                ApplyProjection(childObj, propSchema, user);
+            }
+            else if (val is JsonArray childArr && propSchema["items"] is JsonObject itemSchema)
+            {
+                foreach (var item in childArr.OfType<JsonObject>())
+                {
+                    ApplyProjection(item, itemSchema, user);
+                }
+            }
+        }
+    }
+
+    private static string MaskString(string value, string pattern) => pattern switch
+    {
+        "last4" => value.Length <= 4 ? new string('*', value.Length) : new string('*', value.Length - 4) + value[^4..],
+        "email" => value.IndexOf('@') is > 0 and var at ? $"{value[0]}***{value[at..]}" : "***",
+        _ => "***",
+    };
 
     private static IEnumerable<string> CheckLookup(JsonNode? lookup, string path)
     {
