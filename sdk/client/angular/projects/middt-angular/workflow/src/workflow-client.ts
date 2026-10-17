@@ -1,7 +1,7 @@
 import { EnvironmentProviders, inject, InjectionToken, makeEnvironmentProviders } from '@angular/core';
 import { WorkflowApiClient } from '@middt/ui-core';
-import { bffFetch } from '../core/bff-fetch';
-import { MIDDT_CONFIG } from '../core/config';
+import { bffFetch } from '@middt/angular/core';
+import { MIDDT_CONFIG } from '@middt/angular/core';
 
 /** Settings of the workflow screens. */
 export interface MiddtWorkflowOptions {

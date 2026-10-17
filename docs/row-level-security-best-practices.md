@@ -172,11 +172,13 @@ Akışın ilgili adımına (`onEntry`) doğrudan bir `db-query` görevi eklenere
   "task": "db-query",
   "config": {
     "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
-    "parameters": [ "{{ data.branchId }}" ],
+    "parameters": [ "{{ input.branchId ?? data.branchId }}" ],
     "into": "availableStaffList"
   }
 }
 ```
+
+> 💡 **Not:** Parametre yalnızca akış verisinden (`data.branchId`) değil; kullanıcının formda gönderdiği istek gövdesinden (`input.branchId`), HTTP Header'dan veya QueryString'den de gelebilir. Aşağıda bu kaynakların nasıl yönetileceği detaylandırılmıştır.
 
 > ⚠️ **Uyarı:** Aynı sorguyu birden fazla iş akışında tekrar tekrar yazmak (kredi, müşteri ekleme, hesap açma) **kod tekrarına (DRY ihlali)** ve şema değiştiğinde tüm JSON dosyalarını güncelleme yüküne yol açar. Bu nedenle aşağıdaki **SubFlow (Alt Akış)** deseni tercih edilmelidir.
 
@@ -291,6 +293,135 @@ Alt akış tamamlandığında veriler ebeveyn akışın `data.availableStaff` al
 2. **Kapsülleme (Encapsulation):** Tablo adı, kolon adı veya filtre kuralı (`active = 1`, `store_id`) değiştiğinde yalnızca `get-branch-staff.json` dosyası güncellenir; onlarca iş akışına dokunulmaz.
 3. **Versiyonlama Desteği:** İleride `version: 2` çıkartılabilir ve eski çalışan akışlar bozulmadan yeni akışlara entegre edilebilir (`"version": 2`).
 4. **Kolay Zenginleştirme:** Gelecekte alt akışın içine SQL sorgusu öncesinde Redis önbellek kontrolü (`cache-get`) veya harici İK servisinden LDAP kontrolü (`http-request`) eklemek mümkündür.
+
+---
+
+### Parametre Kaynakları: Header, QueryString, Request Body ve JWT Claim'lerinin Çözümlenmesi
+
+Gerçek hayat senaryolarında `branchId` gibi filtre veya iş parametreleri yalnızca akışın o anki durum verisinde (`data.branchId`) bulunmayabilir. Bilgi şu kaynaklardan biri üzerinden sisteme gelebilir:
+
+1. **Request Body / Form Girdisi (`input`):** Kullanıcının ekrandaki formu doldurup "İlerle" butonuna bastığı an veya REST API üzerinden `POST /transitions/{transition}` gövdesinde gönderilen JSON verisi.
+2. **HTTP Header (`X-Branch-Id`) veya JWT Claim:** Kimlik doğrulama token'ı (OIDC/OAuth2) içindeki kullanıcının bağlı olduğu şube (`branch_id`) veya kurumsal ağ geçidinden (API Gateway/BFF) gelen özel header.
+3. **QueryString (`?branchId=101`):** Sayfa rotasında (URL) veya API çağrısında parametre olarak iletilen değer.
+4. **Mevcut Akış Durumu (`data`):** Akışın önceki bir adımında kullanıcı tarafından seçilmiş veya veritabanından çekilip hafızada saklanan durum verisi.
+
+Middt Framework bu farklı kaynakları şu stratejilerle destekler:
+
+#### A. Otomatik HTTP Bağlamı (`input.header`, `input.query`, `input.body`)
+Middt Framework'te REST API (`WorkflowEndpoints`) üzerinden gelen HTTP isteklerinde, framework gelen tüm HTTP bağlamını **otomatik olarak** `input` zarfına yerleştirir:
+
+- **`input.header.*`**: İstek başlıkları (örneğin `X-Branch-Id: 101` gönderildiğinde `input.header.branchId`, `input.header.xBranchId` veya `input.header["X-Branch-Id"]`).
+- **`input.query.*`**: URL sorgu parametreleri (örneğin `?branchId=101` gönderildiğinde `input.query.branchId`).
+- **`input.body.*`**: İstek gövdesi (JSON body içerisindeki alanlar).
+- **`input.*`**: Geriye dönük uyumluluk ve doğrudan erişim için gövdedeki alanlar (`body`) doğrudan `input` kökünde de mevcuttur (örneğin `input.branchId`).
+
+> ⚡ **Otomatik ve Tip Güvenli:** Sayfa rotasında `?branchId=101` veya başlıkta `X-Branch-Id: 101` olduğunda **tek bir satır C# eşleme kodu yazmanıza gerek kalmaz**. Framework header ve query değerlerini otomatik olarak parse eder (sayı, boolean veya metin olarak) ve akış adımlarına aktarır.
+
+#### B. İfade Düzeyinde Güvenli Fallback Zinciri (`??` Operatörü)
+Middt'in taşınabilir ifade motoru (`ExpressionEvaluator`) **null-coalescing (`??`)** operatörünü destekler. Header ve query nesneleri her zaman güvenli boş nesne olarak sağlandığından `NullReferenceException` oluşmaz. İstediğiniz öncelik sırasına göre zincirleme yapabilirsiniz:
+
+```json
+{
+  "task": "db-query",
+  "config": {
+    "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
+    "parameters": [
+      "{{ input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? data.branchId }}"
+    ],
+    "into": "availableStaffList"
+  }
+}
+```
+
+Alt akış çağrısında (`subFlow.input`) da aynı ifade doğrudan kullanılabilir:
+```json
+"subFlow": {
+  "workflow": "get-branch-staff",
+  "input": {
+    "branchId": "input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? data.branchId"
+  },
+  "outputInto": "availableStaff"
+}
+```
+*Açıklama: HTTP başlığında şube varsa o kullanılır; yoksa URL query'deki şube; yoksa formdan girilen; o da yoksa akışın hafızasındaki şube devreye girer.*
+
+#### C. Özel API Controller veya BFF Endpoint'lerinde Özel Müdahale (Opsiyonel)
+Standart iş akışı uç noktaları (`/api/workflows/...`) yukarıdaki aktarımı otomatik olarak yaparken; eğer özel bir Controller üzerinden akış tetiklemek ve JWT token'daki `branch_id` gibi claim'leri zorunlu kılmak isterseniz:
+
+```csharp
+// Özel API Controller veya Minimal API Endpoint
+app.MapPost("/api/branch-operations/{id}/assign-staff", async (
+    Guid id,
+    [FromHeader(Name = "X-Branch-Id")] long? headerBranchId,
+    [FromQuery] long? queryBranchId,
+    [FromBody] JsonObject input,
+    WorkflowEngine engine,
+    ClaimsPrincipal principal) =>
+{
+    // Güvenlik Öncelik Sıralaması:
+    // 1. JWT Claim (Kullanıcının token'ındaki yetkili şubesi - en güvenli / manipüle edilemez)
+    // 2. Framework'ün otomatik input.header veya input.query çözümü
+    var branchId = principal.FindFirst("branch_id")?.Value
+                   ?? headerBranchId?.ToString()
+                   ?? queryBranchId?.ToString();
+
+    if (branchId != null && !input.ContainsKey("branchId"))
+    {
+        input["branchId"] = long.Parse(branchId);
+    }
+
+    return await engine.ExecuteTransitionAsync("branch-operation", id, "submit", input, WorkflowUser.From(principal));
+});
+```
+
+> 🔒 **Güvenlik Kuralı:** Eğer `branchId` kullanıcının görmeye yetkili olduğu veriyi sınırlıyorsa (Row-Level Security), istemciden gelen query string veya request body değerine **asla körü körüne güvenilmemelidir**. Token'daki yetkili şube claim'i (`user.Claims`) ile istemcinin talep ettiği şube uyuşmuyorsa istek `403 Forbidden` ile reddedilmelidir.
+
+#### C. Önyüzden (Angular / Blazor) QueryString ve Context Aktarımı
+Eğer kullanıcı sayfaya `?branchId=101` linki ile gelmişse veya aktif şubesi UI oturumunda saklanıyorsa:
+
+- **Angular (`@middt/angular`):**
+  ```typescript
+  // Rota query parametresinden veya SessionService'ten okunur
+  const branchId = this.route.snapshot.queryParamMap.get('branchId') ?? this.session.currentBranchId;
+
+  // Geçiş tetiklenirken input'a eklenir
+  this.workflowClient.executeTransition(workflow, instanceId, 'submit-store', {
+    branchId: Number(branchId)
+  });
+  ```
+
+- **Blazor (`Middt.Framework.Blazor.Web`):**
+  ```csharp
+  [SupplyParameterFromQuery]
+  public long? BranchId { get; set; }
+
+  // Geçiş çalıştırılırken aktarılır
+  await WorkflowClient.ExecuteTransitionAsync(Workflow, instance.Id, "submit-store", new
+  {
+      branchId = BranchId ?? UserSession.CurrentBranchId
+  });
+  ```
+
+#### D. Dış Servis Çağrılarında Header ve Query Aktarımı (`http-request` Task)
+İş akışının bir adımı harici bir REST API çağrısı yapıyorsa (`HttpTask`), URL Query ve Header değerleri doğrudan JSON tanımı üzerinden `{{ ... }}` şablonlarıyla beslenebilir:
+
+```json
+{
+  "task": "http-request",
+  "config": {
+    "method": "GET",
+    "url": "https://api.internal/v1/staffs",
+    "queryParams": {
+      "branchId": "{{ input.branchId ?? data.branchId }}"
+    },
+    "headers": {
+      "X-Branch-Id": "{{ input.branchId ?? data.branchId }}",
+      "Authorization": "Bearer {{ data.accessToken }}"
+    },
+    "into": "availableStaff"
+  }
+}
+```
 
 ---
 

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { UiRenderContext } from '@middt/ui-core';
-import { AuthService } from '../core/auth.service';
-import { MIDDT_CONFIG } from '../core/config';
+import { AuthService } from '@middt/angular/core';
+import { MIDDT_CONFIG } from '@middt/angular/core';
 
 /** Creates interactive render contexts for the signed-in user (ExpressionUser.FromPrincipal of the Blazor hosts). */
 @Injectable({ providedIn: 'root' })

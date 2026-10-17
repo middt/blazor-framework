@@ -50,7 +50,7 @@
       "subFlow": {
         "workflow": "get-branch-staff",
         "input": {
-          "branchId": "data.branchId"
+          "branchId": "input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? input.branchId ?? data.branchId"
         },
         "outputInto": "availableStaff"
       },

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
-import { WorkflowStateViewBase } from '@middt/angular';
+import { WorkflowStateViewBase } from '@middt/angular/workflow';
 import { SAMPLE_VIEW_STYLES, ViewFormat } from './view-format';
 
 /** State view of the review states (finance-review / manager-review / express-review / escalated): what a manager needs to decide. */

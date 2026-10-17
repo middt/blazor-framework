@@ -75,6 +75,8 @@ in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a compone
 3. **Layouts**: `MiddtLayoutPageComponent` / `MiddtLayoutHostComponent` load layouts and map widget names to Angular
    components (`MIDDT_UI_WIDGETS`); `UiRenderContext` from `@middt/ui-core` evaluates `visibleWhen`, templates and
    formats exactly like .NET; the same CSS classes (`middt-ui-*`) and E2E selectors work in both frontends.
+   The Angular package has focused `core`, `ui`, `workflow`, and `signalr` entry points; the root entry point remains
+   an aggregate for compatibility. The demo registers workflow views in its lazy workflow route.
 4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; Razor views (`view.component`) have
    Angular counterparts registered with `provideWorkflowViews()`; states with `view.layout` use the layout host;
    unregistered views fall back to the server rendered HTML.

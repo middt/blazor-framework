@@ -1,5 +1,5 @@
 import { EnvironmentProviders } from '@angular/core';
-import { provideWorkflowViews } from '@middt/angular';
+import { provideWorkflowViews } from '@middt/angular/workflow';
 import { OrderResultView } from './order-result.view';
 import { OrderReviewView } from './order-review.view';
 import { RejectReasonForm } from './reject-reason.form';

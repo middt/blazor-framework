@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import { WorkflowTransitionViewBase } from '@middt/angular';
+import { WorkflowTransitionViewBase } from '@middt/angular/workflow';
 import { SAMPLE_VIEW_STYLES } from './view-format';
 
 const OPTIONS: readonly { key: string; text: string }[] = [

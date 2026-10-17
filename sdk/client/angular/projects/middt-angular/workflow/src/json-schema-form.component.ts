@@ -6,7 +6,7 @@ import { MatInput, MatInputModule } from '@angular/material/input';
 import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { schemaFields, schemaFormValue, schemaInitialValues, schemaLookupOptions, validateSchemaField, validateSchemaFields } from '@middt/ui-core';
 import type { SchemaField, SchemaFieldValue, SchemaLookupOption, WorkflowData } from '@middt/ui-core';
-import { UiLookupCache } from '../ui/lookup-cache.service';
+import { UiLookupCache } from '@middt/angular/ui';
 import { JSF_STYLES } from './workflow-styles';
 
 /** Shown below an `x-lookup` select whose options cannot be loaded (same text as JsonSchemaForm.razor). */

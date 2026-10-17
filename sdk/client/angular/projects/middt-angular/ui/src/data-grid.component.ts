@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, forwardRef, inject, Injectable, input, linkedSignal, signal, TemplateRef } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, forwardRef, inject, input, linkedSignal, signal, TemplateRef } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,24 +8,11 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { errorText, isSuccess, UiDataClient, UiExpressions, type UiColumn, type UiField, type UiRenderContext } from '@middt/ui-core';
-import { UI_DATA_CLIENT } from '../core/config';
-import { NotifyService } from '../core/notify.service';
+import { UI_DATA_CLIENT, NotifyService } from '@middt/angular/core';
+import { UiPaginatorIntl } from '@middt/angular/core';
+export { UiPaginatorIntl } from '@middt/angular/core';
 import { UiFieldEditorComponent } from './field-editor.component';
 import { cloneJson, type JsonObject } from './widget-base';
-
-/** Turkish paginator texts. */
-@Injectable()
-export class UiPaginatorIntl extends MatPaginatorIntl {
-  override itemsPerPageLabel = 'Sayfa başına';
-  override nextPageLabel = 'Sonraki sayfa';
-  override previousPageLabel = 'Önceki sayfa';
-  override firstPageLabel = 'İlk sayfa';
-  override lastPageLabel = 'Son sayfa';
-  override getRangeLabel = (page: number, pageSize: number, length: number): string => {
-    const pages = Math.max(1, Math.ceil(length / pageSize));
-    return `Sayfa ${Math.min(page + 1, pages)} / ${pages} (${length} kayıt)`;
-  };
-}
 
 export interface UiRowActionContext {
   $implicit: JsonObject;

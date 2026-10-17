@@ -1,7 +1,7 @@
 import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { UiApiClient, UiDataClient } from '@middt/ui-core';
-import { UiPaginatorIntl } from '../ui/data-grid.component';
+import { UiPaginatorIntl } from './paginator-intl';
 import { bffFetch } from './bff-fetch';
 
 /** Settings of the Middt Angular frontend; the defaults match a host built with Middt.Framework.Bff. */

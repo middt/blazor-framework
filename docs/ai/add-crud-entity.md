@@ -7,7 +7,7 @@ Example: a `Brand` screen for the bike store, in both frontends, without writing
    search-only properties need `[QueryIsNoFilter]` or a `Query*` attribute). Register in the `BikeStoresContext`.
 2. Repository `Repository/Bike/BrandRepository : BaseCrudRepository<Brand, BikeStoresContext>`; register in `Program.cs`.
    Views/keyless entities: override `DefaultSortProperty`.
-3. Controller `BrandController(BrandRepository repository) : SampleCrudController<Brand, BrandRepository>(repository)`
+3. Controller `BrandController(BrandRepository repository) : SampleCrudController<Brand, BrandRepository>(repository)`. For production tenant/owner data, derive from `BasePolicyCrudController<TModel, TRepository>` and implement both `ApplyAccessFilter` and `AuthorizeAsync` explicitly.
    with `[Route("api/v{version:apiVersion}/[controller]")]` and `[ApiVersion("1.0")]`. Add `AuthorizeAsync` /
    `ApplyAccessFilter` overrides if rows belong to users/tenants.
 4. Tests (framework behaviour is covered; add tests only for custom logic).

@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { errorText, isSuccess } from '@middt/ui-core';
-import { UI_DATA_CLIENT } from '../core/config';
+import { UI_DATA_CLIENT } from '@middt/angular/core';
 import type { JsonObject } from './widget-base';
 
 const DURATION_MS = 60_000;

@@ -13,8 +13,8 @@ import {
   type UiRenderContext,
   type UiWidgetSpecModel,
 } from '@middt/ui-core';
-import { MIDDT_CONFIG, UI_API_CLIENT } from '../core/config';
-import { NotifyService } from '../core/notify.service';
+import { MIDDT_CONFIG, UI_API_CLIENT } from '@middt/angular/core';
+import { NotifyService } from '@middt/angular/core';
 import { confirmDialog } from './dialogs';
 import { UiLayoutCache } from './layout-cache.service';
 import { parseLayout, serializeLayout } from './layout-json';

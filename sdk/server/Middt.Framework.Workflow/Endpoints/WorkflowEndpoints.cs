@@ -67,7 +67,9 @@ public static class WorkflowEndpoints
 
         group.MapPost("{workflow}/instances", async (string workflow, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] StartWorkflowRequest? request, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
-            var (instance, created) = await engine.StartAsync(workflow, request ?? new StartWorkflowRequest(), WorkflowUser.From(principal), ct);
+            var startRequest = request ?? new StartWorkflowRequest();
+            startRequest.Data = WorkflowHttpInput.FromHttpContext(http, startRequest.Data);
+            var (instance, created) = await engine.StartAsync(workflow, startRequest, WorkflowUser.From(principal), ct);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
             if (created)
             {
@@ -89,10 +91,11 @@ public static class WorkflowEndpoints
             BaseResponseDataModel<WorkflowInstanceModel>.Success(await engine.GetAsync(workflow, id, WorkflowUser.From(principal), ct), 1))
             .WithName("GetWorkflowInstance");
 
-        group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? input, WorkflowEngine engine, ClaimsPrincipal principal, CancellationToken ct) =>
+        group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
             // The engine checks access and the workflow on the row it loads anyway (no separate read).
-            var instance = await engine.ExecuteTransitionAsync(workflow, id, transition, input, WorkflowUser.From(principal), async == true, ct);
+            var enrichedInput = WorkflowHttpInput.FromHttpContext(http, input);
+            var instance = await engine.ExecuteTransitionAsync(workflow, id, transition, enrichedInput, WorkflowUser.From(principal), async == true, ct);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
             return async == true ? Results.Accepted(null, body) : Results.Ok(body);
         }).WithName("ExecuteWorkflowTransition");

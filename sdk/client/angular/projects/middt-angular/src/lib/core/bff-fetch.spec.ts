@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { bffFetch, CSRF_HEADER, loginUrl } from './bff-fetch';
-import { DEFAULT_MIDDT_CONFIG } from './config';
+import { bffFetch, CSRF_HEADER, loginUrl } from '../../../core/src/bff-fetch';
+import { DEFAULT_MIDDT_CONFIG } from '../../../core/src/config';
 
 describe('bffFetch', () => {
   beforeEach(() => {

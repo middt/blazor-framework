@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { CSRF_HEADER } from './bff-fetch';
-import { MIDDT_CONFIG } from './config';
+import { CSRF_HEADER } from '@middt/angular/core';
+import { MIDDT_CONFIG } from '@middt/angular/core';
 
 /** Wire contract of BaseSignalRHub<T>.Send (Middt.Framework.Model.SignalR.BaseSignalRRequestModel). */
 export interface SignalRRequest<T> {

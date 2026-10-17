@@ -50,8 +50,8 @@ import type {
   WorkflowIncidentModel,
   WorkflowInstanceModel,
 } from '@middt/ui-core';
-import { NotifyService } from '../core/notify.service';
-import { MiddtLayoutHostComponent } from '../ui/layout-host.component';
+import { NotifyService } from '@middt/angular/core';
+import { MiddtLayoutHostComponent } from '@middt/angular/ui';
 import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
 import { WORKFLOW_API_CLIENT } from './workflow-client';
 import { MiddtWorkflowDialogComponent } from './workflow-dialog.component';

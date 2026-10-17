@@ -82,3 +82,41 @@ jobs:
       - name: Build demo app
         working-directory: demo/client/angular/app
         run: npm ci && npx ng build sample --configuration production
+
+  full-stack-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate disposable stack credentials
+        run: |
+          echo "IDP_BLAZOR_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "IDP_ANGULAR_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "MSSQL_SA_PASSWORD=Aa1!$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+          echo "RABBITMQ_DEFAULT_USER=ci-user" >> "$GITHUB_ENV"
+          echo "RABBITMQ_DEFAULT_PASS=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+      - name: Start full stack on SQL Server
+        run: docker compose up -d --build
+      - name: Install browser tests
+        working-directory: tests/e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Wait for application health
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://localhost:8080/health >/dev/null &&
+               curl --fail --silent http://localhost:8081/health >/dev/null &&
+               curl --fail --silent http://localhost:8083/health >/dev/null; then exit 0; fi
+            sleep 5
+          done
+          docker compose ps
+          docker compose logs --tail=100
+          exit 1
+      - name: Browser and SQL Server integration tests
+        working-directory: tests/e2e
+        run: npm test
+      - name: Full stack logs on failure
+        if: failure()
+        run: docker compose logs --tail=150

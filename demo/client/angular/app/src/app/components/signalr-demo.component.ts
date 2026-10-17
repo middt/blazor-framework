@@ -5,7 +5,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { HubConnection, HubConnectionState } from '@microsoft/signalr';
-import { MiddtSignalRService, NotifyService } from '@middt/angular';
+import { MiddtSignalRService } from '@middt/angular/signalr';
+import { NotifyService } from '@middt/angular/core';
 
 /** SignalR through the BFF: listens on /hubs/testhub (like the Blazor TestSignalRComponent) and can broadcast. */
 @Component({

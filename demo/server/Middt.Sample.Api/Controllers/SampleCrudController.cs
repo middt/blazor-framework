@@ -19,7 +19,7 @@ namespace Middt.Sample.Api.Controllers;
 /// </para>
 /// </summary>
 public abstract class SampleCrudController<TModel, TRepository>(TRepository repository)
-    : BaseCrudControllerWithAuth<TModel, TRepository>(repository)
+    : BasePolicyCrudController<TModel, TRepository>(repository)
     where TModel : class, new()
     where TRepository : IBaseRepository<TModel>
 {
@@ -37,6 +37,9 @@ public abstract class SampleCrudController<TModel, TRepository>(TRepository repo
     protected virtual Expression<Func<TModel, bool>>? ActiveRecords => null;
 
     private MiddtApiOptions ApiOptions => HttpContext.RequestServices.GetService<MiddtApiOptions>() ?? DefaultApiOptions;
+
+    // Demo records are shared among signed-in users. Tenant applications must filter here.
+    protected override IQueryable<TModel> ApplyAccessFilter(IQueryable<TModel> query) => query;
 
     protected override Task<bool> AuthorizeAsync(TModel entity, CrudOperation operation, CancellationToken cancellationToken) =>
         Task.FromResult(operation == CrudOperation.Read || User.IsInRole(WriterRole));

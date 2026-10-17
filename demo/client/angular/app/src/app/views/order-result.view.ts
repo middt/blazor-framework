@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
-import { WorkflowStateViewBase } from '@middt/angular';
+import { WorkflowStateViewBase } from '@middt/angular/workflow';
 import { SAMPLE_VIEW_STYLES, ViewFormat } from './view-format';
 
 /** State view of the final states: the decision. */

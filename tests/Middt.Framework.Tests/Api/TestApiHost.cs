@@ -116,7 +116,7 @@ public sealed class DocumentsController(DocumentRepository repository) : BaseCru
 /// <summary>Row/record level security: a user only sees and changes the documents they own.</summary>
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public sealed class OwnedDocumentsController(DocumentRepository repository) : BaseCrudControllerWithAuth<Document, DocumentRepository>(repository)
+public sealed class OwnedDocumentsController(DocumentRepository repository) : BasePolicyCrudController<Document, DocumentRepository>(repository)
 {
     protected override IQueryable<Document> ApplyAccessFilter(IQueryable<Document> query) => query.Where(d => d.OwnerId == UserId);
 

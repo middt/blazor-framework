@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { middtAuthGuard, middtRoleGuard } from '@middt/angular';
+import { middtAuthGuard, middtRoleGuard } from '@middt/angular/core';
 import { HomePage } from './pages/home.page';
 import { ShellComponent } from './shell/shell.component';
 
@@ -13,7 +13,7 @@ export const routes: Routes = [
     children: [
       { path: '', component: HomePage, title: 'Middt Angular Sample' },
       // Every JSON layout of kind "page" – the same layouts the Blazor frontend renders.
-      { path: 'ui/:key', loadComponent: () => import('@middt/angular').then(m => m.MiddtLayoutPageComponent) },
+      { path: 'ui/:key', loadComponent: () => import('@middt/angular/ui').then(m => m.MiddtLayoutPageComponent) },
       {
         path: 'ui-admin',
         loadComponent: () => import('./pages/ui-admin.page').then(m => m.UiAdminPage),
@@ -21,7 +21,7 @@ export const routes: Routes = [
         title: 'Ekran Tasarımı',
       },
       // Every workflow (instance list + detail); the page sets the browser title to the workflow title.
-      { path: 'workflow/:key', loadComponent: () => import('./pages/workflow.page').then(m => m.WorkflowPage) },
+      { path: 'workflow/:key', loadChildren: () => import('./pages/workflow.routes').then(m => m.workflowRoutes) },
       { path: '**', redirectTo: '' },
     ],
   },

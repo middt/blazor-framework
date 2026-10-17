@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import type { WorkflowData } from '@middt/ui-core';
-import { UiLookupCache } from '../ui/lookup-cache.service';
-import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
+import { UiLookupCache } from '@middt/angular/ui';
+import { MiddtJsonSchemaFormComponent } from '../../../workflow/src/json-schema-form.component';
 
 const schema: WorkflowData = {
   type: 'object',

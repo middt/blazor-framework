@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { AuthService, UI_API_CLIENT } from '@middt/angular';
+import { AuthService, UI_API_CLIENT } from '@middt/angular/core';
 import { isSuccess } from '@middt/ui-core';
 
 export interface MenuItem {

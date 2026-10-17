@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import type { StartWorkflowRequest, WorkflowDefinitionModel, WorkflowInstanceModel } from '@middt/ui-core';
-import { NotifyService } from '../core/notify.service';
-import { UiLookupCache } from '../ui/lookup-cache.service';
-import { WORKFLOW_API_CLIENT } from './workflow-client';
-import { MiddtWorkflowInstanceListComponent } from './workflow-instance-list.component';
-import type { WorkflowStartOpened } from './workflow-instance-list.component';
+import { NotifyService } from '@middt/angular/core';
+import { UiLookupCache } from '@middt/angular/ui';
+import { WORKFLOW_API_CLIENT } from '../../../workflow/src/workflow-client';
+import { MiddtWorkflowInstanceListComponent } from '../../../workflow/src/workflow-instance-list.component';
+import type { WorkflowStartOpened } from '../../../workflow/src/workflow-instance-list.component';
 
 const definition: WorkflowDefinitionModel = {
   key: 'store-opening',

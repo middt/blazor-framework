@@ -11,10 +11,11 @@
 | E2E | Playwright scripts (see below) | both frontends, same scenarios |
 
 ## E2E
-The Playwright suites used so far (screens, layout editor, workflow wizard, security – one set per frontend) are kept
-outside the repo. When adding them, place them under `tests/e2e` with their own `package.json`, a `BASE` URL per
-frontend and shared helpers; they rely on the stable ids/classes/aria labels described in the nested `AGENTS.md` files.
-Known data dependency: the Blazor workflow suite's "v1 instance" check scans only the first 50 list rows.
+The versioned Playwright smoke suite lives in `tests/e2e` and runs against both demo frontends and the SQL Server backed
+identity service in CI. Run `npm ci && npx playwright install chromium && npm test` in that folder while the Compose stack
+is running. It covers authentication, anonymous API behavior, workflow start dialogs, the layout editor, and identity
+admin user queries. Extend this suite with full workflow wizard transitions using the stable ids/classes/aria labels
+described in nested `AGENTS.md` files.
 
 ## Writing tests
 - Use the existing hosts (`TestApiHost`, `WorkflowTestHost`, `UiTestHost`, `SpaBffTestHost`, `BlazorTestHost`).

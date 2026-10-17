@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { MiddtLayoutEditorComponent } from '@middt/angular';
+import { MiddtLayoutEditorComponent } from '@middt/angular/ui';
 import { MenuService } from '../shell/menu.service';
 
 /** Runtime layout editor; saving or deleting a layout refreshes the side menu (pages and menu entries change at runtime). */

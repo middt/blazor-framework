@@ -10,11 +10,13 @@ bin/
 obj/
 artifacts/
 TestResults/
+playwright-report/
+test-results/
 *.nupkg
 *.snupkg
 
 /NugetSuges
-/node_modules/
+node_modules/
 
 # Local secrets for docker compose
 .env

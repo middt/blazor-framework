@@ -16,5 +16,5 @@ NOT here (`demo/client/angular/app`). Depends on `@middt/ui-core` as a `file:` p
 - Keep markup parity with Blazor (`middt-ui-*`, `middt-wf-*`, ids like `ui-form-{field}`, `wf-step-{transition}-{field}`,
   aria labels) – the Angular E2E suites use the same selectors.
 - Public API: export new symbols from `src/public-api.ts`; the demo must only import from `@middt/angular`.
-- Library is a single entry point today (lazy routes in the app don't shrink `main`); secondary entry points
-  (`core/ui/workflow/signalr`) are a known follow-up.
+- Library entry points are `core`, `ui`, `workflow`, and `signalr`; the root entry point is a compatibility aggregate.
+  Keep workflow view registration in a lazy route so workflow components stay out of `main`.

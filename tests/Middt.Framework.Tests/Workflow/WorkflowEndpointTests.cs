@@ -329,4 +329,154 @@ public sealed class WorkflowEndpointTests
         page.Data!.Select(i => i.Key).Should().Equal("k2", "k1");
         page.Data!.Should().AllSatisfy(i => i.AvailableTransitions.Should().NotBeEmpty());
     }
+
+    [Fact]
+    public async Task Transition_automatically_captures_headers_query_and_body_into_input()
+    {
+        const string httpContextWf = """
+            {
+              "key": "http-context-wf",
+              "start": { "key": "start", "target": "initial" },
+              "states": [
+                {
+                  "key": "initial",
+                  "transitions": [
+                    {
+                      "key": "process",
+                      "target": "completed",
+                      "input": {
+                        "schema": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [ "note" ],
+                          "properties": { "note": { "type": "string" } }
+                        },
+                        "set": {
+                          "capturedHeaderBranch": "input.header.branchId",
+                          "capturedHeaderXBranch": "input.header.xBranchId",
+                          "capturedHeaderExact": "input.header[\"X-Branch-Id\"]",
+                          "capturedQueryChannel": "input.query.channel",
+                          "capturedQueryPage": "input.query.page",
+                          "capturedBodyNote": "input.body.note",
+                          "capturedDirectNote": "input.note",
+                          "fallbackChain": "input.header.branchId ?? input.query.channel ?? input.note"
+                        }
+                      }
+                    }
+                  ]
+                },
+                { "key": "completed", "type": "Finish", "subType": "Success" }
+              ]
+            }
+            """;
+
+        await using var host = await WorkflowTestHost.StartAsync([httpContextWf]);
+        var instance = (await StartAsync(host, "http-context-wf", new { })).Id;
+
+        using var request = host.Request(HttpMethod.Post, $"{Base}/http-context-wf/instances/{instance}/transitions/process?channel=mobile&page=3", new { note = "test-note" });
+        request.Headers.Add("X-Branch-Id", "101");
+
+        using var response = await host.Client.SendAsync(request, Ct);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var model = (await EnvelopeAsync<WorkflowInstanceModel>(response)).Data!;
+        model.State.Should().Be("completed");
+        model.Data["capturedHeaderBranch"]!.GetValue<long>().Should().Be(101);
+        model.Data["capturedHeaderXBranch"]!.GetValue<long>().Should().Be(101);
+        model.Data["capturedHeaderExact"]!.GetValue<long>().Should().Be(101);
+        model.Data["capturedQueryChannel"]!.GetValue<string>().Should().Be("mobile");
+        model.Data["capturedQueryPage"]!.GetValue<long>().Should().Be(3);
+        model.Data["capturedBodyNote"]!.GetValue<string>().Should().Be("test-note");
+        model.Data["capturedDirectNote"]!.GetValue<string>().Should().Be("test-note");
+        model.Data["fallbackChain"]!.GetValue<long>().Should().Be(101);
+    }
+
+    [Fact]
+    public async Task Start_instance_automatically_captures_headers_and_query_into_input()
+    {
+        const string startContextWf = """
+            {
+              "key": "start-context-wf",
+              "start": {
+                "key": "start",
+                "target": "created",
+                "input": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [ "name" ],
+                    "properties": { "name": { "type": "string" } }
+                  },
+                  "set": {
+                    "branch": "input.header.branchId",
+                    "source": "input.query.source",
+                    "product": "input.body.name"
+                  }
+                }
+              },
+              "states": [
+                { "key": "created", "type": "Finish", "subType": "Success" }
+              ]
+            }
+            """;
+
+        await using var host = await WorkflowTestHost.StartAsync([startContextWf]);
+
+        using var request = host.Request(HttpMethod.Post, $"{Base}/start-context-wf/instances?source=campaign", new { data = new { name = "Bicycle" } });
+        request.Headers.Add("X-Branch-Id", "77");
+
+        using var response = await host.Client.SendAsync(request, Ct);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var model = (await EnvelopeAsync<WorkflowInstanceModel>(response)).Data!;
+        model.Data["branch"]!.GetValue<long>().Should().Be(77);
+        model.Data["source"]!.GetValue<string>().Should().Be("campaign");
+        model.Data["product"]!.GetValue<string>().Should().Be("Bicycle");
+    }
+
+    [Fact]
+    public async Task Expressions_safely_fallback_when_headers_or_query_parameters_are_absent()
+    {
+        const string safeFallbackWf = """
+            {
+              "key": "safe-fallback-wf",
+              "start": {
+                "key": "start",
+                "target": "initial",
+                "input": {
+                  "schema": {
+                    "type": "object",
+                    "properties": { "defaultBranch": { "type": "integer" } }
+                  }
+                }
+              },
+              "states": [
+                {
+                  "key": "initial",
+                  "transitions": [
+                    {
+                      "key": "proceed",
+                      "target": "done",
+                      "input": {
+                        "set": {
+                          "resolvedBranch": "input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? data.defaultBranch"
+                        }
+                      }
+                    }
+                  ]
+                },
+                { "key": "done", "type": "Finish", "subType": "Success" }
+              ]
+            }
+            """;
+
+        await using var host = await WorkflowTestHost.StartAsync([safeFallbackWf]);
+        var instance = (await StartAsync(host, "safe-fallback-wf", new { data = new { defaultBranch = 999 } })).Id;
+
+        using var response = await SendAsync(host, HttpMethod.Post, $"{Base}/safe-fallback-wf/instances/{instance}/transitions/proceed", new { note = "ok" });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var model = (await EnvelopeAsync<WorkflowInstanceModel>(response)).Data!;
+        model.Data["resolvedBranch"]!.GetValue<long>().Should().Be(999);
+    }
 }

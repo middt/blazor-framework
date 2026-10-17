@@ -25,6 +25,11 @@ up without reinstalling.
 
 ## Using the library in an app
 
+New applications should import from `@middt/angular/core`, `@middt/angular/ui`,
+`@middt/angular/workflow`, and `@middt/angular/signalr`. The root `@middt/angular`
+entry point remains available for existing applications. Register workflow views in
+a lazy workflow route so the workflow package stays out of the initial bundle.
+
 ```ts
 // app.config.ts
 providers: [

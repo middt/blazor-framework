@@ -556,6 +556,7 @@ dotnet pack Middt.Framework.slnx -c Release -o artifacts
 (cd sdk/client/typescript/ui-core && npm ci && npm run build)            # @middt/ui-core package
 (cd sdk/client/angular && npm ci && npx ng build middt-angular)           # @middt/angular package
 (cd demo/client/angular/app && npm ci && npx ng build sample)             # Angular demo app (consumes both packages)
+(cd tests/e2e && npm ci && npx playwright install chromium && npm test)    # full-stack browser + SQL Server smoke tests (Compose running)
 ```
 
 `spec/ui-layout.schema.json` is generated from the widget catalog; after changing widget specs regenerate it with

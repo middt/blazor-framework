@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { isSuccess, ResultEnum, type BaseResponseDataModel, type UiLayoutDocument } from '@middt/ui-core';
-import { UI_API_CLIENT } from '../core/config';
+import { UI_API_CLIENT } from '@middt/angular/core';
 
 /** How long a loaded layout is reused without asking the server again. */
 export const LAYOUT_CACHE_TTL_MS = 30_000;

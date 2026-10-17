@@ -3,8 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { Params } from '@angular/router';
-import { MiddtWorkflowInstanceDetailComponent, MiddtWorkflowInstanceListComponent } from '@middt/angular';
-import type { WorkflowStartOpened } from '@middt/angular';
+import { MiddtWorkflowInstanceDetailComponent, MiddtWorkflowInstanceListComponent } from '@middt/angular/workflow';
+import type { WorkflowStartOpened } from '@middt/angular/workflow';
 import { workflowStartQuery, WORKFLOW_START_KEY_PARAM, WORKFLOW_START_QUERY_PARAM } from '@middt/ui-core';
 import type { WorkflowDefinitionModel, WorkflowInstanceModel } from '@middt/ui-core';
 

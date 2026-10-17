@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, forwardRef, inject, signal, untracked } from '@angular/core';
 import { errorText, isSuccess, UiExpressions } from '@middt/ui-core';
-import { UI_DATA_CLIENT } from '../core/config';
+import { UI_DATA_CLIENT } from '@middt/angular/core';
 import { UiNodeListComponent } from './node.component';
 import { type JsonObject, UiProps, UiWidgetBase } from './widget-base';
 

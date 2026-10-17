@@ -9,7 +9,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { AuthService } from '@middt/angular';
+import { AuthService } from '@middt/angular/core';
 import { MenuService } from './menu.service';
 
 /** Stored theme choice; storage may be unavailable (blocked site data, private mode). */

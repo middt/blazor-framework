@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { DEFAULT_MIDDT_CONFIG, MIDDT_CONFIG, provideMiddt, UI_API_CLIENT, UI_DATA_CLIENT } from './config';
+import { DEFAULT_MIDDT_CONFIG, MIDDT_CONFIG, provideMiddt, UI_API_CLIENT, UI_DATA_CLIENT } from '../../../core/src/config';
 
 describe('provideMiddt', () => {
   it('has Turkish defaults as per framework conventions', () => {

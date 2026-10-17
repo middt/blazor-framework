@@ -7,6 +7,7 @@ using Middt.Framework.Model.Workflow;
 using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Expressions;
+using Middt.Framework.Workflow.Endpoints;
 using Middt.Framework.Workflow.Persistence;
 using Middt.Framework.Workflow.Schema;
 using Middt.Framework.Workflow.Tasks;
@@ -53,6 +54,7 @@ public sealed partial class WorkflowEngine(
         Guid? parentInstanceId,
         CancellationToken cancellationToken)
     {
+        request.Data = WorkflowHttpInput.EnsureEnvelope(request.Data);
         var definition = registry.GetLatest(workflow);
         EnsureCanRead(definition, user);
 
@@ -115,7 +117,8 @@ public sealed partial class WorkflowEngine(
         {
             // Same guarantee as RunClaimedAsync: never leave the new instance Busy; it can be retried from the start transition.
             LogUnexpected(logger, ex, instance.Id);
-            var pendingInput = definition.Start.Input?.Persistable(request.Data)?.ToJsonString() ?? (definition.Start.Input is null ? request.Data?.ToJsonString() : null);
+            var target = WorkflowHttpInput.ExtractBody(request.Data, definition.Start.Input?.Schema);
+            var pendingInput = definition.Start.Input?.Persistable(target)?.ToJsonString() ?? (definition.Start.Input is null ? target?.ToJsonString() : null);
             await db.Instances.Where(i => i.Id == instance.Id && i.Status == WorkflowInstanceStatus.Busy)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(i => i.Status, WorkflowInstanceStatus.Faulted)
@@ -149,6 +152,7 @@ public sealed partial class WorkflowEngine(
         bool runAsync,
         CancellationToken cancellationToken)
     {
+        input = WorkflowHttpInput.EnsureEnvelope(input);
         var snapshot = await FindAccessibleAsync(instanceId, workflow, user, cancellationToken);
         var definition = registry.Get(snapshot.WorkflowKey, snapshot.WorkflowVersion);
 
@@ -177,7 +181,7 @@ public sealed partial class WorkflowEngine(
                 run.CancelChildren.Add(child);
                 run.Instance.WaitingForInstanceId = null;
             }
-        }, cancellationToken, (transition.Key, transition.Input?.Persistable(input) ?? input), snapshot);
+        }, cancellationToken, (transition.Key, transition.Input?.Persistable(WorkflowHttpInput.ExtractBody(input, transition.Input?.Schema)) ?? input), snapshot);
 
         return await ToModelAsync(run, cancellationToken);
     }
@@ -633,7 +637,7 @@ public sealed partial class WorkflowEngine(
 
                     if (state.Type == StateType.SubFlow)
                     {
-                        var child = await StartSubFlowAsync(run, state, cancellationToken);
+                        var child = await StartSubFlowAsync(run, state, input, cancellationToken);
                         if (child.Status is WorkflowInstanceStatus.Completed or WorkflowInstanceStatus.Cancelled)
                         {
                             // The child finished synchronously: continue right away instead of waiting for a resume job.
@@ -647,7 +651,7 @@ public sealed partial class WorkflowEngine(
                 }
             }
 
-            AddHistory(run, transition.Key, from, trigger, transition.Input?.Persistable(input) ?? input, startedAt);
+            AddHistory(run, transition.Key, from, trigger, transition.Input?.Persistable(WorkflowHttpInput.ExtractBody(input, transition.Input?.Schema)) ?? input, startedAt);
             run.Events.Add(Event(run, instance.Status switch
             {
                 WorkflowInstanceStatus.Completed => WorkflowEventType.Completed,
@@ -769,8 +773,10 @@ public sealed partial class WorkflowEngine(
             return; // no declared input: the body is never written into instance data
         }
 
+        var target = WorkflowHttpInput.ExtractBody(input, definition.Schema);
+
         // The body is only written when a schema validated it; an input block with just "set" ignores the body.
-        if (input is not null && definition.Schema is not null && definition.Persistable(input) is { } persistable)
+        if (target is not null && definition.Schema is not null && definition.Persistable(target) is { } persistable)
         {
             JsonPath.Merge(run.Data, persistable, definition.Into);
         }
@@ -785,7 +791,8 @@ public sealed partial class WorkflowEngine(
     {
         if (transition.Input?.Schema is { } schema)
         {
-            var errors = JsonSchemaValidator.Validate(input ?? [], schema);
+            var target = WorkflowHttpInput.ExtractBody(input, schema);
+            var errors = JsonSchemaValidator.Validate(target ?? [], schema);
             if (errors.Count > 0)
             {
                 throw new WorkflowValidationException(errors);
@@ -807,7 +814,7 @@ public sealed partial class WorkflowEngine(
             ?? automatic.FirstOrDefault(t => t.Default);
     }
 
-    private async Task<WorkflowInstanceModel> StartSubFlowAsync(Run run, StateDefinition state, CancellationToken cancellationToken)
+    private async Task<WorkflowInstanceModel> StartSubFlowAsync(Run run, StateDefinition state, JsonObject? input, CancellationToken cancellationToken)
     {
         var subFlow = state.SubFlow!;
         JsonObject childData;
@@ -818,7 +825,7 @@ public sealed partial class WorkflowEngine(
         else
         {
             childData = [];
-            var scope = Scope(run, null);
+            var scope = Scope(run, input);
             foreach (var (path, expression) in subFlow.Input)
             {
                 JsonPath.Set(childData, path, expressions.EvaluateToNode(expression, scope));
@@ -1053,7 +1060,7 @@ public sealed partial class WorkflowEngine(
     {
         run.Instance.Status = WorkflowInstanceStatus.Faulted;
         run.Instance.PendingTransition = transition.Key;
-        run.Instance.PendingInput = (transition.Input?.Persistable(input) ?? input)?.ToJsonString();
+        run.Instance.PendingInput = (transition.Input?.Persistable(WorkflowHttpInput.ExtractBody(input, transition.Input?.Schema)) ?? input)?.ToJsonString();
         run.Instance.Error = error;
         if (!incidentAdded)
         {
@@ -1161,207 +1168,6 @@ public sealed partial class WorkflowEngine(
         }
 
         return state.Transitions.Concat(definition.SharedTransitions.Where(t => t.AvailableIn.Contains("*") || t.AvailableIn.Contains(stateKey)));
-    }
-
-    private TransitionDefinition FindManualTransition(WorkflowDefinition definition, WorkflowInstance instance, string key, WorkflowUser user)
-    {
-        if (instance.IsTerminal)
-        {
-            throw new WorkflowConflictException($"The instance is {instance.Status}.");
-        }
-
-        var transition = AvailableIn(definition, instance.State).FirstOrDefault(t => t.Key == key && t.Trigger == TriggerType.Manual)
-            ?? throw new WorkflowConflictException($"Transition '{key}' is not available in state '{instance.State}'.");
-
-        if (!CanExecute(transition, user))
-        {
-            throw new WorkflowForbiddenException($"You are not allowed to execute '{key}'.");
-        }
-
-        if (!IsRuleSatisfied(transition, definition, instance, JsonPath.ParseObject(instance.Data), user))
-        {
-            throw new WorkflowConflictException($"Transition '{key}' is not available for the current data.");
-        }
-
-        if (instance.WaitingForInstanceId is not null && !IsCancellation(definition, transition))
-        {
-            throw new WorkflowConflictException("The instance is waiting for a subflow to finish.");
-        }
-
-        return transition;
-    }
-
-    /// <summary>Availability condition of a manual transition (<c>rule</c>); evaluation errors make it unavailable.</summary>
-    private bool IsRuleSatisfied(TransitionDefinition transition, WorkflowDefinition definition, WorkflowInstance instance, JsonObject data, WorkflowUser user)
-    {
-        if (transition.Trigger != TriggerType.Manual || string.IsNullOrWhiteSpace(transition.Rule))
-        {
-            return true;
-        }
-
-        try
-        {
-            return expressions.EvaluateCondition(transition.Rule, new ExpressionScope
-            {
-                Data = data,
-                User = user,
-                Now = time.GetUtcNow(),
-                Instance = new JsonObject
-                {
-                    ["id"] = instance.Id,
-                    ["key"] = instance.BusinessKey,
-                    ["state"] = instance.State,
-                    ["workflow"] = definition.Key,
-                    ["version"] = definition.Version,
-                },
-            });
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogRuleFailed(logger, ex, transition.Key, instance.Id);
-            return false;
-        }
-    }
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Availability rule of transition {Transition} failed for instance {InstanceId}")]
-    private static partial void LogRuleFailed(ILogger logger, Exception exception, string transition, Guid instanceId);
-
-    private static bool IsCancellation(WorkflowDefinition definition, TransitionDefinition transition) =>
-        definition.FindState(transition.Target) is { IsFinal: true };
-
-    private static bool CanExecute(TransitionDefinition transition, WorkflowUser user) =>
-        transition.Roles.Count == 0 || transition.Roles.Any(user.IsInRole);
-
-    /// <summary>Definition roles plus, in <c>owner</c> mode, ownership of the instance (others get 404: no existence disclosure).</summary>
-    private static void EnsureCanAccess(WorkflowDefinition definition, WorkflowInstance instance, WorkflowUser user)
-    {
-        EnsureCanRead(definition, user);
-        if (!CanSeeAllInstances(definition, user) && !string.Equals(instance.StartedBy, user.AuditName, StringComparison.Ordinal))
-        {
-            throw new WorkflowNotFoundException($"Instance '{instance.Id}' does not exist.");
-        }
-    }
-
-    private static bool CanSeeAllInstances(WorkflowDefinition definition, WorkflowUser user) =>
-        user.IsSystem
-        || definition.InstanceAccess is not { IsOwnerOnly: true } access
-        || access.SupervisorRoles.Any(user.IsInRole);
-
-    private static void EnsureCanRead(WorkflowDefinition definition, WorkflowUser user)
-    {
-        if (definition.Roles.Count > 0 && !definition.Roles.Any(user.IsInRole))
-        {
-            throw new WorkflowForbiddenException($"You are not allowed to access workflow '{definition.Key}'.");
-        }
-    }
-
-    private static void EnsureActive(WorkflowInstance instance)
-    {
-        if (instance.Status != WorkflowInstanceStatus.Active)
-        {
-            throw new WorkflowConflictException($"The instance is {instance.Status}.");
-        }
-    }
-
-    /// <summary>Loads the instance and applies the read checks (roles, owner mode, expected workflow → 403/404).</summary>
-    private async Task<WorkflowInstance> FindAccessibleAsync(Guid id, string? workflow, WorkflowUser user, CancellationToken cancellationToken)
-    {
-        var instance = await FindAsync(id, cancellationToken);
-        EnsureCanAccess(registry.Get(instance.WorkflowKey, instance.WorkflowVersion), instance, user);
-        if (workflow is not null && !string.Equals(instance.WorkflowKey, workflow, StringComparison.Ordinal))
-        {
-            throw new WorkflowNotFoundException($"Instance '{id}' does not belong to workflow '{workflow}'.");
-        }
-
-        return instance;
-    }
-
-    /// <summary>
-    /// Response of a command, built from the committed in-memory run. Scheduled jobs are only read from the database when
-    /// the instance stayed in the state it was claimed in (their jobs were not created by this run).
-    /// </summary>
-    private async Task<WorkflowInstanceModel> ToModelAsync(Run run, CancellationToken cancellationToken)
-    {
-        var instance = run.Instance;
-        if (!run.ClearAllJobs && instance.State == run.InitialState && !run.LeftStates.Contains(instance.State))
-        {
-            return await ToModelAsync(instance, run.User, cancellationToken);
-        }
-
-        var scheduled = run.ClearAllJobs
-            ? []
-            : run.NewJobs
-                .Where(j => j.Kind == WorkflowJobKind.Scheduled && j.State == instance.State)
-                .OrderBy(j => j.DueAt)
-                .Select(j => new ScheduledTransitionModel { Key = j.TransitionKey!, DueAt = j.DueAt })
-                .ToList();
-        return ToModel(instance, run.User, scheduled);
-    }
-
-    private async Task<WorkflowInstance> FindAsync(Guid id, CancellationToken cancellationToken) =>
-        await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
-        ?? throw new WorkflowNotFoundException($"Instance '{id}' does not exist.");
-
-    private async Task<WorkflowInstanceModel> ToModelAsync(WorkflowInstance instance, WorkflowUser user, CancellationToken cancellationToken)
-    {
-        var scheduled = await db.Jobs.AsNoTracking()
-            .Where(j => j.InstanceId == instance.Id && j.Kind == WorkflowJobKind.Scheduled)
-            .OrderBy(j => j.DueAt)
-            .Select(j => new ScheduledTransitionModel { Key = j.TransitionKey!, DueAt = j.DueAt })
-            .ToListAsync(cancellationToken);
-
-        return ToModel(instance, user, scheduled);
-    }
-
-    private WorkflowInstanceModel ToModel(WorkflowInstance instance, WorkflowUser user, List<ScheduledTransitionModel> scheduled)
-    {
-        var definition = registry.Get(instance.WorkflowKey, instance.WorkflowVersion);
-        var state = definition.FindState(instance.State);
-
-        var data = JsonPath.ParseObject(instance.Data);
-        var available = instance.Status == WorkflowInstanceStatus.Active
-            ? AvailableIn(definition, instance.State)
-                .Where(t => t.Trigger == TriggerType.Manual && CanExecute(t, user))
-                .Where(t => instance.WaitingForInstanceId is null || IsCancellation(definition, t))
-                .Where(t => IsRuleSatisfied(t, definition, instance, data, user))
-                .Select(t => new AvailableTransitionModel
-                {
-                    Key = t.Key,
-                    Title = t.Title,
-                    Target = t.Target,
-                    InputSchema = (JsonObject?)t.Input?.Schema?.DeepClone(),
-                    View = string.IsNullOrWhiteSpace(t.View?.Component) ? null : t.View.Component,
-                    Inline = t.View?.Inline == true,
-                    InputInto = t.Input?.Into,
-                })
-                .ToList()
-            : [];
-
-        return new WorkflowInstanceModel
-        {
-            Id = instance.Id,
-            Key = instance.BusinessKey,
-            Workflow = instance.WorkflowKey,
-            WorkflowVersion = instance.WorkflowVersion,
-            State = instance.State,
-            StateTitle = state?.Title,
-            StateType = state?.Type.ToString() ?? string.Empty,
-            StateSubType = state?.SubType.ToString() ?? string.Empty,
-            View = string.IsNullOrWhiteSpace(state?.View?.Component) ? null : state.View.Component,
-            Layout = string.IsNullOrWhiteSpace(state?.View?.Layout) ? null : state.View.Layout,
-            Status = instance.Status,
-            Data = data,
-            DataVersion = instance.DataVersion,
-            ParentInstanceId = instance.ParentInstanceId,
-            WaitingForInstanceId = instance.WaitingForInstanceId,
-            Error = instance.Error is null ? null : options.Value.ExposeErrorDetails ? instance.Error : HiddenErrorText,
-            StartedBy = instance.StartedBy,
-            CreatedAt = instance.CreatedAt,
-            UpdatedAt = instance.UpdatedAt,
-            CompletedAt = instance.CompletedAt,
-            AvailableTransitions = available,
-            ScheduledTransitions = scheduled,
-        };
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Workflow instance {InstanceId} failed unexpectedly")]

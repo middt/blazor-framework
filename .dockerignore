@@ -6,6 +6,8 @@
 **/*.user
 **/node_modules
 **/TestResults
+**/test-results
+**/playwright-report
 .git
 .github
 data

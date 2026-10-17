@@ -18,7 +18,7 @@ import {
   workflowStatusText,
 } from '@middt/ui-core';
 import type { WorkflowData, WorkflowDefinitionModel, WorkflowInstanceModel, WorkflowInstanceStatusName } from '@middt/ui-core';
-import { NotifyService } from '../core/notify.service';
+import { NotifyService } from '@middt/angular/core';
 import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
 import { WORKFLOW_API_CLIENT } from './workflow-client';
 import { MiddtWorkflowDialogComponent } from './workflow-dialog.component';
