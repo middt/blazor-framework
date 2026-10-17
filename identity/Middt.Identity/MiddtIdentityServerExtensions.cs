@@ -26,9 +26,9 @@ namespace Middt.Identity;
 public static class MiddtIdentityServerExtensions
 {
     /// <summary>
-    /// Registers the identity provider: ASP.NET Core Identity (users/roles on EF Core), OpenIddict (core stores in the same
-    /// <see cref="MiddtIdentityDbContext"/>, server with authorization code + PKCE, refresh token rotation, client
-    /// credentials, end session, revocation, introspection, userinfo), the IdP session cookie
+    /// Registers the identity provider: ASP.NET Core Identity (users/roles stored in the workflow database), OpenIddict (core
+    /// stores in <see cref="Middt.Framework.Workflow.Persistence.WorkflowDbContext"/>, server with authorization code + PKCE,
+    /// refresh token rotation, client credentials, end session, revocation, introspection, userinfo), the IdP session cookie
     /// (<see cref="MiddtIdentityDefaults.CookieScheme"/>), the journey engine (Middt workflow engine with the default
     /// journeys) and <see cref="IAuthJourneyService"/>, a development mailbox and the startup seeding.
     /// <code>
@@ -51,20 +51,17 @@ public static class MiddtIdentityServerExtensions
         var options = new MiddtIdentityOptions();
         builder.Configuration.GetSection("Identity:SigningCertificate").Bind(options.SigningCertificate);
         configure(options);
-        var configureDb = options.ConfigureDbContext
-            ?? throw new InvalidOperationException("Configure the identity database with options.UseDbContext(...).");
+        if (options.ConfigureDbContext is null)
+        {
+            throw new InvalidOperationException("Configure the identity database with options.UseDbContext(...).");
+        }
+
         var environment = builder.Environment;
         var services = builder.Services;
 
         services.AddSingleton(Options.Create(options));
         services.TryAddSingleton(TimeProvider.System);
         services.AddDataProtection();
-
-        services.AddDbContext<MiddtIdentityDbContext>(db =>
-        {
-            configureDb(db);
-            db.UseOpenIddict();
-        });
 
         services.AddIdentityCore<MiddtIdentityUser>(identity =>
             {
@@ -79,7 +76,8 @@ public static class MiddtIdentityServerExtensions
                 }
             })
             .AddRoles<IdentityRole>()
-            .AddEntityFrameworkStores<MiddtIdentityDbContext>()
+            .AddUserStore<WorkflowUserStore>()
+            .AddRoleStore<WorkflowRoleStore>()
             .AddDefaultTokenProviders();
 
         services.AddAuthentication(MiddtIdentityDefaults.CookieScheme)
@@ -112,7 +110,18 @@ public static class MiddtIdentityServerExtensions
     private static void AddOpenIddict(IServiceCollection services, MiddtIdentityOptions options, IHostEnvironment environment)
     {
         services.AddOpenIddict()
-            .AddCore(core => core.UseEntityFrameworkCore().UseDbContext<MiddtIdentityDbContext>())
+            .AddCore(core =>
+            {
+                core.SetDefaultApplicationEntity<WorkflowOpenIddictApplication>()
+                    .SetDefaultAuthorizationEntity<WorkflowOpenIddictAuthorization>()
+                    .SetDefaultScopeEntity<WorkflowOpenIddictScope>()
+                    .SetDefaultTokenEntity<WorkflowOpenIddictToken>();
+
+                core.ReplaceApplicationStore<WorkflowOpenIddictApplication, WorkflowOpenIddictApplicationStore>()
+                    .ReplaceAuthorizationStore<WorkflowOpenIddictAuthorization, WorkflowOpenIddictAuthorizationStore>()
+                    .ReplaceScopeStore<WorkflowOpenIddictScope, WorkflowOpenIddictScopeStore>()
+                    .ReplaceTokenStore<WorkflowOpenIddictToken, WorkflowOpenIddictTokenStore>();
+            })
             .AddServer(server =>
             {
                 if (!string.IsNullOrWhiteSpace(options.Issuer))

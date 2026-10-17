@@ -23,9 +23,8 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="OpenIddict.AspNetCore" Version="7.7.2" />
     <!-- The identity provider uses the server package only: the OpenIddict.AspNetCore metapackage pulls Polly 7 (client/validation), which clashes with Polly 8 types. -->
+    <PackageVersion Include="OpenIddict.Core" Version="7.7.2" />
     <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="7.7.2" />
-    <PackageVersion Include="OpenIddict.EntityFrameworkCore" Version="7.7.2" />
-    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="QRCoder" Version="1.8.1" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="$(ExtensionsVersion)" />

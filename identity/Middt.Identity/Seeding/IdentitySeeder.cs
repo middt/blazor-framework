@@ -1,9 +1,4 @@
-using System.Globalization;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,9 +9,9 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 namespace Middt.Identity.Seeding;
 
 /// <summary>
-/// Startup: creates the identity tables (<see cref="MiddtIdentityOptions.AutoCreateSchema"/>) and applies the seed
-/// idempotently – roles and users are created when missing (existing users only get missing roles), scopes and clients
-/// are created or updated (redirect URIs, permissions, consent type …; an existing client secret is never replaced).
+/// Startup: applies the seed idempotently into the workflow-backed Identity and OpenIddict stores – roles and users are
+/// created when missing (existing users only get missing roles), scopes and clients are created or updated (redirect URIs,
+/// permissions, consent type …; an existing client secret is never replaced).
 /// </summary>
 internal sealed partial class IdentitySeeder(
     IServiceScopeFactory scopeFactory,
@@ -29,10 +24,6 @@ internal sealed partial class IdentitySeeder(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        if (options.Value.AutoCreateSchema)
-        {
-            await EnsureTablesAsync(services.GetRequiredService<MiddtIdentityDbContext>(), options.Value.Schema, cancellationToken);
-        }
 
         if (!environment.IsDevelopment() && services.GetRequiredService<IIdentityMessageSender>() is DevelopmentMailbox)
         {
@@ -202,61 +193,6 @@ internal sealed partial class IdentitySeeder(
             throw new InvalidOperationException($"Seeding {what} failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
     }
-
-    /// <summary>Creates the database (if needed) and the tables of this context when they do not exist yet.</summary>
-    internal static async Task EnsureTablesAsync(MiddtIdentityDbContext db, string? schema, CancellationToken cancellationToken)
-    {
-        var creator = db.GetService<IRelationalDatabaseCreator>();
-        if (!await creator.ExistsAsync(cancellationToken))
-        {
-            await creator.CreateAsync(cancellationToken);
-        }
-
-        var provider = db.Database.ProviderName ?? string.Empty;
-        var sqlite = provider.Contains("Sqlite", StringComparison.Ordinal);
-        var sqlServer = provider.Contains("SqlServer", StringComparison.Ordinal);
-        bool exists;
-        if (sqlite)
-        {
-            exists = await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS \"Value\" FROM sqlite_master WHERE type = 'table' AND name = 'AspNetUsers'")
-                .SingleAsync(cancellationToken) > 0;
-        }
-        else
-        {
-            var tableSchema = schema ?? (sqlServer ? "dbo" : "public");
-            exists = await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM information_schema.tables WHERE table_schema = {tableSchema} AND table_name = 'AspNetUsers'")
-                .SingleAsync(cancellationToken) > 0;
-        }
-
-        if (exists)
-        {
-            return;
-        }
-
-        if (!sqlite && schema is { Length: > 0 })
-        {
-            if (!SchemaName().IsMatch(schema))
-            {
-                throw new InvalidOperationException(string.Create(CultureInfo.InvariantCulture, $"Invalid identity schema name '{schema}'."));
-            }
-
-#pragma warning disable EF1002 // schema is a validated identifier
-            if (sqlServer)
-            {
-                await db.Database.ExecuteSqlRawAsync($"IF SCHEMA_ID(N'{schema}') IS NULL EXEC('CREATE SCHEMA [{schema}]')", cancellationToken);
-            }
-            else if (provider.Contains("Npgsql", StringComparison.Ordinal))
-            {
-                await db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schema}\"", cancellationToken);
-            }
-#pragma warning restore EF1002
-        }
-
-        await creator.CreateTablesAsync(cancellationToken);
-    }
-
-    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,63}$", RegexOptions.CultureInvariant)]
-    private static partial Regex SchemaName();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The identity provider uses the development mailbox outside Development: e-mail codes are not delivered. Register an IIdentityMessageSender.")]
     private static partial void LogDevelopmentMailbox(ILogger logger);

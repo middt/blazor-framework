@@ -304,4 +304,29 @@ public sealed class IdentityProtocolTests
             discovery[endpoint]!.GetValue<string>().Should().StartWith("http://localhost/", endpoint);
         }
     }
+
+    [Fact]
+    public async Task Identity_and_oauth2_entities_are_persisted_exclusively_in_workflow_tables()
+    {
+        await using var host = await IdentityTestHost.StartAsync();
+        using var browser = host.NewBrowser();
+        var (verifier, challenge) = Oidc.NewPkce();
+        var callback = await SignInThroughJourneyAsync(host, browser, Oidc.AuthorizeUrl(challenge), "alice", IdentityTestHost.AlicePassword);
+        (await RedeemAsync(browser, Oidc.Query(callback)["code"], verifier)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var (tables, workflowKeys) = await host.WorkflowDbAsync(async db =>
+        {
+            var ct = TestContext.Current.CancellationToken;
+            var tableNames = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.SqlQuery<string>(
+                    db.Database, $"SELECT name AS \"Value\" FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"),
+                ct);
+            var keys = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                db.Instances.Select(i => i.WorkflowKey).Distinct(), ct);
+            return (tableNames, keys);
+        });
+
+        tables.Should().BeEquivalentTo(["WorkflowHistory", "WorkflowIncidents", "WorkflowInstances", "WorkflowJobs"]);
+        workflowKeys.Should().Contain(["idp-user", "idp-role", "oauth-application", "oauth-scope", "oauth-authorization", "oauth-token"]);
+    }
 }

@@ -11,7 +11,7 @@ over OIDC. Everything deployment specific is **configuration**, not code.
 | Folder | Contents |
 |---|---|
 | `Program.cs` | Host: reads the configuration below, maps protocol endpoints, UI, health (`/health`). |
-| `Endpoints/`, `Data/`, `Seeding/`, `Messaging/` | Protocol (OpenIddict 7 server: authorization code + PKCE, refresh token, client credentials, end session, revocation, introspection, userinfo), users/roles (ASP.NET Core Identity on EF Core, schema `idp`), seeding, development mailbox. |
+| `Endpoints/`, `Data/`, `Seeding/`, `Messaging/` | Protocol (OpenIddict 7 server: authorization code + PKCE, refresh token, client credentials, end session, revocation, introspection, userinfo), users/roles/OAuth2 entities (ASP.NET Core Identity + OpenIddict custom stores over `WorkflowDbContext.Instances` in schema `wf_idp`), seeding, development mailbox. |
 | `Journeys/` | `IAuthJourneyService`, workflow tasks and the default journeys (`auth-*.json`, embedded). |
 | `Ui/` | Blazor: account pages (static server rendering – they set cookies), journey views, admin pages (interactive server, Radzen). |
 | `wwwroot/` | `middt-identity.css`. |
@@ -39,7 +39,7 @@ secrets there). The demo uses `demo/server/identity.json`.
 | Option (`Identity:*`) | Default | |
 |---|---|---|
 | `Issuer` | request host | public URL (`iss`); discovery then advertises every endpoint under it, also when a relying party fetches discovery over an internal address (container network) |
-| `Schema` / `WorkflowSchema` | `idp` / `wf_idp` | identity + OpenIddict tables / journey (workflow) tables; ignored by SQLite |
+| `WorkflowSchema` | `wf_idp` | workflow tables (`WorkflowInstances`, `WorkflowHistory`, `WorkflowJobs`, `WorkflowIncidents`) storing journeys, users (`idp-user`), roles (`idp-role`), and OAuth2 entities (`oauth-application`, `oauth-scope`, `oauth-authorization`, `oauth-token`); ignored by SQLite |
 | `AutoCreateSchema` | `false` | creates database, schemas and tables at startup (use migrations in production) |
 | `RequireHttps` | on outside Development | OpenIddict transport security |
 | `AccessTokenLifetime` / `IdentityTokenLifetime` / `RefreshTokenLifetime` / `AuthorizationCodeLifetime` | 15 min / 15 min / 14 days / 5 min | |
@@ -51,9 +51,10 @@ secrets there). The demo uses `demo/server/identity.json`.
 | `AllowRegistration` / `RequireConfirmedEmail` | `true` / `true` | |
 | `AuthenticatorIssuerName` | `Middt` | issuer shown in authenticator apps |
 
-Lockout: 5 attempts / 5 minutes; e-mail addresses are unique. The journeys run on an internal workflow engine
-(schema `wf_idp`). Only `OpenIddict.Server.AspNetCore` + `OpenIddict.EntityFrameworkCore` are referenced (the
-`OpenIddict.AspNetCore` metapackage pulls Polly 7 through the client/validation packages, which clashes with Polly 8).
+Lockout: 5 attempts / 5 minutes; e-mail addresses are unique. Users, roles, OAuth2 applications/scopes/authorizations/tokens,
+and authentication journeys all live in the workflow engine tables (schema `wf_idp`, no separate relational Identity or
+OpenIddict tables). Only `OpenIddict.Server.AspNetCore` + `OpenIddict.Core` are referenced (the `OpenIddict.AspNetCore`
+metapackage pulls Polly 7 through the client/validation packages, which clashes with Polly 8).
 
 Seed (`Identity:Seed`), applied idempotently at every start: roles and users are created when missing
 (existing users only get missing roles; seeded passwords bypass the password policy), scopes and clients are created or

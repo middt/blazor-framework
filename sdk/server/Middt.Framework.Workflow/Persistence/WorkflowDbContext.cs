@@ -23,7 +23,7 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
     /// <c>uniqueidentifier</c> starting with the last six bytes, so a UUIDv7 (time in the first bytes) would be random there
     /// and fragment the clustered primary key; it gets the timestamp in those bytes instead. Other providers use UUIDv7.
     /// </summary>
-    internal Guid NewId()
+    public Guid NewId()
     {
         isSqlServer ??= Database.ProviderName?.Contains("SqlServer", StringComparison.Ordinal) == true;
         return isSqlServer.Value ? NewSqlServerSequentialId(DateTimeOffset.UtcNow) : Guid.CreateVersion7();
