@@ -1,0 +1,339 @@
+@namespace Middt.Framework.Blazor.Ui
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using Middt.Framework.Expressions
+@using Middt.Framework.Blazor.Ui.Components
+@using Middt.Framework.Ui.Model
+@using Middt.Framework.Ui.Rendering
+@using Middt.Framework.Ui.Validation
+@using Middt.Framework.Ui.Widgets
+
+@* Runtime layout editor: list, edit JSON, validate (server), preview, save with optimistic concurrency, revisions. Protect the hosting page with the API's admin role. *@
+<div class="middt-ui-admin">
+    <RadzenCard class="middt-ui-admin-list">
+        <div class="middt-ui-toolbar" style="justify-content: space-between">
+            <h2 class="middt-ui-section-title">Yerleşimler</h2>
+            <RadzenButton Icon="add" Text="Yeni" Size="ButtonSize.Small" Click="NewLayout" />
+        </div>
+        <ul class="middt-ui-admin-items" aria-label="Yerleşimler">
+            @foreach (var item in layouts)
+            {
+                <li>
+                    <button type="button" class="@(item.Key == selectedKey ? "middt-ui-admin-item middt-ui-admin-item-active" : "middt-ui-admin-item")"
+                            aria-current="@(item.Key == selectedKey ? "true" : null)" @onclick="@(() => OpenAsync(item.Key))">
+                        <span>@(item.Title ?? item.Key)</span>
+                        <small>@item.Key · @item.Kind · v@(item.Version)</small>
+                    </button>
+                </li>
+            }
+        </ul>
+    </RadzenCard>
+
+    <div class="middt-ui-admin-main">
+        <RadzenCard>
+            <div class="middt-ui-toolbar" style="justify-content: space-between">
+                <h2 class="middt-ui-section-title">@(selectedKey is null ? "Yeni yerleşim" : selectedKey) @(version > 0 ? $"(v{version})" : null)</h2>
+                <div class="middt-ui-toolbar">
+                    <RadzenButton Icon="data_object" Text="Biçimlendir" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="Format" />
+                    <RadzenButton Icon="rule" Text="Doğrula" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="ValidateAsync" />
+                    <RadzenButton Icon="visibility" Text="Önizle" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="Preview" />
+                    <RadzenButton Icon="save" Text="Kaydet" Size="ButtonSize.Small" Click="SaveAsync" IsBusy="busy" />
+                    @if (selectedKey is not null)
+                    {
+                        <RadzenButton Icon="delete" Text="Sil" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Click="DeleteAsync" Disabled="busy" />
+                    }
+                </div>
+            </div>
+            <label for="ui-layout-json" class="middt-wf-sr-only">Yerleşim JSON</label>
+            <textarea id="ui-layout-json" class="middt-ui-editor rz-textarea" spellcheck="false" @bind="json" @bind:event="oninput"></textarea>
+            @if (errors.Count > 0)
+            {
+                <div class="middt-ui-alert middt-ui-alert-danger" role="alert">
+                    <strong>@errors.Count hata</strong>
+                    <ul class="middt-ui-list">
+                        @foreach (var e in errors)
+                        {
+                            <li>@e</li>
+                        }
+                    </ul>
+                </div>
+            }
+            else if (validMessage is not null)
+            {
+                <div class="middt-ui-alert middt-ui-alert-success" role="status">@validMessage</div>
+            }
+        </RadzenCard>
+
+        @if (preview is not null && previewContext is not null)
+        {
+            <RadzenCard>
+                <h2 class="middt-ui-section-title rz-mb-2">Önizleme</h2>
+                <UiLayoutView @key="previewKey" Layout="preview" Context="previewContext" />
+            </RadzenCard>
+        }
+
+        @if (revisions.Count > 0)
+        {
+            <RadzenCard>
+                <details>
+                    <summary>Önceki sürümler (@revisions.Count)</summary>
+                    <ul class="middt-ui-list">
+                        @foreach (var revision in revisions)
+                        {
+                            <li>
+                                v@(revision.Version) · @revision.CreatedAt.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture) · @revision.CreatedBy
+                                <RadzenButton Text="Editöre yükle" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light" Click="@(() => LoadRevision(revision))" />
+                            </li>
+                        }
+                    </ul>
+                </details>
+            </RadzenCard>
+        }
+
+        <RadzenCard>
+            <details>
+                <summary>Bileşenler (@widgets.Count)</summary>
+                @foreach (var widget in widgets)
+                {
+                    <div class="rz-mt-2">
+                        <strong>@widget.Name</strong> @(widget.Interactive ? "· etkileşimli" : null) @(widget.Children != "none" ? $"· children: {widget.Children}" : null)
+                        <div class="middt-ui-text middt-ui-text-muted">@widget.Description</div>
+                        <code class="middt-ui-text-code">@string.Join(", ", widget.Props.Select(p => p.Required ? p.Name + "*" : p.Name))</code>
+                    </div>
+                }
+            </details>
+        </RadzenCard>
+    </div>
+</div>
+
+@code {
+    private const string Template = """
+        {
+          "key": "new-page",
+          "title": "Yeni sayfa",
+          "kind": "page",
+          "menu": { "title": "Yeni sayfa", "icon": "dashboard", "order": 100 },
+          "body": [
+            { "widget": "heading", "text": "Merhaba {{ user.Name }}" },
+            { "widget": "text", "text": "Bu sayfa çalışma zamanında eklendi." }
+          ]
+        }
+        """;
+
+    private List<UiLayoutSummary> layouts = [];
+    private List<UiWidgetSpecModel> widgets = [];
+    private List<UiLayoutRevisionModel> revisions = [];
+    private List<string> errors = [];
+    private string? selectedKey;
+    private int version;
+    private string json = Template;
+    private string? validMessage;
+    private bool busy;
+    private UiLayoutDocument? preview;
+    private UiRenderContext? previewContext;
+    private int previewKey;
+
+    [Inject]
+    private UiApiClient Client { get; set; } = default!;
+
+    [Inject]
+    private UiWidgetCatalog Catalog { get; set; } = default!;
+
+    [Inject]
+    private NotificationService Notification { get; set; } = default!;
+
+    [Inject]
+    private DialogService DialogService { get; set; } = default!;
+
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    /// <summary>Raised after a save or delete (e.g. to refresh the menu).</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadListAsync();
+        var response = await Client.WidgetsAsync();
+        widgets = response.Data ?? [];
+    }
+
+    private async Task LoadListAsync()
+    {
+        var response = await Client.ListAsync();
+        if (response.IsSuccess)
+        {
+            layouts = response.Data ?? [];
+        }
+        else
+        {
+            Notification.Notify(NotificationSeverity.Error, "Yerleşimler yüklenemedi", response.ErrorText);
+        }
+    }
+
+    private void NewLayout()
+    {
+        selectedKey = null;
+        version = 0;
+        json = Template;
+        revisions = [];
+        ResetMessages();
+    }
+
+    private async Task OpenAsync(string key)
+    {
+        var response = await Client.GetAsync(key);
+        if (!response.IsSuccess || response.Data is null)
+        {
+            Notification.Notify(NotificationSeverity.Error, "Yüklenemedi", response.ErrorText);
+            return;
+        }
+
+        selectedKey = key;
+        version = response.Data.Version;
+        json = UiJson.Serialize(response.Data);
+        ResetMessages();
+        var history = await Client.RevisionsAsync(key);
+        revisions = history.Data ?? [];
+    }
+
+    private void LoadRevision(UiLayoutRevisionModel revision)
+    {
+        try
+        {
+            // Keep the current version as the expected version so saving restores the revision as a new version.
+            var document = UiJson.Parse(revision.Content);
+            document.Version = version;
+            json = UiJson.Serialize(document);
+            ResetMessages();
+        }
+        catch (JsonException ex)
+        {
+            errors = [ex.Message];
+        }
+    }
+
+    private void Format()
+    {
+        if (TryParse() is { } document)
+        {
+            json = UiJson.Serialize(document);
+        }
+    }
+
+    private UiLayoutDocument? TryParse()
+    {
+        ResetMessages();
+        try
+        {
+            return UiJson.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            errors = [$"Geçersiz JSON: {ex.Message}"];
+            return null;
+        }
+    }
+
+    private async Task ValidateAsync()
+    {
+        if (TryParse() is not { } document)
+        {
+            return;
+        }
+
+        var response = await Client.ValidateAsync(document);
+        if (!response.IsSuccess)
+        {
+            errors = [.. response.MessageList];
+            return;
+        }
+
+        errors = response.Data?.Errors ?? [];
+        validMessage = errors.Count == 0 ? "Yerleşim geçerli." : null;
+    }
+
+    private async Task Preview()
+    {
+        if (TryParse() is not { } document)
+        {
+            return;
+        }
+
+        var validation = new UiLayoutValidator(Catalog).Validate(document);
+        errors = validation.Errors;
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        preview = document;
+        previewContext = new UiRenderContext(Catalog, ExpressionUser.FromPrincipal(state.User), new Dictionary<string, JsonNode?> { [UiExpressions.Query] = new JsonObject() }, interactive: true)
+        {
+            IdPrefix = "ui-preview",
+        };
+        previewKey++;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (TryParse() is not { } document)
+        {
+            return;
+        }
+
+        if (selectedKey is not null && document.Key != selectedKey)
+        {
+            errors = ["Kayıtlı bir yerleşimin anahtarı değiştirilemez; yeni yerleşim için 'Yeni' kullanın."];
+            return;
+        }
+
+        document.Version = version;
+        busy = true;
+        try
+        {
+            var response = await Client.SaveAsync(document);
+            if (!response.IsSuccess || response.Data is null)
+            {
+                errors = [.. response.MessageList];
+                return;
+            }
+
+            selectedKey = response.Data.Key;
+            version = response.Data.Version;
+            json = UiJson.Serialize(response.Data);
+            validMessage = $"Kaydedildi (v{version}).";
+            await LoadListAsync();
+            revisions = (await Client.RevisionsAsync(selectedKey)).Data ?? [];
+            await OnChanged.InvokeAsync();
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (selectedKey is null
+            || await DialogService.Confirm($"'{selectedKey}' silinsin mi?", "Sil", new ConfirmOptions { OkButtonText = "Sil", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        var response = await Client.DeleteAsync(selectedKey, version);
+        if (!response.IsSuccess)
+        {
+            errors = [.. response.MessageList];
+            return;
+        }
+
+        Notification.Notify(NotificationSeverity.Success, "Silindi", selectedKey);
+        NewLayout();
+        await LoadListAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private void ResetMessages()
+    {
+        errors = [];
+        validMessage = null;
+    }
+}

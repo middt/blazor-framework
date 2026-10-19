@@ -1,4 +1,4 @@
-# Container based alternative to the Aspire AppHost (demo/Middt.Sample.AppHost).
+# Container based alternative to the Aspire AppHost (demo/Middt.Demo.AppHost).
 #   docker compose up --build   → Blazor UI: http://localhost:8080   Angular UI: http://localhost:8081
 #                                 Identity provider (login, /admin): http://localhost:8083   API docs: http://127.0.0.1:8180/scalar
 name: middt-sample
@@ -12,7 +12,7 @@ services:
   middt-sample-blazorserver:
     build:
       context: .
-      dockerfile: demo/client/blazor/Middt.Sample.BlazorServer/Dockerfile
+      dockerfile: demo/Middt.Demo.Blazor/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ApiSettings__URL: http://middt-sample-api:8080
@@ -40,7 +40,7 @@ services:
   middt-sample-angular:
     build:
       context: .
-      dockerfile: demo/client/angular/Middt.Sample.Angular/Dockerfile
+      dockerfile: demo/Middt.Demo.Angular/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ApiSettings__URL: http://middt-sample-api:8080
@@ -67,7 +67,7 @@ services:
   middt-sample-api:
     build:
       context: .
-      dockerfile: demo/server/Middt.Sample.Api/Dockerfile
+      dockerfile: demo/Middt.Demo.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__WorkflowDb: "Host=db_server;Port=5432;Database=middt_workflow;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}"
@@ -94,7 +94,7 @@ services:
         condition: service_healthy
 
   # Middt Identity (identity/Middt.Identity) – the OAuth 2.0 / OpenID Connect server, configured for the demo by
-  # demo/server/identity.json (clients, demo users, relaxed password policy); secrets come from .env.
+  # demo/identity.json (clients, demo users, relaxed password policy); secrets come from .env.
   middt-identity:
     build:
       context: .
@@ -111,7 +111,7 @@ services:
       Identity__Seed__Clients__0__ClientSecret: *blazor-client-secret
       Identity__Seed__Clients__1__ClientSecret: *angular-client-secret
     volumes:
-      - ./demo/server/identity.json:/app/config/identity.json:ro
+      - ./demo/identity.json:/app/config/identity.json:ro
       # Development signing keys (see the Dockerfile): survive container recreation.
       - identity-keys:/home/app/.dotnet/corefx/cryptography/x509stores
     ports:

@@ -1,0 +1,66 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "order-escalated",
+  "title": "Eskale edilen sipariş",
+  "kind": "view",
+  "version": 5,
+  "body": [
+    { "widget": "alert", "severity": "warning", "text": "{{ data.customerName }} siparişi süresi içinde karara bağlanmadığı için eskale edildi." },
+    {
+      "widget": "columns",
+      "widths": [ "2", "1" ],
+      "children": [
+        {
+          "widget": "section",
+          "title": "{{ data.customerName }}",
+          "children": [
+            {
+              "widget": "fields",
+              "items": [
+                { "label": "Çağrı Başlığı", "value": "{{ data.ticketTitle }}", "visibleWhen": "data.ticketTitle != null" },
+                { "label": "Öncelik", "value": "{{ data.severity }}", "visibleWhen": "data.severity != null" },
+                { "label": "Atanan Ekip", "value": "{{ data.assignedQueue }}", "visibleWhen": "data.assignedQueue != null" },
+                { "label": "Tutar", "value": "{{ data.amount }}", "format": "N2" },
+                { "label": "Ürün", "value": "{{ data.product }}", "visibleWhen": "data.product != null" },
+                { "label": "Teslimat", "value": "{{ data.deliveryType }}" },
+                { "label": "Müşteri tipi", "value": "{{ data.customerType }}" },
+                { "label": "Talep eden", "value": "{{ data.requestedBy }}" },
+                { "label": "Talep zamanı", "value": "{{ data.requestedAt }}", "format": "g" },
+                { "label": "Eskalasyon Nedeni", "value": "{{ data.escalatedReason }}", "visibleWhen": "data.escalatedReason != null" },
+                { "label": "Çözüm Notu", "value": "{{ data.resolutionNote }}", "visibleWhen": "data.resolutionNote != null" }
+              ]
+            },
+            { "widget": "text", "style": "muted", "text": "Not: {{ data.note }}", "visibleWhen": "data.note != null && data.note != \"\"" }
+          ]
+        },
+        {
+          "widget": "section",
+          "title": "Kredi kontrolü",
+          "children": [
+            { "widget": "badge", "color": "success", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score >= 70" },
+            { "widget": "badge", "color": "warning", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score >= 50 && data.credit.score < 70" },
+            { "widget": "badge", "color": "danger", "text": "Skor {{ data.credit.score }}", "visibleWhen": "data.credit != null && data.credit.score < 50" },
+            { "widget": "fields", "items": [ { "label": "Kontrol zamanı", "value": "{{ data.credit != null ? data.credit.checkedAt : data.escalatedAt }}", "format": "g" } ] },
+            { "widget": "alert", "severity": "danger", "text": "Yüksek tutar: ek kontrol önerilir.", "visibleWhen": "data.amount > 20000" }
+          ]
+        }
+      ]
+    },
+    {
+      "widget": "section",
+      "title": "Firma bilgileri",
+      "visibleWhen": "data.company != null",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Vergi numarası", "value": "{{ data.company.taxNumber }}" },
+            { "label": "Vergi dairesi", "value": "{{ data.company.taxOffice }}" },
+            { "label": "Yetkili kişi", "value": "{{ data.company.contactPerson }}" }
+          ]
+        }
+      ]
+    },
+    { "widget": "text", "style": "small", "text": "Durum: {{ instance.stateTitle }} · Akış: {{ instance.workflow }}" }
+  ]
+}

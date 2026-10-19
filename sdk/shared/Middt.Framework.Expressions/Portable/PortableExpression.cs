@@ -7,7 +7,7 @@ namespace Middt.Framework.Expressions.Portable;
 
 /// <summary>
 /// The <b>portable expression language</b>: a small, sandboxed language with identical semantics in .NET and in the
-/// TypeScript client (<c>sdk/client/typescript/ui-core</c>), so that any frontend (Blazor, Angular, static HTML) can evaluate
+/// TypeScript client (<c>sdk/client/ui-core</c>), so that any frontend (Blazor, Angular, static HTML) can evaluate
 /// layouts. The shared conformance suite <c>spec/expressions.conformance.json</c> is run by both implementations.
 /// <list type="bullet">
 /// <item>Literals: numbers, <c>"text"</c> / <c>'text'</c>, <c>true</c>, <c>false</c>, <c>null</c></item>

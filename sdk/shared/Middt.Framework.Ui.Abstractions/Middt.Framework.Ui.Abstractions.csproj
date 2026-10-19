@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Product>Middt Framework UI Abstractions</Product>
-    <Description>The UI technology independent contract of Middt server driven UI: JSON layout model, widget specs, validator, portable expressions and formats, JSON Schema. Renderers: Middt.Framework.Blazor.Web (Blazor), the static HTML renderer of Middt.Framework.Ui.Server and @middt/ui-core (TypeScript).</Description>
+    <Description>The UI technology independent contract of Middt server driven UI: JSON layout model, widget specs, validator, portable expressions and formats, JSON Schema. Renderers: Middt.Framework.Blazor (Blazor), the static HTML renderer of Middt.Framework.Ui.Server and @middt/ui-core (TypeScript).</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

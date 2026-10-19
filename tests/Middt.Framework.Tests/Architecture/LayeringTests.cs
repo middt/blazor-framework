@@ -12,7 +12,7 @@ public sealed class LayeringTests
     [
         "Middt.Framework.Client",
         "Middt.Framework.Bff",
-        "Middt.Framework.Blazor.Web",
+        "Middt.Framework.Blazor",
         "Radzen.Blazor",
     ];
 
@@ -25,7 +25,7 @@ public sealed class LayeringTests
             "Middt.Framework.Api",
             "Middt.Framework.Workflow",
             "Middt.Framework.Ui.Server",
-            "Middt.Framework.Plugin.Rebus",
+            "Middt.Framework.Rebus",
         ];
 
     [Theory]
@@ -40,10 +40,10 @@ public sealed class LayeringTests
 
     [Fact]
     public void Sample_api_backend_does_not_depend_on_client_or_blazor_web() =>
-        References("Middt.Sample.Api").Should().NotContain(r => IsClientOrBlazorWeb(r));
+        References("Middt.Demo.Api").Should().NotContain(r => IsClientOrBlazorWeb(r));
 
     private static bool IsClientOrBlazorWeb(string r) =>
-        r is "Middt.Framework.Client" or "Middt.Framework.Bff" or "Middt.Framework.Blazor.Web" or "Radzen.Blazor";
+        r is "Middt.Framework.Client" or "Middt.Framework.Bff" or "Middt.Framework.Blazor" or "Radzen.Blazor";
 
     [Fact]
     public void Client_sdk_does_not_depend_on_backend_or_ui_technology() =>
@@ -51,7 +51,7 @@ public sealed class LayeringTests
 
     [Theory]
     [InlineData("Middt.Framework.Bff")]
-    [InlineData("Middt.Framework.Blazor.Web")]
+    [InlineData("Middt.Framework.Blazor")]
     public void Frontends_do_not_depend_on_backend_engines(string assembly) =>
         References(assembly).Should().NotContain(r => IsBackendEngine(r));
 

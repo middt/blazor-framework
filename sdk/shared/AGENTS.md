@@ -1,11 +1,11 @@
 # sdk/shared – contracts (read the root AGENTS.md first)
 
-Model · Expressions · Ui.Abstractions. Used by **every** layer and mirrored in TypeScript (`sdk/client/typescript/ui-core`).
+Model · Expressions · Ui.Abstractions. Used by **every** layer and mirrored in TypeScript (`sdk/client/ui-core`).
 
 - **No ASP.NET Core, Razor, Radzen, EF Core** references here (LayeringTests fail). Plain `Microsoft.NET.Sdk` + BCL.
 - `Middt.Framework.Model`: wire DTOs only (no logic, no dependencies). Namespaces are historic
   (`Middt.Framework.Common.Model.Data`, `Middt.Framework.Api.Configuration.Model`, `Middt.Framework.Model.Workflow`, …).
-  Changing a DTO changes the wire format → update `sdk/client/typescript/ui-core/src/types.ts` / `workflow.ts` too.
+  Changing a DTO changes the wire format → update `sdk/client/ui-core/src/types.ts` / `workflow.ts` too.
 - `Middt.Framework.Expressions`:
   - `Portable/` = the **portable expression language** used by layouts. Semantics are specified by
     `spec/expressions.conformance.json` and implemented identically in `ui-core/src/expression.ts`. Any semantic change:

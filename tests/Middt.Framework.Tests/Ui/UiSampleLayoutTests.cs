@@ -1,4 +1,4 @@
-using Middt.Framework.Plugin.Rebus;
+using Middt.Framework.Rebus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Ui.Model;
@@ -33,7 +33,7 @@ public sealed class UiSampleLayoutTests
         return dir?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
 
-    internal static string SampleDirectory(string name) => Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", name);
+    internal static string SampleDirectory(string name) => Path.Combine(RepositoryRoot(), "demo", "Middt.Demo.Api", name);
 
     private static string[] LayoutFiles() => Directory.GetFiles(SampleDirectory("Layouts"), "*.json");
 

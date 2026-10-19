@@ -1,7 +1,7 @@
 # sdk/server – backend (read the root AGENTS.md first)
 
-Common · Api · Workflow · Ui.Server · plugins (Rebus). **Must not reference any client/frontend package**
-(Client, Bff, Blazor.Web, Radzen) – LayeringTests enforce it.
+Common · Api · Workflow · Ui.Server · Rebus. **Must not reference any client/frontend package**
+(Client, Bff, Blazor, Radzen) – LayeringTests enforce it.
 
 ## Api (`Middt.Framework.Api`)
 - Hosting: `AddMiddtApi()` / `UseMiddtApi()` (ProblemDetails, versioning, JWT, rate limiting, CORS,
@@ -9,7 +9,7 @@ Common · Api · Workflow · Ui.Server · plugins (Rebus). **Must not reference 
 - Controllers: `BaseController`, `BaseTokenController` (refresh token rotation & revocation via `IRefreshTokenStore`).
 
 ## Workflow (`Middt.Framework.Workflow`)
-- Definitions are JSON (`demo/server/Middt.Sample.Api/Workflows`), validated at startup by `WorkflowRegistry`
+- Definitions are JSON (`demo/Middt.Demo.Api/Workflows`), validated at startup by `WorkflowRegistry`
   (`WorkflowDefinitionValidator`) – add validation for every new definition property.
 - `WorkflowEngine` runs transitions with an optimistic claim (Busy + revision), automatic chains, subflows, jobs
   (`WorkflowJobProcessor`), history and incidents. Keep round trips low (there is a test pinning the command count).

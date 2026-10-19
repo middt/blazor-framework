@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Middt.Framework.Model.Workflow;
-using Middt.Framework.Plugin.Rebus;
+using Middt.Framework.Rebus;
 using Middt.Framework.Tests.Workflow;
 using Rebus.Bus;
 using Rebus.Transport.InMem;

@@ -1,5 +1,5 @@
 using System.Net;
-using Middt.Framework.Blazor.Web.DependencyInjection;
+using Middt.Framework.Blazor.DependencyInjection;
 using Middt.Framework.Tests.Api;
 using Middt.Framework.Bff.Security;
 

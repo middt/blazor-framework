@@ -1,6 +1,6 @@
 # Playbook: add or change a workflow
 
-Definitions are JSON(C) files in `demo/server/Middt.Sample.Api/Workflows/` (`customer-onboarding.json`, `credit-allocation.json`, and `order-payment-orchestration.json` are full examples: `dataSchema`, `icon`, rules, subflows, `fanOut`, `loadWorkflow`, `cache`, roles, timers, and backend-driven `view.layout` screens).
+Definitions are JSON(C) files in `demo/Middt.Demo.Api/Workflows/` (`customer-onboarding.json`, `credit-allocation.json`, and `order-payment-orchestration.json` are full examples: `dataSchema`, `icon`, rules, subflows, `fanOut`, `loadWorkflow`, `cache`, roles, timers, and backend-driven `view.layout` screens).
 
 1. **Definition & Dynamic Menu / List Columns**:
    - Top-level properties: `key`, `version` (bump `version` when updating a seeded file so `WorkflowSeedService` updates the DB), `title`, `icon` (Material icon rendered automatically in the sidebar menu of both frontends), `roles`, optional `instanceAccess` (`owner` + `supervisorRoles`), `dataSchema`, `start`, `states` (`type`, `subType`, `step`, `view`, `actors`, `onEntry`, `onExit`, `transitions`).
@@ -13,7 +13,7 @@ Definitions are JSON(C) files in `demo/server/Middt.Sample.Api/Workflows/` (`cus
 2. **Validation** runs at API startup – fix every reported error; add validator rules in `WorkflowRegistry` for new definition properties (with tests in `tests/Middt.Framework.Tests/Workflow`).
 
 3. **Screens per state (100% Backend-Driven JSON)**:
-   - Every `Human` and `Finish` state should specify `"view": { "layout": "<layout-key>" }` pointing to a `kind: "view"` JSON layout in `demo/server/Middt.Sample.Api/Layouts/` (e.g., `kyc-review.json`, `credit-review.json`, `order-review.json`, `order-result.json`, `risk-detail.json`).
+   - Every `Human` and `Finish` state should specify `"view": { "layout": "<layout-key>" }` pointing to a `kind: "view"` JSON layout in `demo/Middt.Demo.Api/Layouts/` (e.g., `kyc-review.json`, `credit-review.json`, `order-review.json`, `order-result.json`, `risk-detail.json`).
    - Reuse common partial layouts across multiple workflow views with `{ "widget": "layout", "key": "workflow-footer" }` (see [`backend-driven-json-ui.md`](backend-driven-json-ui.md)).
    - **Transition forms**: Define `input.schema` on transitions (`JsonSchemaForm` in Blazor / `WfSchemaFormComponent` in Angular).
      - Dynamic dropdown lookups against another workflow's data:

@@ -27,22 +27,22 @@ A .NET 10 framework for line-of-business apps with **two interchangeable fronten
 ```
 sdk/                              the framework (NuGet + npm packages)
   shared/                         Model · Expressions · Ui.Abstractions        contracts, NO UI technology / ASP.NET
-  server/                         Common · Api · Workflow · Ui.Server          backend, NO frontend dependencies
-    plugins/                      Plugin.Rebus
+  server/                         Common · Api · Workflow · Ui.Server · Rebus  backend, NO frontend dependencies
   client/
-    dotnet/                       Middt.Framework.Client                        typed API clients (.NET)
-    typescript/ui-core/           @middt/ui-core                                TS twin of the contracts + API clients
-    bff/                          Middt.Framework.Bff                           cookie session, login pages, YARP proxy
-    blazor/                       Middt.Framework.Blazor.Web                    Blazor frontend
-    angular/                      @middt/angular (library workspace)            Angular frontend
+    Middt.Framework.Client        typed API clients (.NET)
+    Middt.Framework.Bff           cookie session, login pages, YARP proxy
+    Middt.Framework.Blazor        Blazor Server frontend (Radzen)
+    ui-core/                      @middt/ui-core – TS twin of the contracts + API clients
+    angular/                      @middt/angular (library workspace) – Angular frontend
 identity/Middt.Identity           OAuth2/OIDC server – ONE runnable service (not SDK), configured by appsettings (docs/identity.md)
-demo/                             100% backend-driven JSON sample (KYC, credit, order orchestration)
-  shared/                         Middt.Sample.ServiceDefaults                  Aspire OpenTelemetry & health defaults
-  server/Middt.Sample.Api         API + Layouts/*.json + Workflows/*.json seeds (zero hardcoded domain views/tables)
-  server/identity.json            demo settings of Middt Identity (:8083) – both demos sign in there
-  client/blazor/…BlazorServer     Blazor demo (:8080)
-  client/angular/                 Middt.Sample.Angular (BFF host, :8081) + app/ (Angular demo app)
-  Middt.Sample.AppHost            Aspire orchestration
+demo/                             100% backend-driven JSON demo (KYC, credit, order orchestration)
+  Middt.Demo.AppHost              Aspire orchestration
+  Middt.Demo.ServiceDefaults      Aspire OpenTelemetry & health defaults
+  Middt.Demo.Api                  API + Layouts/*.json + Workflows/*.json seeds (zero hardcoded domain views/tables)
+  Middt.Demo.Blazor               Blazor demo (:8080)
+  Middt.Demo.Angular              Angular BFF host (:8081)
+  angular-app/                    Angular demo SPA workspace
+  identity.json                   demo settings of Middt Identity (:8083) – both demos sign in there
 spec/                             expressions.conformance.json · ui-layout.schema.json (generated)
 tests/Middt.Framework.Tests       all .NET tests (xunit.v3)
 docs/                             architecture.md, ai/ playbooks
@@ -62,9 +62,9 @@ dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*WorkflowEn
 MIDDT_UPDATE_SPEC=1 dotnet test --project tests/Middt.Framework.Tests  # regenerate spec/ui-layout.schema.json
 
 # TypeScript / Angular (order matters: ui-core → library → app)
-(cd sdk/client/typescript/ui-core && npm ci && npm run build && node --test test/)
+(cd sdk/client/ui-core && npm ci && npm run build && node --test test/)
 (cd sdk/client/angular && npm ci && npx ng build middt-angular)
-(cd demo/client/angular/app && npm ci && npx ng build sample --configuration production)
+(cd demo/angular-app && npm ci && npx ng build sample --configuration production)
 
 # Full stack (needs .env – copy .env.example and fill it)
 docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083 · API :8180/scalar (Development) · login test@test.com / test
@@ -107,7 +107,7 @@ docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083
 - Number text in expressions follows ECMAScript `Number.prototype.toString`, not .NET "R".
 - Browsers don't separate cookies by port: each BFF app on the same host needs its own `CookieName`.
 - Workflow and job keys use UUIDv7 (`Guid.CreateVersion7()`) for chronological B-tree indexing in PostgreSQL.
-- Seeds (`demo/server/…/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
+- Seeds (`demo/Middt.Demo.Api/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
 - E2E (Playwright) suites live in `tests/e2e`; see `docs/ai/testing.md`.
 - Identity admin pages materialize an `IAsyncEnumerable` from OpenIddict/EF before querying per row on the same connection.
 - Radzen grids with `LoadData` lose the initial load across prerendering: call `grid.Reload()` in

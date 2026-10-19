@@ -8,7 +8,7 @@ namespace Middt.Framework.Tests.Expressions;
 
 /// <summary>
 /// Runs the shared conformance suite (spec/expressions.conformance.json) against the .NET implementation; the TypeScript
-/// client (sdk/client/typescript/ui-core) runs the same file, so both frontends evaluate layouts identically.
+/// client (sdk/client/ui-core) runs the same file, so both frontends evaluate layouts identically.
 /// </summary>
 public sealed class PortableExpressionConformanceTests
 {

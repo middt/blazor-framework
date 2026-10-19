@@ -5,8 +5,8 @@
 | CI build | `dotnet build Middt.Framework.slnx -p:ContinuousIntegrationBuild=true` | warnings are errors |
 | .NET tests | `dotnet test --project tests/Middt.Framework.Tests` | complete xunit suite |
 | Contracts | conformance + schema tests (part of the .NET tests) and `node --test` in ui-core | regenerate schema with `MIDDT_UPDATE_SPEC=1` |
-| TypeScript | `cd sdk/client/typescript/ui-core && npm run build && node --test test/` | |
-| Angular | `cd sdk/client/angular && npx ng build middt-angular`, then `cd demo/client/angular/app && npx ng build sample --configuration production` | 0 warnings |
+| TypeScript | `cd sdk/client/ui-core && npm run build && node --test test/` | |
+| Angular | `cd sdk/client/angular && npx ng build middt-angular`, then `cd demo/angular-app && npx ng build sample --configuration production` | 0 warnings |
 | Full stack | `docker compose up -d --build` (needs `.env`) | Blazor :8080, Angular :8081, API :8180 |
 | E2E | Playwright scripts (see below) | both frontends, same scenarios |
 

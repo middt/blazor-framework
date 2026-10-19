@@ -1,6 +1,6 @@
 <Solution>
   <!-- sdk: the framework. shared = contracts used by server and client; server = backend; client = everything a frontend
-       needs (.NET client SDK, TypeScript core, BFF host blocks, Blazor, Angular in sdk/client/angular). -->
+       needs (.NET client SDK, TypeScript ui-core, BFF host blocks, Blazor, Angular in sdk/client/angular). -->
   <Folder Name="/sdk/shared/">
     <Project Path="sdk/shared/Middt.Framework.Model/Middt.Framework.Model.csproj" />
     <Project Path="sdk/shared/Middt.Framework.Expressions/Middt.Framework.Expressions.csproj" />
@@ -11,36 +11,24 @@
     <Project Path="sdk/server/Middt.Framework.Api/Middt.Framework.Api.csproj" />
     <Project Path="sdk/server/Middt.Framework.Workflow/Middt.Framework.Workflow.csproj" />
     <Project Path="sdk/server/Middt.Framework.Ui.Server/Middt.Framework.Ui.Server.csproj" />
-  </Folder>
-  <Folder Name="/sdk/server/plugins/">
-    <Project Path="sdk/server/plugins/Middt.Framework.Plugin.Rebus/Middt.Framework.Plugin.Rebus.csproj" />
+    <Project Path="sdk/server/Middt.Framework.Rebus/Middt.Framework.Rebus.csproj" />
   </Folder>
   <Folder Name="/sdk/client/">
-    <Project Path="sdk/client/dotnet/Middt.Framework.Client/Middt.Framework.Client.csproj" />
-  </Folder>
-  <Folder Name="/sdk/client/bff/">
-    <Project Path="sdk/client/bff/Middt.Framework.Bff/Middt.Framework.Bff.csproj" />
-  </Folder>
-  <Folder Name="/sdk/client/blazor/">
-    <Project Path="sdk/client/blazor/Middt.Framework.Blazor.Web/Middt.Framework.Blazor.Web.csproj" />
+    <Project Path="sdk/client/Middt.Framework.Client/Middt.Framework.Client.csproj" />
+    <Project Path="sdk/client/Middt.Framework.Bff/Middt.Framework.Bff.csproj" />
+    <Project Path="sdk/client/Middt.Framework.Blazor/Middt.Framework.Blazor.csproj" />
   </Folder>
   <!-- identity: the OAuth 2.0 / OpenID Connect server (one ready to run service, configured by appsettings). -->
   <Folder Name="/identity/">
     <Project Path="identity/Middt.Identity/Middt.Identity.csproj" />
   </Folder>
-  <!-- demo: the 100% backend-driven JSON sample (shared / server / client). -->
+  <!-- demo: the 100% backend-driven JSON demo (AppHost, ServiceDefaults, Api, Blazor, Angular). -->
   <Folder Name="/demo/">
-    <Project Path="demo/Middt.Sample.AppHost/Middt.Sample.AppHost.csproj" />
-  </Folder>
-  <Folder Name="/demo/shared/">
-    <Project Path="demo/shared/Middt.Sample.ServiceDefaults/Middt.Sample.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/demo/server/">
-    <Project Path="demo/server/Middt.Sample.Api/Middt.Sample.Api.csproj" />
-  </Folder>
-  <Folder Name="/demo/client/">
-    <Project Path="demo/client/blazor/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj" />
-    <Project Path="demo/client/angular/Middt.Sample.Angular/Middt.Sample.Angular.csproj" />
+    <Project Path="demo/Middt.Demo.AppHost/Middt.Demo.AppHost.csproj" />
+    <Project Path="demo/Middt.Demo.ServiceDefaults/Middt.Demo.ServiceDefaults.csproj" />
+    <Project Path="demo/Middt.Demo.Api/Middt.Demo.Api.csproj" />
+    <Project Path="demo/Middt.Demo.Blazor/Middt.Demo.Blazor.csproj" />
+    <Project Path="demo/Middt.Demo.Angular/Middt.Demo.Angular.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Middt.Framework.Tests/Middt.Framework.Tests.csproj" />

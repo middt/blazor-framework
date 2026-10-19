@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using Middt.Framework.Blazor.Web.Base.Component.Workflow;
+using Middt.Framework.Blazor.Workflow;
 
 namespace Middt.Framework.Tests.Blazor;
 

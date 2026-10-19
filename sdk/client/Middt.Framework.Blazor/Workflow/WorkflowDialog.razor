@@ -1,0 +1,79 @@
+@namespace Middt.Framework.Blazor.Workflow
+
+@if (Visible)
+{
+    <div class="middt-wf-backdrop">
+        <div @ref="panel" class="middt-wf-dialog" role="dialog" aria-modal="true" aria-labelledby="@($"{Id}-title")" tabindex="-1"
+             id="@Id" @onkeydown="OnKeyDown">
+            <div class="middt-wf-dialog-header">
+                <h3 id="@($"{Id}-title")" class="middt-wf-dialog-title">@Title</h3>
+                <RadzenButton Icon="close" Variant="Variant.Text" ButtonStyle="ButtonStyle.Base" Size="ButtonSize.Small"
+                              title="Kapat" aria-label="Kapat" Click="CloseAsync" Disabled="@Busy" />
+            </div>
+            <div class="middt-wf-dialog-body">
+                @ChildContent
+            </div>
+            @if (FooterContent is not null)
+            {
+                <div class="middt-wf-dialog-footer">
+                    @FooterContent
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference panel;
+    private bool focusPending;
+
+    /// <summary>Whether the dialog is shown.</summary>
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Element id of the dialog (the title gets <c>{Id}-title</c>).</summary>
+    [Parameter]
+    public string Id { get; set; } = "middt-wf-dialog";
+
+    /// <summary>Disables closing while an operation runs.</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+
+    /// <summary>Raised when the user closes the dialog (close button or Escape).</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private bool wasVisible;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !wasVisible)
+        {
+            focusPending = true;
+        }
+
+        wasVisible = Visible;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusPending && Visible)
+        {
+            focusPending = false;
+            await panel.FocusAsync();
+        }
+    }
+
+    private Task CloseAsync() => Busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
+}

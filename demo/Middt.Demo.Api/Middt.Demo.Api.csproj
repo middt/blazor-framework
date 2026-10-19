@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>fdef3700-fe48-43e5-9f52-498750917b24</UserSecretsId>
+    <ContainerRepository>middt-demo-api</ContainerRepository>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sdk\server\Middt.Framework.Api\Middt.Framework.Api.csproj" />
+    <ProjectReference Include="..\..\sdk\server\Middt.Framework.Rebus\Middt.Framework.Rebus.csproj" />
+    <ProjectReference Include="..\..\sdk\server\Middt.Framework.Workflow\Middt.Framework.Workflow.csproj" />
+    <ProjectReference Include="..\..\sdk\server\Middt.Framework.Ui.Server\Middt.Framework.Ui.Server.csproj" />
+    <ProjectReference Include="..\Middt.Demo.ServiceDefaults\Middt.Demo.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="Workflows\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="Layouts\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

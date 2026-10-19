@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Middt.Framework.Blazor.Web.Ui.Components;
-using Middt.Framework.Blazor.Web.Ui.Components.Display;
-using Middt.Framework.Blazor.Web.Ui.Rendering;
+using Middt.Framework.Blazor.Ui.Components;
+using Middt.Framework.Blazor.Ui.Components.Display;
+using Middt.Framework.Blazor.Ui.Rendering;
 using Middt.Framework.Ui.Model;
 using Middt.Framework.Ui.Rendering;
 using Middt.Framework.Ui.Server;
@@ -31,7 +31,7 @@ public sealed class StarsWidget : UiWidgetBase
     }
 }
 
-/// <summary>Display components of Middt.Framework.Blazor.Web.Ui rendered with <see cref="HtmlRenderer"/>.</summary>
+/// <summary>Display components of Middt.Framework.Blazor.Ui rendered with <see cref="HtmlRenderer"/>.</summary>
 public sealed class UiBlazorRenderingTests
 {
     internal static async Task<string> RenderAsync(UiLayoutDocument layout, IReadOnlyDictionary<string, JsonNode?> variables, bool interactive = false, UiBlazorWidgets? widgets = null, CultureInfo? culture = null)

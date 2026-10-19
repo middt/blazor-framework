@@ -1,0 +1,11 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "workflow-footer",
+  "title": "Ortak Akış Durum Altbilgisi",
+  "kind": "view",
+  "version": 1,
+  "body": [
+    { "widget": "divider" },
+    { "widget": "text", "style": "small", "text": "Durum: {{ instance.stateTitle }} · Akış: {{ instance.workflow }}" }
+  ]
+}

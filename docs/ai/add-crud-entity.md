@@ -6,14 +6,14 @@ Middt Framework uses a **100% backend-driven JSON** pattern for server-paged `gr
 
 ## Workflow JSON-Backed Screen (Zero C# Code)
 
-In `demo/server/Middt.Sample.Api`, domain records live as JSON documents inside PostgreSQL-partitioned workflow instances (`WorkflowInstances` + `WorkflowInstanceData`). `WorkflowInstanceDataQuery` dynamically exposes `/api/v1/{workflowKey}/getitems`, `/api/v1/{workflowKey}/getall`, `/api/v1/{workflowKey}/getbyid`, `/api/v1/{workflowKey}/insert`, `/api/v1/{workflowKey}/update`, and `/api/v1/{workflowKey}/delete` for every registered workflow definition—no C# entity, repository, or controller is needed.
+In `demo/Middt.Demo.Api`, domain records live as JSON documents inside PostgreSQL-partitioned workflow instances (`WorkflowInstances` + `WorkflowInstanceData`). `WorkflowInstanceDataQuery` dynamically exposes `/api/v1/{workflowKey}/getitems`, `/api/v1/{workflowKey}/getall`, `/api/v1/{workflowKey}/getbyid`, `/api/v1/{workflowKey}/insert`, `/api/v1/{workflowKey}/update`, and `/api/v1/{workflowKey}/delete` for every registered workflow definition—no C# entity, repository, or controller is needed.
 
 ### 1. Workflow definition (`Workflows/<key>.json`)
-1. Define or reuse a workflow in `demo/server/Middt.Sample.Api/Workflows/` (e.g., `customer-onboarding.json`, `credit-allocation.json`, `order-payment-orchestration.json`).
+1. Define or reuse a workflow in `demo/Middt.Demo.Api/Workflows/` (e.g., `customer-onboarding.json`, `credit-allocation.json`, `order-payment-orchestration.json`).
 2. Declare searchable/sortable fields in `dataSchema.properties` with explicit JSON types (`string`, `integer`, `number`, `boolean`). `WorkflowPartitionManager` automatically creates PostgreSQL partitions and typed B-Tree expression indexes on `WorkflowInstanceData.Data` at startup.
 
 ### 2. Screen = JSON layout (`Layouts/<screen-key>.json`)
-1. Copy `demo/server/Middt.Sample.Api/Layouts/customer-directory.json` (or `credit-pipeline.json` / `order-monitor.json`).
+1. Copy `demo/Middt.Demo.Api/Layouts/customer-directory.json` (or `credit-pipeline.json` / `order-monitor.json`).
 2. Set `key`, `version`, `title`, `kind: "page"`, and configure the `grid` widget:
    - `entity`: the workflow key in PascalCase or kebab-case (e.g., `"CustomerOnboarding"` or `"customer-onboarding"` — `WorkflowInstanceDataQuery` resolves both dynamically).
    - `columns`: `{ "field": "key", "title": "Müşteri Anahtarı", "sortable": true, ... }`.

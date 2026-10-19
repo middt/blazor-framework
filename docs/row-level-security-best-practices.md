@@ -92,7 +92,7 @@ public class BankingDbContext(
 
 ## 4. Katman 2: API & Controller Seviyesi
 
-Middt Framework'ün [BaseListController](file:///Volumes/Data/personel/github/blazor-framework/sdk/server/Middt.Framework.Api/BaseController/BaseListController.cs) ve [BaseCrudController](file:///Volumes/Data/personel/github/blazor-framework/sdk/server/Middt.Framework.Api/BaseController/BaseCrudController.cs) sınıfları satır bazlı güvenlik için iki ana kanca sunar:
+Middt Framework'ün [`BaseController`](../sdk/server/Middt.Framework.Api/Controllers/BaseController.cs) ve [`WorkflowInstanceDataQuery`](../sdk/server/Middt.Framework.Workflow/Runtime/WorkflowInstanceDataQuery.cs) katmanlarında satır bazlı güvenlik aşağıdaki desenlerle uygulanır:
 
 ### A. Liste Sorguları Filtresi: `ApplyAccessFilter`
 `getall` ve `getitems` (sayfalama, sıralama, arama) endpoint'lerinde çalıştırılan IQueryable zincirine otomatik eklenir:
@@ -394,7 +394,7 @@ Eğer kullanıcı sayfaya `?branchId=101` linki ile gelmişse veya aktif şubesi
   });
   ```
 
-- **Blazor (`Middt.Framework.Blazor.Web`):**
+- **Blazor (`Middt.Framework.Blazor`):**
   ```csharp
   [SupplyParameterFromQuery]
   public long? BranchId { get; set; }

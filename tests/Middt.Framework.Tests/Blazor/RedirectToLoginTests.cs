@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Middt.Framework.Blazor.Web.Base.Component.Security;
+using Middt.Framework.Blazor.Security;
 using Middt.Framework.Model.Configuration;
 
 namespace Middt.Framework.Tests.Blazor;

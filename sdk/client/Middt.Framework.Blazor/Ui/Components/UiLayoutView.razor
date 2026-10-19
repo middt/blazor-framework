@@ -1,0 +1,12 @@
+@* Renders a layout document. Use UiPageHost (Middt.Framework.Blazor) for routable pages; this component only renders. *@
+<div class="middt-ui" data-layout="@Layout.Key">
+    <UiNodeList Nodes="Layout.Body" Context="Context" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public UiLayoutDocument Layout { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public UiRenderContext Context { get; set; } = default!;
+}

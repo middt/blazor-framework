@@ -4,7 +4,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Middt.Framework.Client.Security;
 using Microsoft.AspNetCore.Components.Authorization;
-using Middt.Framework.Blazor.Web.Security;
+using Middt.Framework.Blazor.Security;
 
 namespace Middt.Framework.Tests.Security;
 

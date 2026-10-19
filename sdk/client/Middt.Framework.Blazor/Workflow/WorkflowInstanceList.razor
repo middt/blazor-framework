@@ -1,0 +1,83 @@
+@namespace Middt.Framework.Blazor.Workflow
+@using Middt.Framework.Model.Workflow
+@inherits BaseComponent
+
+<RadzenCard class="middt-wf-card">
+    <div class="middt-wf-toolbar">
+        <h2 class="middt-wf-heading">@(Title ?? definition?.Title ?? Workflow)</h2>
+        <div class="middt-wf-toolbar-actions">
+            @if (ShowStatusFilter)
+            {
+                <RadzenDropDown TValue="WorkflowInstanceStatus?" Data="@WorkflowUi.StatusOptions" TextProperty="Value" ValueProperty="Key"
+                                Value="@statusFilter" Change="@(v => OnStatusFilterChanged(v as WorkflowInstanceStatus?))"
+                                AllowClear="true" Placeholder="Tüm durumlar" aria-label="Duruma göre filtrele" title="Duruma göre filtrele"
+                                class="middt-wf-filter" />
+            }
+            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" title="Listeyi yenile" aria-label="Listeyi yenile" Click="RefreshAsync" />
+            @if (AllowStart)
+            {
+                <RadzenButton Icon="add" Text="Yeni başlat" title="Yeni akış başlat" Click="OnStartClick" Disabled="@(definition is null || (starting && !startOpen))"
+                              IsBusy="@(starting && !startOpen)" BusyText="Başlatılıyor..." class="middt-wf-start" />
+            }
+        </div>
+    </div>
+
+    <RadzenDataGrid @ref="grid" TItem="WorkflowInstanceModel" Data="@items" Count="@count" LoadData="OnLoadData" IsLoading="@loading"
+                    AllowPaging="true" PageSize="@PageSize" PageSizeOptions="@(new[] { 10, 20, 50 })" ShowPagingSummary="true"
+                    SelectionMode="DataGridSelectionMode.Single" Value="@selection" RowSelect="OnRowSelect"
+                    EmptyText="Kayıt bulunamadı." class="middt-wf-grid">
+        <Columns>
+            <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="Key" Title="Anahtar" Sortable="false" MinWidth="160px">
+                <Template Context="item">@(item.Key ?? item.Id.ToString()[..8])</Template>
+            </RadzenDataGridColumn>
+            @foreach (var col in dataColumns)
+            {
+                var currentCol = col;
+                <RadzenDataGridColumn @key="currentCol.Key" TItem="WorkflowInstanceModel" Title="@currentCol.Title" Sortable="false" MinWidth="130px">
+                    <Template Context="item">@WorkflowUi.FormatDataCell(item.Data, currentCol)</Template>
+                </RadzenDataGridColumn>
+            }
+            <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="StateTitle" Title="Adım" Sortable="false" MinWidth="140px">
+                <Template Context="item">@(item.StateTitle ?? item.State)</Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="Status" Title="Durum" Sortable="false" Width="120px">
+                <Template Context="item">
+                    <RadzenBadge BadgeStyle="@WorkflowUi.StatusBadge(item.Status)" Text="@WorkflowUi.StatusText(item.Status)" IsPill="true" />
+                </Template>
+            </RadzenDataGridColumn>
+            @if (dataColumns.Count == 0)
+            {
+                <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="CreatedAt" Title="Oluşturma" Sortable="false" Width="165px">
+                    <Template Context="item">@WorkflowUi.FormatDate(item.CreatedAt, timeZone)</Template>
+                </RadzenDataGridColumn>
+            }
+            <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="UpdatedAt" Title="Güncelleme" Sortable="false" Width="165px">
+                <Template Context="item">@WorkflowUi.FormatDate(item.UpdatedAt, timeZone)</Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenCard>
+
+<WorkflowDialog Id="@($"{IdPrefix}-start-dialog")" Visible="@startOpen" Title="@($"Yeni başlat: {definition?.Title ?? Workflow}")" Busy="@starting" OnClose="CloseStartDialog">
+    <ChildContent>
+        <div class="middt-jsf-field">
+            <label for="@($"{IdPrefix}-start-key")" class="middt-jsf-label">İş anahtarı (opsiyonel)</label>
+            <RadzenTextBox Name="@($"{IdPrefix}-start-key")" id="@($"{IdPrefix}-start-key")" @bind-Value="startKey" MaxLength="200" class="middt-jsf-input"
+                           Placeholder="Aynı anahtarla tekrar başlatılırsa mevcut kayıt döner" />
+        </div>
+        <JsonSchemaForm @ref="startForm" Schema="@definition?.StartInputSchema" Value="@startPrefill" IdPrefix="@($"{IdPrefix}-start")" Disabled="@starting" />
+        @if (startErrors.Count > 0)
+        {
+            <ul class="middt-wf-errors" role="alert">
+                @foreach (var error in startErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        }
+    </ChildContent>
+    <FooterContent>
+        <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="CloseStartDialog" Disabled="@starting" />
+        <RadzenButton Text="Başlat" Icon="play_arrow" Click="StartAsync" IsBusy="@starting" BusyText="Başlatılıyor..." class="middt-wf-start-submit" />
+    </FooterContent>
+</WorkflowDialog>

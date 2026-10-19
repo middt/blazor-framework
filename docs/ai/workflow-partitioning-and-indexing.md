@@ -40,7 +40,7 @@ Developers and AI assistants do **not** need to manually write raw partition DDL
 
 When the API starts up:
 1. `WorkflowStartup` invokes `WorkflowPartitionManager.EnsurePartitionsAndIndexesAsync(...)`.
-2. The manager inspects all definitions loaded in `WorkflowRegistry` (from `demo/server/.../Workflows/*.json`).
+2. The manager inspects all definitions loaded in `WorkflowRegistry` (from `demo/Middt.Demo.Api/Workflows/*.json`).
 3. For each workflow:
    - Computes PascalCase suffix via `WorkflowPartitionManager.PartitionSuffix(workflowKey)`.
      *(e.g., `order-approval` $\to$ `OrderApproval`, `bike-repair_v2` $\to$ `BikeRepairV2`)*

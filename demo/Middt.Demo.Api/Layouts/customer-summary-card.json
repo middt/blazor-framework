@@ -1,0 +1,31 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "customer-summary-card",
+  "title": "Müşteri Kimlik & Profil Kartı (Reusable Widget Grubu)",
+  "kind": "view",
+  "version": 1,
+  "body": [
+    {
+      "widget": "section",
+      "title": "Müşteri Profili: {{ data.fullName }}",
+      "children": [
+        { "widget": "badge", "color": "success", "text": "KYC Skoru: {{ data.kycScore }} (Düşük Risk)", "visibleWhen": "data.kycScore != null && data.kycScore >= 750" },
+        { "widget": "badge", "color": "warning", "text": "KYC Skoru: {{ data.kycScore }} (Orta Risk)", "visibleWhen": "data.kycScore != null && data.kycScore >= 650 && data.kycScore < 750" },
+        { "widget": "badge", "color": "danger", "text": "KYC Skoru: {{ data.kycScore }} (Yüksek Risk)", "visibleWhen": "data.kycScore != null && data.kycScore < 650" },
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "T.C. Kimlik / Vergi No", "value": "{{ data.identityNumber }}", "visibleWhen": "data.identityNumber != null" },
+            { "label": "Müşteri Segmenti", "value": "{{ data.segment }}", "visibleWhen": "data.segment != null" },
+            { "label": "Risk Seviyesi", "value": "{{ data.riskLevel }}", "visibleWhen": "data.riskLevel != null" },
+            { "label": "Aylık Gelir / Ciro (₺)", "value": "{{ data.monthlyIncome }}", "format": "N2", "visibleWhen": "data.monthlyIncome != null" },
+            { "label": "E-posta", "value": "{{ data.email }}", "visibleWhen": "data.email != null" },
+            { "label": "Telefon", "value": "{{ data.phone }}", "visibleWhen": "data.phone != null" },
+            { "label": "Kaydı Açan", "value": "{{ data.requestedBy }}", "visibleWhen": "data.requestedBy != null" },
+            { "label": "Başvuru Zamanı", "value": "{{ data.requestedAt }}", "format": "g", "visibleWhen": "data.requestedAt != null" }
+          ]
+        }
+      ]
+    }
+  ]
+}

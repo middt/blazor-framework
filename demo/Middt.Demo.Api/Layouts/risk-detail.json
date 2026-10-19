@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "risk-detail",
+  "title": "Risk & Limit Değerlendirme Özeti",
+  "kind": "view",
+  "version": 3,
+  "body": [
+    {
+      "widget": "alert",
+      "severity": "warning",
+      "text": "Yüksek tutarlı işlem: Tahsis uzmanı alt akış incelemesi bekleniyor.",
+      "visibleWhen": "instance.state == \"manual-underwriting\""
+    },
+    {
+      "widget": "alert",
+      "severity": "success",
+      "text": "Risk ve limit değerlendirmesi onaylandı.",
+      "visibleWhen": "instance.state == \"approved\""
+    },
+    {
+      "widget": "alert",
+      "severity": "danger",
+      "text": "Risk değerlendirmesi reddedildi: {{ data.reason }}",
+      "visibleWhen": "instance.state == \"rejected\""
+    },
+    { "widget": "layout", "key": "risk-eval-card" },
+    { "widget": "layout", "key": "workflow-footer" }
+  ]
+}

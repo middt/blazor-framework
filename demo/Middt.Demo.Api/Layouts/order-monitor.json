@@ -1,0 +1,28 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "order-monitor",
+  "title": "Sipariş & Ödeme İzleme (Workflow JSON)",
+  "kind": "page",
+  "version": 2,
+  "body": [
+    { "widget": "heading", "text": "Sipariş & Ödeme İzleme (Workflow JSON Verisi)" },
+    { "widget": "link", "text": "Yeni Sipariş & Ödeme Başlat", "href": "/workflow/order-payment-orchestration?start=1", "style": "button" },
+    {
+      "widget": "grid",
+      "id": "orders",
+      "entity": "OrderPaymentOrchestration",
+      "columns": [
+        { "field": "key", "title": "Sipariş Anahtarı", "width": "170px" },
+        { "field": "customerName", "title": "Müşteri" },
+        { "field": "amount", "title": "Tutar", "format": "N2", "width": "140px" },
+        { "field": "paymentMethod", "title": "Ödeme Yöntemi", "width": "160px" },
+        { "field": "stateTitle", "title": "Akış Durumu", "width": "190px" },
+        { "field": "createdAt", "title": "Oluşturulma", "format": "g", "width": "160px" }
+      ],
+      "search": [
+        { "field": "customerName", "label": "Müşteri Adı" },
+        { "field": "paymentMethod", "label": "Ödeme Yöntemi" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+@namespace Middt.Framework.Blazor.Ui.Widgets
+@using System.Text.Json.Nodes
+@using Middt.Framework.Ui.Rendering
+
+<form class="middt-ui-form" novalidate @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+    @foreach (var field in Fields)
+    {
+        <UiFieldEditor @key="field.Field" Field="field" Target="Model" Context="Context" IdPrefix="ui-form" Disabled="busy"
+                       Error="@errors.GetValueOrDefault(field.Field)" OnChange="@(() => Revalidate(field))" />
+    }
+    @if (serverError is not null)
+    {
+        <div class="middt-ui-alert middt-ui-alert-danger" role="alert">@serverError</div>
+    }
+    <div class="middt-ui-toolbar">
+        <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Primary" Text="Kaydet" IsBusy="busy" BusyText="Kaydediliyor..." />
+        <RadzenButton ButtonStyle="ButtonStyle.Secondary" Text="İptal" Click="@(() => DialogService.Close(null))" Disabled="busy" />
+    </div>
+</form>
+
+@code {
+    private readonly Dictionary<string, string> errors = new(StringComparer.Ordinal);
+    private bool validated;
+    private bool busy;
+    private string? serverError;
+
+    [Inject]
+    private DialogService DialogService { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public List<UiField> Fields { get; set; } = [];
+
+    /// <summary>Copy of the record being edited (new object for create).</summary>
+    [Parameter, EditorRequired]
+    public JsonObject Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public UiRenderContext Context { get; set; } = default!;
+
+    /// <summary>Saves the model; returns an error message, or <c>null</c> on success (the dialog then closes with the model).</summary>
+    [Parameter, EditorRequired]
+    public Func<JsonObject, Task<string?>> Save { get; set; } = default!;
+
+    private void Revalidate(UiField field)
+    {
+        if (!validated)
+        {
+            return;
+        }
+
+        if (field.Validate(Model) is { } error)
+        {
+            errors[field.Field] = error;
+        }
+        else
+        {
+            errors.Remove(field.Field);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        validated = true;
+        errors.Clear();
+        foreach (var field in Fields)
+        {
+            if (field.Validate(Model) is { } error)
+            {
+                errors[field.Field] = error;
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return;
+        }
+
+        busy = true;
+        serverError = null;
+        try
+        {
+            serverError = await Save(Model);
+        }
+        finally
+        {
+            busy = false;
+        }
+
+        if (serverError is null)
+        {
+            DialogService.Close(Model);
+        }
+    }
+}

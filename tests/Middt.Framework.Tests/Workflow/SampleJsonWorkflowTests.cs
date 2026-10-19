@@ -18,7 +18,7 @@ using Middt.Framework.Workflow.Tasks;
 namespace Middt.Framework.Tests.Workflow;
 
 /// <summary>
-/// Comprehensive integration tests for all 5 JSON-backed demo workflows (<c>demo/server/Middt.Sample.Api/Workflows</c>) and
+/// Comprehensive integration tests for all 5 JSON-backed demo workflows (<c>demo/Middt.Demo.Api/Workflows</c>) and
 /// <see cref="WorkflowInstanceDataQuery"/> operating purely on <c>WorkflowDbContext</c> JSON documents without relational domain tables.
 /// </summary>
 public sealed class SampleJsonWorkflowTests
@@ -49,7 +49,7 @@ public sealed class SampleJsonWorkflowTests
 
     private static string[] SampleWorkflowFiles()
     {
-        var path = Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows");
+        var path = Path.Combine(RepositoryRoot(), "demo", "Middt.Demo.Api", "Workflows");
         return Directory.GetFiles(path, "*.json").Select(File.ReadAllText).ToArray();
     }
 
@@ -399,7 +399,7 @@ public sealed class SampleJsonWorkflowTests
         escalated.State.Should().Be("escalated");
 
         // Verify order-escalated layout renders cleanly for sla-escalation without any '⚠' expression error
-        var layoutPath = Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Layouts", "order-escalated.json");
+        var layoutPath = Path.Combine(RepositoryRoot(), "demo", "Middt.Demo.Api", "Layouts", "order-escalated.json");
         var layout = UiJson.Parse(File.ReadAllText(layoutPath));
         var uiOptions = new MiddtUiOptions();
         var renderedHtml = new UiHtmlRenderer(uiOptions.Widgets, Options.Create(uiOptions)).Render(

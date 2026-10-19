@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <ContainerRepository>middt-demo-angular</ContainerRepository>
+    <!-- The Angular demo (../angular-app) is built into wwwroot by the Dockerfile; local runs serve ../angular-app/dist (see Program.SpaWebRoot). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sdk\client\Middt.Framework.Bff\Middt.Framework.Bff.csproj" />
+    <ProjectReference Include="..\Middt.Demo.ServiceDefaults\Middt.Demo.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+
+</Project>

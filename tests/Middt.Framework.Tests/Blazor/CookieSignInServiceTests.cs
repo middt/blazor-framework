@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Middt.Framework.Api.Configuration.Model;
-using Middt.Framework.Blazor.Web.Security;
+using Middt.Framework.Blazor.Security;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Tests.Client;

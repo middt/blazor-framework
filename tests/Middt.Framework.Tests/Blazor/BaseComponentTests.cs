@@ -1,4 +1,4 @@
-using Middt.Framework.Blazor.Web.Base;
+using Middt.Framework.Blazor.Base;
 
 namespace Middt.Framework.Tests.Blazor;
 

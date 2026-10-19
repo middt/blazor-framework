@@ -21,10 +21,10 @@ Targets **.NET 10 (LTS)**.
 | Backend | `Middt.Framework.Ui.Server` | Layout store on EF Core (`ui` schema, revisions, optimistic concurrency), seeding, `MapMiddtUi()` REST API (incl. widgets and JSON Schema), plain C# static HTML renderer. |
 | Client SDK | `Middt.Framework.Client` | Typed API clients (`WorkflowApiClient`, `UiApiClient`, `UiDataClient`) on `IHttpClientFactory` + resilience, token refresh, SignalR client. |
 | Frontends | `Middt.Framework.Bff` | Backend-for-frontend blocks for any browser frontend: HttpOnly cookie session, server side token store with refresh, Login/Logout pages, `GET /bff/user`, YARP proxy of `/api` + `/hubs` with the session's token and CSRF protection (`AddMiddtSpaBff()` / `UseMiddtSpaBff()`). |
-| Blazor | `Middt.Framework.Blazor.Web` | The Blazor frontend: `AddMiddtBlazor()` / `UseMiddtBlazor()`, BFF cookie auth, workflow screens, SignalR; layout renderer under `Ui/` (`AddMiddtUi()`, display + interactive widgets, `UiPageHost`, `UiLayoutHost`, runtime `UiLayoutEditor`). |
-| TypeScript | `sdk/client/typescript/ui-core` (`@middt/ui-core`) | Types, portable expressions, formats, layout/data/workflow API clients for non-.NET frontends. |
-| Angular | `sdk/client/angular` (`@middt/angular`) | Angular 22 frontend library: BFF auth, layout renderer/widgets/editor, workflow list/detail/wizard, SignalR – see [sdk/client/angular/README.md](sdk/client/angular/README.md). Demo app: `demo/client/angular/app`. |
-| Plugins | `Middt.Framework.Plugin.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
+| Blazor | `Middt.Framework.Blazor` | The Blazor frontend: `AddMiddtBlazor()` / `UseMiddtBlazor()`, BFF cookie auth, workflow screens, SignalR; layout renderer under `Ui/` (`AddMiddtUi()`, display + interactive widgets, `UiPageHost`, `UiLayoutHost`, runtime `UiLayoutEditor`). |
+| TypeScript | `sdk/client/ui-core` (`@middt/ui-core`) | Types, portable expressions, formats, layout/data/workflow API clients for non-.NET frontends. |
+| Angular | `sdk/client/angular` (`@middt/angular`) | Angular 22 frontend library: BFF auth, layout renderer/widgets/editor, workflow list/detail/wizard, SignalR – see [sdk/client/angular/README.md](sdk/client/angular/README.md). Demo app: `demo/angular-app`. |
+| Plugins | `Middt.Framework.Rebus` | Messaging on [Rebus](https://github.com/rebus-org/Rebus/wiki) (MIT): `AddMiddtRebus()` with RabbitMQ or in-memory transport, publish/subscribe, send routing, retries and error queue. |
 
 **Middt Identity** (`identity/Middt.Identity`, not a package): the OAuth 2.0 / OpenID Connect server of Middt
 applications – one service, configured by appsettings / environment (database, issuer, certificate, clients, users).
@@ -33,29 +33,28 @@ Sign-in, registration, password reset and authenticator enrollment run as workfl
 
 ### Repository layout
 
-The repository has two halves with the same shape: **`sdk/`** (the framework) and **`demo/`** (the 100% backend-driven JSON sample).
-Each is split into `shared` (used by server and client), `server` and `client`, and `client` has one folder per
-frontend technology.
+The repository has two main folders: **`sdk/`** (the framework packages, split into `shared`, `server` and `client`) and
+**`demo/`** (the 100% backend-driven JSON demo).
 
 ```
 sdk/                              the framework (NuGet / npm packages)
   shared/                         Model · Expressions · Ui.Abstractions         contracts, no UI technology
-  server/                         Common · Api · Workflow · Ui.Server           backend, no frontend dependencies
-    plugins/                      Plugin.Rebus
+  server/                         Common · Api · Workflow · Ui.Server · Rebus   backend, no frontend dependencies
   client/
-    dotnet/                       Client                                        .NET client SDK (typed API clients)
-    typescript/ui-core/           @middt/ui-core                                TypeScript contract, expressions, API clients
-    bff/                          Bff                                           backend-for-frontend host blocks (Blazor + Angular)
-    blazor/                       Blazor.Web                                    Blazor frontend
-    angular/                      @middt/angular                                Angular frontend (library workspace)
-identity/Middt.Identity          the OAuth 2.0 / OpenID Connect server: one ready to run service (not an SDK package)
-demo/                             the workflow & server-driven UI sample
-  shared/                         ServiceDefaults
-  server/                         Sample.Api (+ Layouts/, Workflows/ seeds) · identity.json (demo settings of Middt Identity)
-  client/
-    blazor/                       Sample.BlazorServer
-    angular/                      Sample.Angular (BFF host) · app/ (Angular demo app using @middt/angular as a package)
-  Middt.Sample.AppHost            Aspire orchestration of everything
+    Middt.Framework.Client        .NET client SDK (typed API clients)
+    Middt.Framework.Bff           backend-for-frontend host blocks (Blazor + Angular)
+    Middt.Framework.Blazor        Blazor Server frontend (Radzen)
+    ui-core/                      @middt/ui-core – TypeScript contract, expressions, API clients
+    angular/                      @middt/angular – Angular frontend (library workspace)
+identity/Middt.Identity           the OAuth 2.0 / OpenID Connect server: one ready to run service (not an SDK package)
+demo/                             the 100% backend-driven JSON demo
+  Middt.Demo.AppHost              Aspire orchestration of everything
+  Middt.Demo.ServiceDefaults      Aspire OpenTelemetry & health defaults
+  Middt.Demo.Api                  API (+ Layouts/, Workflows/ seeds)
+  Middt.Demo.Blazor               Blazor Server demo
+  Middt.Demo.Angular              Angular BFF host
+  angular-app/                    Angular demo SPA using @middt/angular as a package
+  identity.json                   demo settings of Middt Identity
 spec/                             expressions.conformance.json · ui-layout.schema.json (shared by .NET and TypeScript)
 tests/  docs/
 ```
@@ -64,9 +63,9 @@ tests/  docs/
 
 ```
  Contracts      Model · Expressions (portable) · Ui.Abstractions · spec/*.json      ← shared by every layer and language
- Backend        Api · Workflow · Ui.Server · Common                                 ← no Razor/Blazor/Radzen
+ Backend        Api · Workflow · Ui.Server · Rebus · Common                         ← no Razor/Blazor/Radzen
  Client SDK     Client (typed HttpClient + resilience + token refresh)
- Frontends      BFF: Bff   Blazor: Blazor.Web   Angular: @middt/ui-core · @middt/angular
+ Frontends      BFF: Bff   Blazor: Blazor   Angular: @middt/ui-core · @middt/angular
 
  Blazor / Angular   UiPageHost / UiLayoutHost / WorkflowInstanceDetail ──► Middt.Framework.Client / @middt/ui-core
                                                                         │  HTTPS / JSON, RFC 9457 ProblemDetails on errors
@@ -140,7 +139,7 @@ builder.Services.AddMiddtWorkflow(o =>
 app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
 ```
 
-A definition ([full example](demo/server/Middt.Sample.Api/Workflows/customer-onboarding.json)):
+A definition ([full example](demo/Middt.Demo.Api/Workflows/customer-onboarding.json)):
 
 ```jsonc
 {
@@ -169,7 +168,7 @@ A definition ([full example](demo/server/Middt.Sample.Api/Workflows/customer-onb
 |---|---|
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
-| Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/server/Middt.Sample.Api/Workflows/credit-allocation.json) |
+| Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/Middt.Demo.Api/Workflows/credit-allocation.json) |
 | Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
 | Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
@@ -189,12 +188,12 @@ REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are 
 `POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`.
 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
-`Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
+`Middt.Framework.Blazor.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
 start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
 with a form generated from its input schema) and `JsonSchemaForm`. A schema property with
 `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` is rendered as a select of the
 entity's rows (same shape as the layout field `lookup`; the value type follows the property `type`). The demo has one
-generic page per workflow, `/workflow/{key}` (`demo/client/blazor/Middt.Sample.BlazorServer/Pages/Workflow/WorkflowPage.razor`,
+generic page per workflow, `/workflow/{key}` (`demo/Middt.Demo.Blazor/Pages/Workflow/WorkflowPage.razor`,
 menu group "İş Akışları"); `?start=1` opens the start dialog once (`WorkflowInstanceList.OpenStart`), `key` prefills
 its business key and every other parameter named like a start input property prefills that field (typed by the schema,
 e.g. `/workflow/customer-onboarding?start=1`); nothing starts before "Başlat", and these
@@ -212,7 +211,7 @@ idempotent across retries.
 Screens are data: a **layout** is a JSON tree of registered **widgets**, stored in the database and editable at
 runtime – no deployment for a new list page, a changed column or a new workflow state screen. Layouts never contain
 code or markup: only widget names, properties and sandboxed expressions, validated against the widget catalog.
-A layout is frontend independent: Blazor renders it today (`Middt.Framework.Blazor.Web`, namespace `Middt.Framework.Blazor.Web.Ui`), the API renders it to static
+A layout is frontend independent: Blazor renders it today (`Middt.Framework.Blazor`, namespace `Middt.Framework.Blazor.Ui`), the API renders it to static
 HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@middt/ui-core`).
 
 ```jsonc
@@ -277,7 +276,7 @@ HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@midd
 - **Custom widgets**: register the spec in the API – `o.AddWidget(spec, html)` (optional static HTML) – and an
   implementation in each frontend: `AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, `provideMiddtUiWidgets({ name, component })` in Angular.
 
-All screens in `demo/server/Middt.Sample.Api/Layouts` (`executive-overview`, `customer-directory`, `credit-pipeline`, `order-monitor`, `kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `customer-summary-card`, `risk-eval-card`, and `workflow-footer`) are 100% backend-driven JSON layouts.
+All screens in `demo/Middt.Demo.Api/Layouts` (`executive-overview`, `customer-directory`, `credit-pipeline`, `order-monitor`, `kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `customer-summary-card`, `risk-eval-card`, and `workflow-footer`) are 100% backend-driven JSON layouts.
 
 ## Messaging (Rebus)
 
@@ -395,11 +394,11 @@ The demo (`demo/`) runs on PostgreSQL (`middt_workflow` + `middt_identity`), Red
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
 ```bash
-dotnet run --project demo/Middt.Sample.AppHost
+dotnet run --project demo/Middt.Demo.AppHost
 ```
 
 The Aspire dashboard shows all resources, logs, traces and metrics. Set the PostgreSQL password once with
-`dotnet user-secrets set Parameters:postgres-password "<password>" --project demo/Middt.Sample.AppHost`
+`dotnet user-secrets set Parameters:postgres-password "<password>" --project demo/Middt.Demo.AppHost`
 (Aspire prompts for missing parameters otherwise).
 
 **With Docker Compose:**
@@ -426,10 +425,10 @@ Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/i
 dotnet build Middt.Framework.slnx
 dotnet test --solution Middt.Framework.slnx
 dotnet pack Middt.Framework.slnx -c Release -o artifacts
-(cd sdk/client/typescript/ui-core && node --test test/)     # TypeScript core, same conformance suite
-(cd sdk/client/typescript/ui-core && npm ci && npm run build)            # @middt/ui-core package
+(cd sdk/client/ui-core && node --test test/)     # TypeScript core, same conformance suite
+(cd sdk/client/ui-core && npm ci && npm run build)            # @middt/ui-core package
 (cd sdk/client/angular && npm ci && npx ng build middt-angular)           # @middt/angular package
-(cd demo/client/angular/app && npm ci && npx ng build sample)             # Angular demo app (consumes both packages)
+(cd demo/angular-app && npm ci && npx ng build sample)             # Angular demo app (consumes both packages)
 (cd tests/e2e && npm ci && npx playwright install chromium && npm test)    # full-stack browser + PostgreSQL smoke tests (Compose running)
 ```
 

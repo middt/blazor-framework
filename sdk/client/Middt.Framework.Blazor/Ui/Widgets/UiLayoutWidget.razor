@@ -1,0 +1,115 @@
+@namespace Middt.Framework.Blazor.Ui.Widgets
+@using System.Text.Json.Nodes
+@using Microsoft.Extensions.DependencyInjection
+@using Middt.Framework.Blazor.Ui.Components
+@using Middt.Framework.Expressions.Portable
+@using Middt.Framework.Ui.Model
+@using Middt.Framework.Ui.Rendering
+@inherits UiWidgetBase
+@implements IDisposable
+
+@if (loading)
+{
+    <p class="middt-ui-text middt-ui-text-muted" role="status">Yükleniyor...</p>
+}
+else if (error is not null)
+{
+    <div class="middt-ui-alert middt-ui-alert-warning" role="alert">@error</div>
+}
+else if (layout is not null && childContext is not null)
+{
+    <UiNodeList Nodes="layout.Body" Context="childContext" />
+}
+
+@code {
+    private const int MaxDepth = 5;
+    private const string DepthKey = "__layoutDepth";
+
+    private readonly CancellationTokenSource cancellation = new();
+    private UiLayoutDocument? layout;
+    private string? loadedKey;
+    private string? error;
+    private bool loading = true;
+    private UiRenderContext? childContext;
+    private UiRenderContext? cachedParent;
+    private string? cachedDataExpr;
+
+    [Inject]
+    private IServiceProvider Services { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var depth = Context[DepthKey] is JsonValue dv && dv.TryGetValue<int>(out var d) ? d : 0;
+        if (depth >= MaxDepth)
+        {
+            loading = false;
+            error = $"Alt yerleşim derinlik sınırı ({MaxDepth}) aşıldı.";
+            return;
+        }
+
+        if (Services.GetService<UiApiClient>() is not { } client)
+        {
+            loading = false;
+            error = "JSON yerleşimler için services.AddMiddtUi() çağrılmalıdır.";
+            return;
+        }
+
+        var key = Node.StringProp("key") ?? string.Empty;
+        if (key != loadedKey)
+        {
+            loadedKey = key;
+            layout = null;
+            error = null;
+            childContext = null;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                loading = false;
+                return;
+            }
+
+            loading = true;
+            try
+            {
+                var response = await client.GetAsync(key, cancellation.Token);
+                layout = response.IsSuccess ? response.Data : null;
+                error = layout is null ? $"'{key}' yerleşimi yüklenemedi: {response.ErrorText}" : null;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+            finally
+            {
+                loading = false;
+            }
+        }
+
+        var dataExpr = Node.StringProp("data");
+        if (layout is not null && (childContext is null || !ReferenceEquals(cachedParent, Context) || cachedDataExpr != dataExpr))
+        {
+            var nextContext = Context.With(DepthKey, JsonValue.Create(depth + 1));
+            if (!string.IsNullOrWhiteSpace(dataExpr))
+            {
+                try
+                {
+                    var scopedData = UiExpressions.Evaluator.EvaluateToNode(dataExpr, Context.ToExpressionContext())?.DeepClone();
+                    nextContext = nextContext.With(UiExpressions.Data, scopedData);
+                }
+                catch (PortableExpressionException)
+                {
+                    nextContext = nextContext.With(UiExpressions.Data, null);
+                }
+            }
+
+            childContext = nextContext;
+            cachedParent = Context;
+            cachedDataExpr = dataExpr;
+        }
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <Product>Middt Framework BFF</Product>
+    <Description>Backend-for-frontend host building blocks for any browser frontend (Blazor Server, Angular, React): HttpOnly cookie session, server side token store with refresh, login/logout pages, /bff/user and a YARP proxy that forwards /api and /hubs to the API with the session's token. Tokens never reach the browser.</Description>
+    <IsPackable>true</IsPackable>
+    <!-- Ships the Razor Pages Account/Login and Account/Logout. -->
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Yarp.ReverseProxy" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\server\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+    <ProjectReference Include="..\Middt.Framework.Client\Middt.Framework.Client.csproj" />
+  </ItemGroup>
+
+</Project>

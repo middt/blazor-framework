@@ -1,0 +1,11 @@
+@page "/ui-admin"
+@attribute [Authorize(Roles = "ui-admin")]
+@using Middt.Framework.Blazor.Ui
+@using Middt.Demo.Blazor.Service
+
+<UiLayoutEditor OnChanged="MenuService.RefreshAsync" />
+
+@code {
+    [Inject]
+    private MenuService MenuService { get; set; } = default!;
+}

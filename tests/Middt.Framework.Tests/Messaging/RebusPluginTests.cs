@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Middt.Framework.Plugin.Rebus;
+using Middt.Framework.Rebus;
 using Rebus.Bus;
 using Rebus.Handlers;
 using Rebus.Transport.InMem;

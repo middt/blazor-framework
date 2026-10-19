@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: sdk/client/typescript/ui-core
+        working-directory: sdk/client/ui-core
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +68,7 @@ jobs:
           node-version: 24
 
       - name: Build @middt/ui-core
-        working-directory: sdk/client/typescript/ui-core
+        working-directory: sdk/client/ui-core
         run: npm ci && npm run build
 
       - name: Build @middt/angular
@@ -80,7 +80,7 @@ jobs:
         run: npx ng test --watch=false
 
       - name: Build demo app
-        working-directory: demo/client/angular/app
+        working-directory: demo/angular-app
         run: npm ci && npx ng build sample --configuration production
 
   full-stack-e2e:

@@ -1,0 +1,44 @@
+@page "/"
+@namespace Middt.Demo.Blazor.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Middt Sample</title>
+    <base href="~/" />
+    @* "~/" URLs are resolved to fingerprinted (immutable cached) files through MapRazorPages().WithStaticAssets(). *@
+    <link rel="stylesheet" href="~/css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/_content/Middt.Framework.Blazor/framework.css" />
+    <link rel="stylesheet" href="~/_content/Middt.Framework.Blazor/middt-ui.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    @* Static: an interactive root component would replace the <link> when the circuit starts (second request). Theme switches
+       go through ThemeService (Radzen.setTheme swaps the href); MainLayout initialises the circuit's ThemeService. *@
+    <component type="typeof(Radzen.Blazor.RadzenTheme)" render-mode="Static" param-Theme="@Middt.Demo.Blazor.Shared.MainLayout.DefaultTheme" />
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+    @* Hands data loaded while prerendering (menu, layouts) over to the circuit instead of loading it twice. *@
+    <persist-component-state />
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            Bir hata oluştu. Sayfayı yeniden yüklemeniz gerekebilir.
+        </environment>
+        <environment include="Development">
+            An unhandled exception has occurred. See browser dev tools for details.
+        </environment>
+        <a href="" class="reload">Yeniden yükle</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="~/_framework/blazor.server.js"></script>
+    <script src="~/_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script src="~/_content/Middt.Framework.Blazor/framework.js"></script>
+</body>
+</html>

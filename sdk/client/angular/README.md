@@ -1,25 +1,25 @@
 # Middt Angular
 
-Angular 22 frontend of the Middt framework – the counterpart of `Middt.Framework.Blazor.Web`. Both frontends talk to the
+Angular 22 frontend of the Middt framework – the counterpart of `Middt.Framework.Blazor`. Both frontends talk to the
 same API, render the same JSON layouts and drive the same workflows.
 
 This workspace contains only the library **`@middt/angular`** (`projects/middt-angular`): BFF authentication, layout
 renderer + widgets + runtime editor, workflow list/detail/wizard/JSON Schema forms, SignalR, notifications. It is built on
-[`@middt/ui-core`](../typescript/ui-core) (consumed as a package) and Angular Material.
+[`@middt/ui-core`](../ui-core) (consumed as a package) and Angular Material.
 
-The demo app lives in [`demo/client/angular/app`](../../../demo/client/angular/app) and uses both packages exactly like
-any application would; it is served by the BFF host [`demo/client/angular/Middt.Sample.Angular`](../../../demo/client/angular/Middt.Sample.Angular)
+The demo app lives in [`demo/angular-app`](../../../demo/angular-app) and uses both packages exactly like
+any application would; it is served by the BFF host [`demo/Middt.Demo.Angular`](../../../demo/Middt.Demo.Angular)
 (cookie session, server side tokens, `/api` + `/hubs` proxy) – the browser never sees a token.
 
 ## Build
 
 ```bash
-(cd ../typescript/ui-core && npm ci && npm run build)    # @middt/ui-core → dist (dependency of the library)
+(cd ../ui-core && npm ci && npm run build)                # @middt/ui-core → dist (dependency of the library)
 npm ci && npx ng build middt-angular                      # @middt/angular → dist/middt-angular (ng-packagr)
 ```
 
 Run the demo: `docker compose up --build` from the repository root → <http://localhost:8081> (test@test.com / test), or
-for live reload `cd demo/client/angular/app && npm ci && npx ng serve sample` (http://localhost:4200, proxies to the BFF
+for live reload `cd demo/angular-app && npm ci && npx ng serve sample` (http://localhost:4200, proxies to the BFF
 on :8081). The demo links the packages with `file:` dependencies and `preserveSymlinks`, so a rebuilt library is picked
 up without reinstalling.
 

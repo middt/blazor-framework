@@ -1,7 +1,7 @@
 # sdk/client/angular – Angular frontend library (read the root AGENTS.md first)
 
 Workspace with one library: `projects/middt-angular` → package **`@middt/angular`** (ng-packagr). The demo app is
-NOT here (`demo/client/angular/app`). Depends on `@middt/ui-core` as a `file:` package – build ui-core first.
+NOT here (`demo/angular-app`). Depends on `@middt/ui-core` as a `file:` package – build ui-core first.
 
 ```bash
 (cd ../typescript/ui-core && npm run build) && npx ng build middt-angular

@@ -7,10 +7,10 @@ public sealed class SharedStylesTests
     public void Blazor_and_ui_core_ship_identical_layout_styles()
     {
         var root = RepositoryRoot();
-        var uiCore = File.ReadAllText(Path.Combine(root, "sdk", "client", "typescript", "ui-core", "styles", "middt-ui.css"));
-        var blazor = File.ReadAllText(Path.Combine(root, "sdk", "client", "blazor", "Middt.Framework.Blazor.Web", "wwwroot", "middt-ui.css"));
+        var uiCore = File.ReadAllText(Path.Combine(root, "sdk", "client", "ui-core", "styles", "middt-ui.css"));
+        var blazor = File.ReadAllText(Path.Combine(root, "sdk", "client", "Middt.Framework.Blazor", "wwwroot", "middt-ui.css"));
 
-        blazor.Should().Be(uiCore, "copy sdk/client/typescript/ui-core/styles/middt-ui.css to the Blazor wwwroot (or the other way round)");
+        blazor.Should().Be(uiCore, "copy sdk/client/ui-core/styles/middt-ui.css to the Blazor wwwroot (or the other way round)");
     }
 
     private static string RepositoryRoot()

@@ -1,8 +1,8 @@
 # Architecture: contracts, backend, frontends
 
 Middt is split so that the **frontend technology is replaceable**. Two frontends run side by side against the same API,
-workflows and layouts: Blazor Server (`sdk/client/blazor`) and Angular (`sdk/client/angular`). Both sit behind the same
-backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API token.
+workflows and layouts: Blazor Server (`sdk/client/Middt.Framework.Blazor`) and Angular (`sdk/client/angular`). Both sit behind the same
+backend-for-frontend blocks (`sdk/client/Middt.Framework.Bff`), so no frontend ever holds an API token.
 
 ```
                          ┌────────────────────────────── 1. Contracts (no UI technology) ──────────────────────────────┐
@@ -13,13 +13,13 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
                          └───────────────▲───────────────────────────────▲──────────────────────────────▲───────────────┘
                                          │                               │                              │ same rules
 ┌──────────── 2. Backend ────────────────┴───┐   ┌──── 3. .NET client SDK ──┴──────┐   ┌──── TypeScript ───┴────────────┐
-│ Api, Common (server helpers)               │   │ Middt.Framework.Client           │   │ sdk/client/typescript/ui-core     │
+│ Api, Common (server helpers)               │   │ Middt.Framework.Client           │   │ sdk/client/ui-core     │
 │ Workflow   (engine; IWorkflowViewRenderer, │   │ typed workflow/layout/data       │   │ @middt/ui-core: types,         │
 │             WorkflowInstanceDataQuery)      │   │ clients, token refresh, SignalR  │   │ expressions, formats, clients  │
 │ Ui.Server  (layout store, REST, schema,    │   └───────────────▲──────────────────┘   └───────────────▲────────────────┘
 │            plain C# static HTML renderer)  │                   │                                      │
-│ Plugins: Rebus                             │   ┌──── 4. Blazor frontend ┴──────────┐   ┌──── Angular frontend ─────────┴┐
-└─────────────────────▲──────────────────────┘   │ Blazor.Web  BFF auth, workflow    │   │ @middt/angular: widgets as     │
+│ Rebus      (RabbitMQ / in-memory messaging)│   ┌──── 4. Blazor frontend ┴──────────┐   ┌──── Angular frontend ─────────┴┐
+└─────────────────────▲──────────────────────┘   │ Blazor      BFF auth, workflow    │   │ @middt/angular: widgets as     │
                       │  HTTPS / JSON (REST,     │             screens, layout       │   │ Angular components, BFF/cookie │
                       │  ProblemDetails)         │             widgets + editor (Ui/)│   │ auth, workflow screens         │
                       └──────────────────────────└───────────────────────────────────┘   └────────────────────────────────┘
@@ -30,7 +30,7 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 | Layer | May reference | Must not reference |
 |---|---|---|
 | Contracts | BCL, each other (Model ← Expressions ← Ui.Abstractions) | ASP.NET Core UI, Razor, Radzen, EF Core |
-| Backend | Contracts, EF Core, ASP.NET Core | Client, Bff, Blazor.Web, Radzen |
+| Backend | Contracts, EF Core, ASP.NET Core | Client, Bff, Blazor, Radzen |
 | Client SDK | Contracts | Backend, any UI technology |
 | Blazor frontend | Contracts, Client, Bff, Common (host helpers) | Backend engine packages (Workflow, Ui.Server, Api) |
 
@@ -46,13 +46,13 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
    `spec/expressions.conformance.json` is executed by both test suites, so they cannot drift apart. Workflow rules and
    mappings run only on the server and keep the richer C# (DynamicExpresso) dialect.
 4. **Formats and CSS** – value formats are limited to a portable set (`N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`);
-   display widgets share the `middt-ui-*` CSS classes (`sdk/client/blazor/Middt.Framework.Blazor.Web/wwwroot/middt-ui.css`).
+   display widgets share the `middt-ui-*` CSS classes (`sdk/client/Middt.Framework.Blazor/wwwroot/middt-ui.css`).
 
 ## Renderers of a layout
 
 | Renderer | Where | Widgets |
 |---|---|---|
-| Blazor (interactive) | `Middt.Framework.Blazor.Web` (`Ui/`) | display widgets + `grid`/`record`/`layout` (Radzen) |
+| Blazor (interactive) | `Middt.Framework.Blazor` (`Ui/`) | display widgets + `grid`/`record`/`layout` (Radzen) |
 | Static HTML | `Middt.Framework.Ui.Server` (`UiHtmlRenderer`, plain C#) | display widgets; interactive ones render a placeholder |
 | Angular | `@middt/angular` on top of `@middt/ui-core` | same names, Angular components (Material) |
 
@@ -62,9 +62,9 @@ widgets can also be defined in pure JSON (`kind: "view"`) and embedded via `{ "w
 
 ## How the Angular frontend was added (and how to add another)
 
-1. **Workspace**: `sdk/client/angular` (Angular 22 + Material) with the library `@middt/angular` (demo app in `demo/client/angular/app`); it
+1. **Workspace**: `sdk/client/angular` (Angular 22 + Material) with the library `@middt/angular` (demo app in `demo/angular-app`); it
    consumes `@middt/ui-core` as a `file:` package.
-2. **Authentication**: the SPA is served by a BFF host (`demo/client/angular/Middt.Sample.Angular`: `AddMiddtSpaBff()` +
+2. **Authentication**: the SPA is served by a BFF host (`demo/Middt.Demo.Angular`: `AddMiddtSpaBff()` +
    `UseMiddtSpaBff()`). It owns the cookie session and the tokens, serves the server rendered login/logout pages,
    `GET /bff/user`, and proxies `/api/**` and `/hubs/**` (YARP, WebSockets included) to the API with the session's
    access token, refreshing it before it expires. CSRF: API calls carry an `X-CSRF` header, WebSocket upgrades must be
@@ -109,9 +109,7 @@ instance's stored version of `roles` and `instanceAccess`, rather than the newes
 
 ## Project map
 
-Folders follow the layers: `sdk/shared` (contracts), `sdk/server` (backend + plugins), `sdk/client/{dotnet,typescript,bff,blazor,angular}`
-(everything a frontend needs, one folder per technology), and the same shape for the sample in `demo/{shared,server,client}`;
-`spec`, `tests`, `docs` at the root.
+Folders follow the layers: `sdk/shared` (contracts), `sdk/server` (backend), `sdk/client` (`.NET` client SDK, BFF, Blazor, TypeScript `ui-core`, Angular), `identity/Middt.Identity`, and `demo/` (`Middt.Demo.*` + `angular-app`); `spec`, `tests`, `docs` at the root.
 
 | Project | Layer | Notes |
 |---|---|---|
@@ -122,8 +120,9 @@ Folders follow the layers: `sdk/shared` (contracts), `sdk/server` (backend + plu
 | Middt.Framework.Api | backend | hosting, controllers, JWT, ProblemDetails, OpenAPI |
 | Middt.Framework.Workflow | backend | engine, endpoints, `IWorkflowViewRenderer`, `WorkflowInstanceDataQuery` |
 | Middt.Framework.Ui.Server | backend | layout store, endpoints, `UiHtmlRenderer` |
+| Middt.Framework.Rebus | backend | messaging on Rebus (RabbitMQ / in-memory), `publish` workflow task |
 | Middt.Framework.Client | client SDK | typed API clients, token refresh, SignalR client |
 | Middt.Framework.Bff | frontends | cookie session, token store + refresh, login pages, `/bff/user`, `/api` + `/hubs` proxy (YARP) |
-| Middt.Framework.Blazor.Web | Blazor | BFF auth, workflow screens, layout widgets/hosts/editor (`Ui/`) |
-| sdk/client/typescript/ui-core | TypeScript | `@middt/ui-core` – contract, expressions, formats, layout/data/workflow clients |
-| sdk/client/angular | Angular | `@middt/angular` library workspace (demo app: `demo/client/angular/app`) |
+| Middt.Framework.Blazor | Blazor | BFF auth, workflow screens (`Workflow/`), layout widgets/hosts/editor (`Ui/`) |
+| sdk/client/ui-core | TypeScript | `@middt/ui-core` – contract, expressions, formats, layout/data/workflow clients |
+| sdk/client/angular | Angular | `@middt/angular` library workspace (demo app: `demo/angular-app`) |
