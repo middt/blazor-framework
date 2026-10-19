@@ -24,6 +24,9 @@ namespace Middt.Identity;
 public static class MiddtIdentityEndpoints
 {
     public const string AuthorizePath = "connect/authorize";
+    public const string PushedAuthorizationPath = "connect/par";
+    public const string DeviceAuthorizationPath = "connect/device";
+    public const string EndUserVerificationPath = "connect/verify";
     public const string TokenPath = "connect/token";
     public const string UserInfoPath = "connect/userinfo";
     public const string EndSessionPath = "connect/logout";
@@ -34,15 +37,16 @@ public static class MiddtIdentityEndpoints
     public const string ConsentDeniedParameter = "middt_consent_denied";
 
     /// <summary>
-    /// Maps <c>/connect/authorize</c>, <c>/connect/token</c>, <c>/connect/userinfo</c>, <c>/connect/logout</c> (passthrough
-    /// parts of the protocol; discovery, keys, revocation and introspection are answered by OpenIddict itself) and
-    /// <c>GET /account/journey/{id}/complete</c>.
+    /// Maps <c>/connect/authorize</c>, <c>/connect/verify</c>, <c>/connect/token</c>, <c>/connect/userinfo</c>, <c>/connect/logout</c>
+    /// (passthrough parts of the protocol; discovery, keys, PAR, device authorization, revocation and introspection are answered by OpenIddict itself)
+    /// and <c>GET /account/journey/{id}/complete</c>.
     /// </summary>
     public static IEndpointRouteBuilder MapMiddtIdentity(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapMethods("/" + AuthorizePath, [HttpMethods.Get, HttpMethods.Post], (Delegate)AuthorizeAsync).ExcludeFromDescription().DisableAntiforgery();
+        endpoints.MapMethods("/" + EndUserVerificationPath, [HttpMethods.Get, HttpMethods.Post], (Delegate)VerifyAsync).ExcludeFromDescription().DisableAntiforgery();
         endpoints.MapPost("/" + TokenPath, (Delegate)TokenAsync).ExcludeFromDescription().DisableAntiforgery();
         endpoints.MapMethods("/" + UserInfoPath, [HttpMethods.Get, HttpMethods.Post], (Delegate)UserInfoAsync).ExcludeFromDescription().DisableAntiforgery();
         endpoints.MapMethods("/" + EndSessionPath, [HttpMethods.Get, HttpMethods.Post], (Delegate)EndSessionAsync).ExcludeFromDescription().DisableAntiforgery();
@@ -135,6 +139,94 @@ public static class MiddtIdentityEndpoints
         identity.SetAuthorizationId(await authorizations.GetIdAsync(permanent, cancellationToken));
         identity.SetDestinations(GetDestinations);
         return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    // ───────────────────────────── device verify ─────────────────────────────
+
+    private static async Task<IResult> VerifyAsync(HttpContext context, CancellationToken cancellationToken)
+    {
+        var services = context.RequestServices;
+        var request = context.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+        var users = services.GetRequiredService<UserManager<MiddtIdentityUser>>();
+        var journeys = services.GetRequiredService<IAuthJourneyService>();
+
+        var session = await context.AuthenticateAsync(MiddtIdentityDefaults.CookieScheme);
+        var user = session.Succeeded ? await MiddtIdentitySession.GetValidUserAsync(users, session.Principal) : null;
+        if (user is null)
+        {
+            var returnUrl = HttpMethods.IsGet(context.Request.Method)
+                ? AuthorizeUrl(context)
+                : MiddtIdentityDefaults.DevicePath;
+            var handle = await journeys.StartAsync(AuthJourneys.Login, new AuthJourneyStart { ReturnUrl = returnUrl }, cancellationToken);
+            AuthJourneyCookie.Write(context, handle);
+            return Results.Redirect(MiddtIdentityDefaults.JourneyPath(handle.Id));
+        }
+
+        if (HttpMethods.IsGet(context.Request.Method))
+        {
+            if (string.IsNullOrWhiteSpace(request.UserCode))
+            {
+                return Results.Redirect(MiddtIdentityDefaults.DevicePath);
+            }
+
+            var check = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            if (!check.Succeeded || check.Principal is null)
+            {
+                return Results.Redirect(MiddtIdentityDefaults.DevicePath + "?error=invalid_code");
+            }
+
+            return Results.Redirect($"{MiddtIdentityDefaults.DevicePath}?user_code={Uri.EscapeDataString(request.UserCode)}");
+        }
+
+        if (context.Request.Headers.TryGetValue("Sec-Fetch-Site", out var fetchSite)
+            && !string.Equals(fetchSite, "same-origin", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fetchSite, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.StatusCode(StatusCodes.Status400BadRequest);
+        }
+
+        var result = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        if (!result.Succeeded || result.Principal is null)
+        {
+            return Results.Redirect(MiddtIdentityDefaults.DevicePath + "?error=invalid_code");
+        }
+
+        var decision = context.Request.HasFormContentType ? context.Request.Form["decision"].ToString() : null;
+        if (string.Equals(decision, "deny", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Forbid(
+                new AuthenticationProperties { RedirectUri = MiddtIdentityDefaults.DevicePath + "?status=denied" },
+                [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+        }
+
+        var scopes = result.Principal.GetScopes();
+        var identity = await CreateIdentityAsync(services, user, scopes, cancellationToken);
+        if (MiddtIdentitySession.GetAuthenticationTime(session.Principal) is { } authenticatedAt)
+        {
+            identity.SetClaim(Claims.AuthenticationTime, authenticatedAt.ToUnixTimeSeconds());
+        }
+
+        var applications = services.GetRequiredService<IOpenIddictApplicationManager>();
+        var authorizations = services.GetRequiredService<IOpenIddictAuthorizationManager>();
+        if (result.Principal.GetClaim(Claims.ClientId) is { Length: > 0 } clientId
+            && await applications.FindByClientIdAsync(clientId, cancellationToken) is { } application)
+        {
+            var applicationId = await applications.GetIdAsync(application, cancellationToken) ?? string.Empty;
+            object? permanent = null;
+            await foreach (var authorization in authorizations.FindAsync(user.Id, applicationId, Statuses.Valid, AuthorizationTypes.Permanent, scopes, cancellationToken))
+            {
+                permanent = authorization;
+            }
+
+            permanent ??= await authorizations.CreateAsync(identity, user.Id, applicationId, AuthorizationTypes.Permanent, scopes, cancellationToken);
+            identity.SetAuthorizationId(await authorizations.GetIdAsync(permanent, cancellationToken));
+        }
+
+        identity.SetDestinations(GetDestinations);
+        return Results.SignIn(
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties { RedirectUri = MiddtIdentityDefaults.DevicePath + "?status=approved" },
+            OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     /// <summary>Local URL of the current authorize request (form posts become a query string) without <c>prompt</c> and the denial marker.</summary>
@@ -230,9 +322,9 @@ public static class MiddtIdentityEndpoints
         var services = context.RequestServices;
         var request = context.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
+        if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType() || request.IsDeviceCodeGrantType())
         {
-            // The code/refresh token was validated by OpenIddict; the user must still exist and be allowed to sign in.
+            // The code/refresh/device token was validated by OpenIddict; the user must still exist and be allowed to sign in.
             var result = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             var users = services.GetRequiredService<UserManager<MiddtIdentityUser>>();
             var options = services.GetRequiredService<IOptions<MiddtIdentityOptions>>().Value;
@@ -248,29 +340,118 @@ public static class MiddtIdentityEndpoints
             return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
+        if (request.IsPasswordGrantType())
+        {
+            var users = services.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            var options = services.GetRequiredService<IOptions<MiddtIdentityOptions>>().Value;
+            var userName = request.Username ?? string.Empty;
+            var user = await users.FindByNameAsync(userName) ?? await users.FindByEmailAsync(userName);
+            if (user is null || await users.IsLockedOutAsync(user) || (options.RequireConfirmedEmail && !user.EmailConfirmed))
+            {
+                return Forbid(Errors.InvalidGrant, "Kullanıcı adı veya şifre hatalı.");
+            }
+
+            if (await users.GetTwoFactorEnabledAsync(user))
+            {
+                return Forbid(Errors.InvalidGrant, "İki adımlı doğrulama etkin hesaplarda şifre grant türü kullanılamaz.");
+            }
+
+            if (!await users.CheckPasswordAsync(user, request.Password ?? string.Empty))
+            {
+                if (users.SupportsUserLockout)
+                {
+                    await users.AccessFailedAsync(user);
+                }
+
+                return Forbid(Errors.InvalidGrant, "Kullanıcı adı veya şifre hatalı.");
+            }
+
+            if (users.SupportsUserLockout)
+            {
+                await users.ResetAccessFailedCountAsync(user);
+            }
+
+            user.LastLoginAt = services.GetRequiredService<TimeProvider>().GetUtcNow();
+            await users.UpdateAsync(user);
+
+            var identity = await CreateIdentityAsync(services, user, request.GetScopes(), cancellationToken);
+            identity.SetDestinations(GetDestinations);
+            return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        if (request.IsTokenExchangeGrantType())
+        {
+            var result = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            var subject = result.Principal?.GetClaim(Claims.Subject);
+            if (string.IsNullOrEmpty(subject))
+            {
+                return Forbid(Errors.InvalidGrant, "Belirteç artık geçerli değil.");
+            }
+
+            var requestedScopes = request.GetScopes();
+            var scopes = requestedScopes.IsDefaultOrEmpty ? result.Principal!.GetScopes() : requestedScopes;
+            var users = services.GetRequiredService<UserManager<MiddtIdentityUser>>();
+            var options = services.GetRequiredService<IOptions<MiddtIdentityOptions>>().Value;
+            var user = await users.FindByIdAsync(subject);
+            if (user is not null)
+            {
+                if (await users.IsLockedOutAsync(user) || (options.RequireConfirmedEmail && !user.EmailConfirmed))
+                {
+                    return Forbid(Errors.InvalidGrant, "Belirteç artık geçerli değil.");
+                }
+
+                var identity = await CreateIdentityAsync(services, user, scopes, cancellationToken);
+                if (!string.IsNullOrEmpty(request.ClientId))
+                {
+                    identity.SetClaim("act", new System.Text.Json.Nodes.JsonObject { [Claims.Subject] = request.ClientId });
+                }
+
+                identity.SetDestinations(GetDestinations);
+                return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            var applications = services.GetRequiredService<IOpenIddictApplicationManager>();
+            if (await applications.FindByClientIdAsync(subject, cancellationToken) is { } subjectApplication)
+            {
+                return await SignInClientAsync(services, applications, subjectApplication, subject, scopes, cancellationToken);
+            }
+
+            return Forbid(Errors.InvalidGrant, "Belirteç artık geçerli değil.");
+        }
+
         if (request.IsClientCredentialsGrantType())
         {
             var applications = services.GetRequiredService<IOpenIddictApplicationManager>();
             var application = await applications.FindByClientIdAsync(request.ClientId!, cancellationToken)
                 ?? throw new InvalidOperationException("The client application cannot be found.");
 
-            var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
-            identity.SetClaim(Claims.Subject, request.ClientId)
-                .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application, cancellationToken) ?? request.ClientId);
-            var scopes = request.GetScopes();
-            identity.SetScopes(scopes);
-            var resources = new List<string>();
-            await foreach (var resource in services.GetRequiredService<IOpenIddictScopeManager>().ListResourcesAsync(scopes, cancellationToken))
-            {
-                resources.Add(resource);
-            }
-
-            identity.SetResources(resources);
-            identity.SetDestinations(_ => [Destinations.AccessToken]);
-            return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            return await SignInClientAsync(services, applications, application, request.ClientId!, request.GetScopes(), cancellationToken);
         }
 
         return Forbid(Errors.UnsupportedGrantType, "Desteklenmeyen grant türü.");
+    }
+
+    private static async Task<IResult> SignInClientAsync(
+        IServiceProvider services,
+        IOpenIddictApplicationManager applications,
+        object application,
+        string clientId,
+        ImmutableArray<string> scopes,
+        CancellationToken cancellationToken)
+    {
+        var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, Claims.Name, Claims.Role);
+        identity.SetClaim(Claims.Subject, clientId)
+            .SetClaim(Claims.Name, await applications.GetDisplayNameAsync(application, cancellationToken) ?? clientId);
+        identity.SetScopes(scopes);
+        var resources = new List<string>();
+        await foreach (var resource in services.GetRequiredService<IOpenIddictScopeManager>().ListResourcesAsync(scopes, cancellationToken))
+        {
+            resources.Add(resource);
+        }
+
+        identity.SetResources(resources);
+        identity.SetDestinations(_ => [Destinations.AccessToken]);
+        return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     // ───────────────────────────── userinfo ─────────────────────────────

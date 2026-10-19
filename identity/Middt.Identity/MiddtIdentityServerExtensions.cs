@@ -131,6 +131,9 @@ public static class MiddtIdentityServerExtensions
                 }
 
                 server.SetAuthorizationEndpointUris(MiddtIdentityEndpoints.AuthorizePath)
+                    .SetPushedAuthorizationEndpointUris(MiddtIdentityEndpoints.PushedAuthorizationPath)
+                    .SetDeviceAuthorizationEndpointUris(MiddtIdentityEndpoints.DeviceAuthorizationPath)
+                    .SetEndUserVerificationEndpointUris(MiddtIdentityEndpoints.EndUserVerificationPath, MiddtIdentityDefaults.DevicePath.TrimStart('/'))
                     .SetTokenEndpointUris(MiddtIdentityEndpoints.TokenPath)
                     .SetUserInfoEndpointUris(MiddtIdentityEndpoints.UserInfoPath)
                     .SetEndSessionEndpointUris(MiddtIdentityEndpoints.EndSessionPath)
@@ -140,6 +143,9 @@ public static class MiddtIdentityServerExtensions
                 server.AllowAuthorizationCodeFlow()
                     .AllowRefreshTokenFlow()
                     .AllowClientCredentialsFlow()
+                    .AllowDeviceAuthorizationFlow()
+                    .AllowPasswordFlow()
+                    .AllowTokenExchangeFlow()
                     .RequireProofKeyForCodeExchange();
 
                 server.RegisterScopes(Scopes.OpenId, Scopes.Profile, Scopes.Email, Scopes.Roles, Scopes.OfflineAccess);
@@ -156,6 +162,7 @@ public static class MiddtIdentityServerExtensions
 
                 var aspNetCore = server.UseAspNetCore()
                     .EnableAuthorizationEndpointPassthrough()
+                    .EnableEndUserVerificationEndpointPassthrough()
                     .EnableTokenEndpointPassthrough()
                     .EnableUserInfoEndpointPassthrough()
                     .EnableEndSessionEndpointPassthrough();

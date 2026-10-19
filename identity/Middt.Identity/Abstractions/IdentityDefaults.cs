@@ -23,6 +23,7 @@ public static class MiddtIdentityDefaults
     public const string RegisterPath = "/account/register";
     public const string ForgotPasswordPath = "/account/forgot-password";
     public const string AccessDeniedPath = "/account/denied";
+    public const string DevicePath = "/account/device";
 
     /// <summary>Page that renders journey <c>{id}</c>.</summary>
     public static string JourneyPath(Guid id) => $"/account/journey/{id.ToString("D", CultureInfo.InvariantCulture)}";

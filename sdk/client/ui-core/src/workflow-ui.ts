@@ -9,6 +9,8 @@ import type {
   WorkflowHistoryModel,
   WorkflowInstanceModel,
   WorkflowInstanceStatusName,
+  WorkflowStateModel,
+  WorkflowTransitionModel,
 } from './workflow.ts';
 import { WORKFLOW_INSTANCE_STATUSES } from './workflow.ts';
 
@@ -990,4 +992,613 @@ export function formatWorkflowDataCell(data: WorkflowData | null | undefined, co
 
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
+
+// ----------------------------------------------------------------------------------------------- workflow graph diagram
+
+export const WORKFLOW_GRAPH_NODE_WIDTH = 176;
+export const WORKFLOW_GRAPH_NODE_HEIGHT = 60;
+export const WORKFLOW_GRAPH_COLUMN_GAP = 60;
+export const WORKFLOW_GRAPH_ROW_GAP = 36;
+export const WORKFLOW_GRAPH_PADDING_LEFT = 64;
+export const WORKFLOW_GRAPH_PADDING_RIGHT = 24;
+export const WORKFLOW_GRAPH_PADDING_TOP = 52;
+export const WORKFLOW_GRAPH_PADDING_BOTTOM = 48;
+export const WORKFLOW_GRAPH_START_RADIUS = 9;
+
+export interface WorkflowGraphNode {
+  key: string;
+  title: string;
+  type: string;
+  subType: string;
+  step: number | null;
+  column: number;
+  row: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isStart: boolean;
+  isFinish: boolean;
+  isCurrent: boolean;
+  isVisited: boolean;
+  visitCount: number;
+  visitSteps: number[];
+  statusKind: 'active' | 'busy' | 'completed' | 'faulted' | 'error' | 'cancelled' | 'visited' | 'upcoming';
+  badgeText: string;
+  metaText: string;
+  shortTitle: string;
+  tooltip: string;
+}
+
+export interface WorkflowGraphEdge {
+  id: string;
+  from: string | null;
+  target: string;
+  label: string;
+  trigger: string;
+  kind: 'start' | 'forward' | 'skip' | 'back' | 'self';
+  path: string;
+  labelX: number;
+  labelY: number;
+  isStart: boolean;
+  isSelfLoop: boolean;
+  isBackEdge: boolean;
+  isTraversed: boolean;
+  isAvailable: boolean;
+  traversalCount: number;
+  stepNumbers: number[];
+  orderBadge: string;
+  tone: 'traversed' | 'traversed-error' | 'available' | 'upcoming';
+  tooltip: string;
+}
+
+export interface WorkflowGraph {
+  width: number;
+  height: number;
+  startX: number;
+  startY: number;
+  nodes: WorkflowGraphNode[];
+  edges: WorkflowGraphEdge[];
+  isEmpty: boolean;
+}
+
+const isFinishState = (state: WorkflowStateModel): boolean => state.type.toLowerCase() === 'finish';
+
+function subTypePriority(subType: string | null | undefined): number {
+  switch (subType) {
+    case 'Success':
+      return 0;
+    case 'Human':
+    case 'None':
+    case null:
+    case undefined:
+    case '':
+      return 1;
+    case 'Cancelled':
+      return 2;
+    case 'Timeout':
+      return 3;
+    case 'Error':
+      return 4;
+    default:
+      return 1;
+  }
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function resolveNodeStatusKind(
+  state: WorkflowStateModel,
+  instance: WorkflowInstanceModel | null | undefined,
+  isCurrent: boolean,
+  isVisited: boolean,
+): WorkflowGraphNode['statusKind'] {
+  if (isCurrent && instance) {
+    switch (instance.status) {
+      case 'Faulted':
+        return 'faulted';
+      case 'Busy':
+        return 'busy';
+      case 'Cancelled':
+        return 'cancelled';
+      case 'Completed':
+        if (state.subType === 'Error') {
+          return 'error';
+        }
+        if (state.subType === 'Cancelled' || state.subType === 'Timeout') {
+          return 'cancelled';
+        }
+        return 'completed';
+      default:
+        return 'active';
+    }
+  }
+
+  if (isVisited) {
+    return state.subType === 'Error' ? 'error' : 'visited';
+  }
+
+  return 'upcoming';
+}
+
+function resolveNodeBadge(state: WorkflowStateModel, isCurrent: boolean, isVisited: boolean, visitCount: number): string {
+  if (isCurrent) {
+    return visitCount > 1 ? `Şu an (${visitCount}×)` : 'Şu an';
+  }
+
+  if (isVisited) {
+    return visitCount > 1 ? `✓ ${visitCount}×` : '✓';
+  }
+
+  return state.step !== null && state.step !== undefined ? `#${state.step}` : '';
+}
+
+function resolveNodeMetaText(state: WorkflowStateModel): string {
+  const step = state.step !== null && state.step !== undefined ? state.step : null;
+  if (state.type.toLowerCase() === 'subflow') {
+    return step !== null ? `Adım ${step} · Alt akış` : 'Alt akış';
+  }
+
+  if (isFinishState(state)) {
+    switch (state.subType) {
+      case 'Success':
+        return 'Bitiş · Başarılı';
+      case 'Error':
+        return 'Bitiş · Red / Hata';
+      case 'Cancelled':
+        return 'Bitiş · İptal';
+      case 'Timeout':
+        return 'Bitiş · Süre doldu';
+      default:
+        return 'Bitiş';
+    }
+  }
+
+  if (state.subType === 'Human') {
+    return step !== null ? `Adım ${step} · Kullanıcı` : 'Kullanıcı';
+  }
+
+  return step !== null ? `Adım ${step} · Otomatik` : 'Otomatik';
+}
+
+function truncateNodeTitle(title: string, maxLength = 21): string {
+  return title.length <= maxLength ? title : `${title.slice(0, maxLength - 1)}…`;
+}
+
+function formatStepBadge(steps: readonly number[]): string {
+  if (steps.length === 0) {
+    return '';
+  }
+
+  if (steps.length <= 2) {
+    return steps.join(',');
+  }
+
+  return `${steps[0]}..${steps[steps.length - 1]}`;
+}
+
+function computeEdgeGeometry(
+  from: WorkflowGraphNode,
+  to: WorkflowGraphNode,
+  kind: WorkflowGraphEdge['kind'],
+): { path: string; labelX: number; labelY: number } {
+  const fromCenterY = from.y + WORKFLOW_GRAPH_NODE_HEIGHT / 2;
+  const toCenterY = to.y + WORKFLOW_GRAPH_NODE_HEIGHT / 2;
+
+  if (kind === 'self') {
+    const x1 = from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.34;
+    const x2 = from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.66;
+    const y = from.y;
+    const peakY = y - 34;
+    return {
+      path: `M ${round1(x1)} ${round1(y)} C ${round1(x1 - 8)} ${round1(peakY)}, ${round1(x2 + 8)} ${round1(peakY)}, ${round1(x2)} ${round1(y)}`,
+      labelX: from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.5,
+      labelY: peakY + 5,
+    };
+  }
+
+  if (kind === 'back') {
+    const x1 = from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.5;
+    const y1 = from.y + WORKFLOW_GRAPH_NODE_HEIGHT;
+    const x2 = to.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.5;
+    const y2 = to.y + WORKFLOW_GRAPH_NODE_HEIGHT;
+    const span = Math.max(1, from.column - to.column);
+    const troughY = Math.max(y1, y2) + 28 + span * 6;
+    return {
+      path: `M ${round1(x1)} ${round1(y1)} C ${round1(x1)} ${round1(troughY)}, ${round1(x2)} ${round1(troughY)}, ${round1(x2)} ${round1(y2)}`,
+      labelX: (x1 + x2) / 2,
+      labelY: troughY - 5,
+    };
+  }
+
+  if (kind === 'skip') {
+    if (toCenterY <= fromCenterY) {
+      const x1 = from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.78;
+      const y1 = from.y;
+      const sameRow = Math.abs(toCenterY - fromCenterY) <= 12;
+      const x2 = sameRow ? to.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.22 : to.x;
+      const y2 = sameRow ? to.y : toCenterY;
+      const peakY = Math.min(from.y, to.y) - 32;
+      return {
+        path: `M ${round1(x1)} ${round1(y1)} C ${round1(x1 + 32)} ${round1(peakY)}, ${round1(x2 - 32)} ${round1(peakY)}, ${round1(x2)} ${round1(y2)}`,
+        labelX: (x1 + x2) / 2,
+        labelY: peakY + 6,
+      };
+    } else {
+      const x1 = from.x + WORKFLOW_GRAPH_NODE_WIDTH * 0.78;
+      const y1 = from.y + WORKFLOW_GRAPH_NODE_HEIGHT;
+      const x2 = to.x;
+      const y2 = toCenterY;
+      const troughY = Math.max(y1 + 28, y2 + 12);
+      return {
+        path: `M ${round1(x1)} ${round1(y1)} C ${round1(x1 + 36)} ${round1(troughY)}, ${round1(x2 - 44)} ${round1(y2)}, ${round1(x2)} ${round1(y2)}`,
+        labelX: (x1 + x2) / 2,
+        labelY: (y1 + troughY + y2) / 3,
+      };
+    }
+  }
+
+  const startY = toCenterY < fromCenterY - 8 ? fromCenterY - 10 : toCenterY > fromCenterY + 8 ? fromCenterY + 10 : fromCenterY;
+  const endY = fromCenterY < toCenterY - 8 ? toCenterY - 8 : fromCenterY > toCenterY + 8 ? toCenterY + 8 : toCenterY;
+  const startX = from.x + WORKFLOW_GRAPH_NODE_WIDTH;
+  const endX = to.x;
+  const dx = (endX - startX) * 0.45;
+  return {
+    path: `M ${round1(startX)} ${round1(startY)} C ${round1(startX + dx)} ${round1(startY)}, ${round1(endX - dx)} ${round1(endY)}, ${round1(endX)} ${round1(endY)}`,
+    labelX: (startX + endX) / 2,
+    labelY: (startY + endY) / 2 - 10,
+  };
+}
+
+/**
+ * Deterministic layered DAG layout of `definition` combined with the runtime state and transition history of `instance`
+ * (TypeScript counterpart of `WorkflowGraph.Build` in `Middt.Framework.Model`).
+ */
+export function workflowBuildGraph(
+  definition: WorkflowDefinitionModel | null | undefined,
+  instance?: WorkflowInstanceModel | null,
+  history: readonly WorkflowHistoryModel[] = [],
+): WorkflowGraph {
+  const empty: WorkflowGraph = { width: 0, height: 0, startX: 0, startY: 0, nodes: [], edges: [], isEmpty: true };
+  if (!definition || definition.states.length === 0) {
+    return empty;
+  }
+
+  const stateByKey = new Map<string, WorkflowStateModel>();
+  for (const state of definition.states) {
+    if (state.key && !stateByKey.has(state.key)) {
+      stateByKey.set(state.key, state);
+    }
+  }
+
+  if (stateByKey.size === 0) {
+    return empty;
+  }
+
+  const startKey = definition.startState && stateByKey.has(definition.startState) ? definition.startState : definition.states[0]!.key;
+  const orderedStates: WorkflowStateModel[] = [];
+  const startStateModel = stateByKey.get(startKey);
+  if (startStateModel) {
+    orderedStates.push(startStateModel);
+  }
+  for (const state of definition.states) {
+    if (state.key !== startKey && !isFinishState(state)) {
+      orderedStates.push(state);
+    }
+  }
+  for (const state of definition.states) {
+    if (state.key !== startKey && isFinishState(state)) {
+      orderedStates.push(state);
+    }
+  }
+
+  const stateOrder = new Map<string, number>();
+  orderedStates.forEach((s, idx) => stateOrder.set(s.key, idx));
+
+  const edgeGroups = new Map<string, { from: string; target: string; transitions: WorkflowTransitionModel[] }>();
+  const addTransitionEdge = (from: string, target: string, transition: WorkflowTransitionModel): void => {
+    if (!stateByKey.has(from) || !stateByKey.has(target)) {
+      return;
+    }
+    const pairKey = `${from}->${target}`;
+    const existing = edgeGroups.get(pairKey);
+    if (existing) {
+      existing.transitions.push(transition);
+    } else {
+      edgeGroups.set(pairKey, { from, target, transitions: [transition] });
+    }
+  };
+
+  for (const transition of definition.transitions) {
+    if (!transition.from || transition.from.trim() === '') {
+      continue;
+    }
+    const target = transition.target === '$self' ? transition.from : transition.target;
+    if (target && target.trim() !== '') {
+      addTransitionEdge(transition.from, target, transition);
+    }
+  }
+
+  for (const entry of history) {
+    if (!entry.fromState || !entry.toState) {
+      continue;
+    }
+    const pairKey = `${entry.fromState}->${entry.toState}`;
+    if (!edgeGroups.has(pairKey) && stateByKey.has(entry.fromState) && stateByKey.has(entry.toState)) {
+      const shared = definition.transitions.find(t => t.key === entry.transitionKey);
+      addTransitionEdge(entry.fromState, entry.toState, {
+        key: entry.transitionKey,
+        title: shared?.title ?? (entry.trigger === 'Timeout' ? 'Zaman aşımı' : entry.transitionKey),
+        from: entry.fromState,
+        target: entry.toState,
+        trigger: entry.trigger,
+      });
+    }
+  }
+
+  const rawCol = new Map<string, number>();
+  for (const state of orderedStates) {
+    rawCol.set(state.key, 0);
+  }
+
+  for (const state of orderedStates) {
+    if (isFinishState(state)) {
+      continue;
+    }
+    const u = state.key;
+    const uOrder = stateOrder.get(u)!;
+    const uCol = rawCol.get(u)!;
+    for (const group of edgeGroups.values()) {
+      if (group.from !== u || group.target === u) {
+        continue;
+      }
+      const targetState = stateByKey.get(group.target)!;
+      if (!isFinishState(targetState) && stateOrder.get(group.target)! > uOrder) {
+        rawCol.set(group.target, Math.max(rawCol.get(group.target)!, uCol + 1));
+      }
+    }
+  }
+
+  const nonFinishCols = orderedStates.filter(s => !isFinishState(s)).map(s => rawCol.get(s.key)!);
+  const finishCol = (nonFinishCols.length > 0 ? Math.max(...nonFinishCols) : -1) + 1;
+  for (const state of orderedStates) {
+    if (isFinishState(state)) {
+      rawCol.set(state.key, finishCol);
+    }
+  }
+
+  const distinctCols = [...new Set(rawCol.values())].sort((a, b) => a - b);
+  const colMap = new Map<number, number>();
+  distinctCols.forEach((c, idx) => colMap.set(c, idx));
+
+  const columns: WorkflowStateModel[][] = distinctCols.map(() => []);
+  for (const state of orderedStates) {
+    columns[colMap.get(rawCol.get(state.key)!)!]!.push(state);
+  }
+
+  for (const colStates of columns) {
+    colStates.sort((a, b) => {
+      const prio = subTypePriority(a.subType) - subTypePriority(b.subType);
+      return prio !== 0 ? prio : stateOrder.get(a.key)! - stateOrder.get(b.key)!;
+    });
+  }
+
+  const visitStepsByState = new Map<string, number[]>();
+  const visitedStates = new Set<string>();
+  const stepNumbersByEdge = new Map<string, number[]>();
+  const lastTransitionTitleByEdge = new Map<string, string>();
+
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i]!;
+    const stepNo = i + 1;
+    if (entry.fromState) {
+      visitedStates.add(entry.fromState);
+    }
+    if (entry.toState) {
+      visitedStates.add(entry.toState);
+      const steps = visitStepsByState.get(entry.toState) ?? [];
+      steps.push(stepNo);
+      visitStepsByState.set(entry.toState, steps);
+    }
+
+    const fromKey = !entry.fromState || entry.trigger === 'Start' ? '__start' : entry.fromState;
+    const edgeKey = `${fromKey}->${entry.toState}`;
+    const edgeSteps = stepNumbersByEdge.get(edgeKey) ?? [];
+    edgeSteps.push(stepNo);
+    stepNumbersByEdge.set(edgeKey, edgeSteps);
+
+    if (fromKey !== '__start') {
+      const trTitle = definition.transitions.find(t => t.key === entry.transitionKey && t.title && t.title.trim() !== '')?.title;
+      if (trTitle) {
+        lastTransitionTitleByEdge.set(edgeKey, trTitle);
+      }
+    }
+  }
+
+  if (instance?.state) {
+    visitedStates.add(instance.state);
+    visitedStates.add(startKey);
+  }
+
+  const availableTargetsFromCurrent = new Set<string>();
+  if (instance && instance.status === 'Active') {
+    for (const avail of instance.availableTransitions) {
+      const target = avail.target === '$self' ? instance.state : avail.target;
+      if (target) {
+        availableTargetsFromCurrent.add(target);
+      }
+    }
+  }
+
+  const maxRows = Math.max(1, ...columns.map(c => c.length));
+  const contentHeight = maxRows * WORKFLOW_GRAPH_NODE_HEIGHT + (maxRows - 1) * WORKFLOW_GRAPH_ROW_GAP;
+  const totalWidth =
+    WORKFLOW_GRAPH_PADDING_LEFT +
+    columns.length * WORKFLOW_GRAPH_NODE_WIDTH +
+    (columns.length - 1) * WORKFLOW_GRAPH_COLUMN_GAP +
+    WORKFLOW_GRAPH_PADDING_RIGHT;
+  const totalHeight = WORKFLOW_GRAPH_PADDING_TOP + contentHeight + WORKFLOW_GRAPH_PADDING_BOTTOM;
+
+  const nodes: WorkflowGraphNode[] = [];
+  const nodeByKey = new Map<string, WorkflowGraphNode>();
+
+  for (let colIndex = 0; colIndex < columns.length; colIndex++) {
+    const colStates = columns[colIndex]!;
+    const colHeight = colStates.length * WORKFLOW_GRAPH_NODE_HEIGHT + (colStates.length - 1) * WORKFLOW_GRAPH_ROW_GAP;
+    const startYOffset = WORKFLOW_GRAPH_PADDING_TOP + (contentHeight - colHeight) / 2;
+    const x = WORKFLOW_GRAPH_PADDING_LEFT + colIndex * (WORKFLOW_GRAPH_NODE_WIDTH + WORKFLOW_GRAPH_COLUMN_GAP);
+
+    for (let rowIndex = 0; rowIndex < colStates.length; rowIndex++) {
+      const state = colStates[rowIndex]!;
+      const y = startYOffset + rowIndex * (WORKFLOW_GRAPH_NODE_HEIGHT + WORKFLOW_GRAPH_ROW_GAP);
+      const isCurrent = !!instance && instance.state === state.key;
+      const isVisited = isCurrent || visitedStates.has(state.key);
+      const visitSteps = visitStepsByState.get(state.key) ?? (isCurrent ? [1] : []);
+      const visitCount = visitSteps.length;
+      const statusKind = resolveNodeStatusKind(state, instance, isCurrent, isVisited);
+      const badgeText = resolveNodeBadge(state, isCurrent, isVisited, visitCount);
+      const metaText = resolveNodeMetaText(state);
+      const title = state.title && state.title.trim() !== '' ? state.title : state.key;
+      const statusLabel = isCurrent
+        ? 'Şu anki adım'
+        : isVisited
+          ? visitCount > 1
+            ? `Geçildi (${visitCount} kez)`
+            : 'Geçildi'
+          : 'Henüz geçilmedi';
+
+      const node: WorkflowGraphNode = {
+        key: state.key,
+        title,
+        type: state.type,
+        subType: state.subType,
+        step: state.step ?? null,
+        column: colIndex,
+        row: rowIndex,
+        x: round1(x),
+        y: round1(y),
+        width: WORKFLOW_GRAPH_NODE_WIDTH,
+        height: WORKFLOW_GRAPH_NODE_HEIGHT,
+        isStart: state.key === startKey,
+        isFinish: isFinishState(state),
+        isCurrent,
+        isVisited,
+        visitCount,
+        visitSteps,
+        statusKind,
+        badgeText,
+        metaText,
+        shortTitle: truncateNodeTitle(title),
+        tooltip: `${title} (${state.key}) — ${statusLabel}`,
+      };
+      nodes.push(node);
+      nodeByKey.set(state.key, node);
+    }
+  }
+
+  const startNode = nodeByKey.get(startKey)!;
+  const startX = 20;
+  const startY = round1(startNode.y + WORKFLOW_GRAPH_NODE_HEIGHT / 2);
+
+  const edges: WorkflowGraphEdge[] = [];
+  const startSteps = stepNumbersByEdge.get(`__start->${startKey}`) ?? (instance ? [1] : []);
+  const startTraversed = startSteps.length > 0 || !!instance;
+  edges.push({
+    id: `__start->${startKey}`,
+    from: null,
+    target: startKey,
+    label: 'Başlangıç',
+    trigger: 'Start',
+    kind: 'start',
+    path: `M ${round1(startX + WORKFLOW_GRAPH_START_RADIUS)} ${startY} L ${round1(startNode.x)} ${startY}`,
+    labelX: round1((startX + WORKFLOW_GRAPH_START_RADIUS + startNode.x) / 2),
+    labelY: round1(startY - 10),
+    isStart: true,
+    isSelfLoop: false,
+    isBackEdge: false,
+    isTraversed: startTraversed,
+    isAvailable: false,
+    traversalCount: startSteps.length,
+    stepNumbers: startSteps,
+    orderBadge: formatStepBadge(startSteps),
+    tone: startTraversed ? 'traversed' : 'upcoming',
+    tooltip: `Başlangıç → ${startNode.title}`,
+  });
+
+  for (const group of edgeGroups.values()) {
+    const fromNode = nodeByKey.get(group.from)!;
+    const toNode = nodeByKey.get(group.target)!;
+    const pairKey = `${group.from}->${group.target}`;
+    const steps = stepNumbersByEdge.get(pairKey) ?? [];
+    const isTraversed = steps.length > 0;
+    const isAvailable = !!instance && instance.status === 'Active' && instance.state === group.from && availableTargetsFromCurrent.has(group.target);
+    const firstWithTitle = group.transitions.find(t => t.title && t.title.trim() !== '')?.title ?? group.transitions[0]!.key;
+    const defaultLabel = group.transitions.length > 1 ? `${firstWithTitle} (+${group.transitions.length - 1})` : firstWithTitle;
+    const label = lastTransitionTitleByEdge.get(pairKey) ?? defaultLabel;
+    const isSelf = group.from === group.target;
+    const isBack = !isSelf && toNode.column <= fromNode.column;
+    const isSkip = !isSelf && !isBack && toNode.column > fromNode.column + 1;
+    const kind: WorkflowGraphEdge['kind'] = isSelf ? 'self' : isBack ? 'back' : isSkip ? 'skip' : 'forward';
+    const geom = computeEdgeGeometry(fromNode, toNode, kind);
+    const tone: WorkflowGraphEdge['tone'] = isTraversed
+      ? toNode.subType === 'Error'
+        ? 'traversed-error'
+        : 'traversed'
+      : isAvailable
+        ? 'available'
+        : 'upcoming';
+    const statusDesc = isTraversed
+      ? `Geçildi (${steps.map(s => `${s}. adım`).join(', ')})`
+      : isAvailable
+        ? 'Kullanılabilir geçiş'
+        : 'Henüz geçilmedi';
+
+    edges.push({
+      id: pairKey,
+      from: group.from,
+      target: group.target,
+      label,
+      trigger: group.transitions[0]!.trigger,
+      kind,
+      path: geom.path,
+      labelX: round1(geom.labelX),
+      labelY: round1(geom.labelY),
+      isStart: false,
+      isSelfLoop: isSelf,
+      isBackEdge: isBack,
+      isTraversed,
+      isAvailable,
+      traversalCount: steps.length,
+      stepNumbers: steps,
+      orderBadge: formatStepBadge(steps),
+      tone,
+      tooltip: `${fromNode.title} → ${toNode.title} (${label}) — ${statusDesc}`,
+    });
+  }
+
+  // Order edges so traversed edges render last (on top of upcoming/available edges).
+  edges.sort((a, b) => (a.isTraversed ? 2 : a.isAvailable ? 1 : 0) - (b.isTraversed ? 2 : b.isAvailable ? 1 : 0));
+
+  return {
+    width: round1(totalWidth),
+    height: round1(totalHeight),
+    startX,
+    startY,
+    nodes,
+    edges,
+    isEmpty: false,
+  };
+}
+
+export function workflowGraphNodeClass(node: WorkflowGraphNode): string {
+  return (
+    `middt-wf-node middt-wf-node-${node.statusKind}` +
+    (node.isCurrent ? ' middt-wf-node-current' : '') +
+    (node.isVisited ? ' middt-wf-node-visited' : '') +
+    (node.isFinish ? ' middt-wf-node-finish' : '')
+  );
+}
+
 

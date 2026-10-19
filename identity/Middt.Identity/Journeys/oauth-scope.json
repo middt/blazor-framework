@@ -1,0 +1,20 @@
+{
+  "key": "oauth-scope",
+  "version": 1,
+  "title": "OAuth 2.0 Kapsamı",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "title": "Kapsam Adı", "x-index": true },
+      "displayName": { "type": "string", "title": "Görünen Ad" },
+      "description": { "type": "string", "title": "Açıklama" },
+      "resources": { "type": "array", "title": "Kaynaklar (Audience)", "items": { "type": "string" } },
+      "concurrencyToken": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "active" },
+  "states": [
+    { "key": "active", "title": "Etkin", "type": "Initial", "subType": "Human" }
+  ]
+}

@@ -156,38 +156,43 @@ public static class WorkflowEndpoints
         }
     }
 
-    private static WorkflowDefinitionModel ToModel(WorkflowDefinition definition, Middt.Framework.Expressions.ExpressionUser user) => new()
+    /// <summary>Projects a <see cref="WorkflowDefinition"/> to its client <see cref="WorkflowDefinitionModel"/> contract.</summary>
+    public static WorkflowDefinitionModel ToModel(WorkflowDefinition definition, Middt.Framework.Expressions.ExpressionUser? user = null)
     {
-        Key = definition.Key,
-        Version = definition.Version,
-        Title = definition.Title,
-        Icon = definition.Icon,
-        StartState = definition.Start.Target,
-        StartInputSchema = (JsonObject?)definition.Start.Input?.Schema?.DeepClone(),
-        DataSchema = Schema.JsonSchemaValidator.ProjectSchema(definition.DataSchema, user),
-        States = definition.States.Select(s => new WorkflowStateModel
+        ArgumentNullException.ThrowIfNull(definition);
+        return new WorkflowDefinitionModel
         {
-            Key = s.Key,
-            Title = s.Title,
-            Type = s.Type.ToString(),
-            SubType = s.SubType.ToString(),
-            View = s.View?.Component,
-            Layout = s.View?.Layout,
-            Step = s.Step,
-        }).ToList(),
-        Transitions = definition.States
-            .SelectMany(s => s.Transitions.Select(t => (From: (string?)s.Key, Transition: t)))
-            .Concat(definition.SharedTransitions.Select(t => (From: (string?)null, Transition: t)))
-            .Select(x => new WorkflowTransitionModel
+            Key = definition.Key,
+            Version = definition.Version,
+            Title = definition.Title,
+            Icon = definition.Icon,
+            StartState = definition.Start.Target,
+            StartInputSchema = (JsonObject?)definition.Start.Input?.Schema?.DeepClone(),
+            DataSchema = Schema.JsonSchemaValidator.ProjectSchema(definition.DataSchema, user ?? Expressions.WorkflowUser.System),
+            States = definition.States.Select(s => new WorkflowStateModel
             {
-                Key = x.Transition.Key,
-                Title = x.Transition.Title,
-                From = x.From,
-                Target = x.Transition.Target,
-                Trigger = x.Transition.Trigger.ToString(),
-            })
-            .ToList(),
-    };
+                Key = s.Key,
+                Title = s.Title,
+                Type = s.Type.ToString(),
+                SubType = s.SubType.ToString(),
+                View = s.View?.Component,
+                Layout = s.View?.Layout,
+                Step = s.Step,
+            }).ToList(),
+            Transitions = definition.States
+                .SelectMany(s => s.Transitions.Select(t => (From: (string?)s.Key, Transition: t)))
+                .Concat(definition.SharedTransitions.Select(t => (From: (string?)null, Transition: t)))
+                .Select(x => new WorkflowTransitionModel
+                {
+                    Key = x.Transition.Key,
+                    Title = x.Transition.Title,
+                    From = x.From,
+                    Target = x.Transition.Target,
+                    Trigger = x.Transition.Trigger.ToString(),
+                })
+                .ToList(),
+        };
+    }
 
     private static readonly HashSet<string> ReservedInstanceQueryKeys = new(StringComparer.OrdinalIgnoreCase)
     {

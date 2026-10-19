@@ -13,6 +13,7 @@
     {
         <RadzenButton Icon="block" Text="Kullanıcının tümünü iptal et" ButtonStyle="ButtonStyle.Danger" Click="RevokeAllAsync" />
     }
+    <RadzenButton Icon="CleaningServices" Text="Süresi dolanları temizle" ButtonStyle="ButtonStyle.Light" Click="PruneExpiredAsync" />
 </div>
 
 @if (message is not null)
@@ -294,6 +295,26 @@
                 await sp.GetRequiredService<IOpenIddictTokenManager>().RevokeBySubjectAsync(id);
                 return Ok;
             }, "Kullanıcının tüm oturumları iptal edildi."))
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task PruneExpiredAsync()
+    {
+        if (await Dialogs.Confirm("Süresi dolmuş veya iptal edilmiş tüm tokenlar ve geçici yetkilendirmeler temizlenecek.", "Süresi dolanları temizle",
+                new ConfirmOptions { OkButtonText = "Temizle", CancelButtonText = "Vazgeç" }) != true)
+        {
+            return;
+        }
+
+        if (await RunAsync(async sp =>
+            {
+                var threshold = sp.GetRequiredService<TimeProvider>().GetUtcNow();
+                await sp.GetRequiredService<IOpenIddictTokenManager>().PruneAsync(threshold);
+                await sp.GetRequiredService<IOpenIddictAuthorizationManager>().PruneAsync(threshold);
+                return Ok;
+            }, "Süresi dolan tokenlar ve yetkilendirmeler temizlendi."))
         {
             await LoadAsync();
         }

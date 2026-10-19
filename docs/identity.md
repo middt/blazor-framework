@@ -11,9 +11,9 @@ over OIDC. Everything deployment specific is **configuration**, not code.
 | Folder | Contents |
 |---|---|
 | `Program.cs` | Host: reads the configuration below, maps protocol endpoints, UI, health (`/health`). |
-| `Endpoints/`, `Data/`, `Seeding/`, `Messaging/` | Protocol (OpenIddict 7 server: authorization code + PKCE, refresh token, client credentials, end session, revocation, introspection, userinfo), users/roles/OAuth2 entities (ASP.NET Core Identity + OpenIddict custom stores over `WorkflowDbContext.Instances` in schema `wf_idp`), seeding, development mailbox. |
-| `Journeys/` | `IAuthJourneyService`, workflow tasks and the default journeys (`auth-*.json`, embedded). |
-| `Ui/` | Blazor: account pages (static server rendering – they set cookies), journey views, admin pages (interactive server, Radzen). |
+| `Endpoints/`, `Data/`, `Seeding/`, `Messaging/` | Protocol (OpenIddict 7 server: authorization code + PKCE, PAR, device authorization, token exchange, password, refresh token, client credentials, end session, revocation, introspection, userinfo), users/roles/OAuth2 entities (ASP.NET Core Identity + OpenIddict custom stores over `WorkflowDbContext.Instances` in schema `wf_idp`), seeding, development mailbox. |
+| `Journeys/` | `IAuthJourneyService`, workflow tasks, default authentication journeys (`auth-*.json`), and entity workflow definitions (`idp-user.json`, `idp-role.json`, `oauth-application.json`, `oauth-scope.json`, `oauth-authorization.json`, `oauth-token.json`). |
+| `Ui/` | Blazor: account pages (static server rendering – they set cookies, including `/account/device` for RFC 8628 verification), journey views, admin pages (interactive server, Radzen: users, roles, clients, scopes, sessions, journeys). |
 | `wwwroot/` | `middt-identity.css`. |
 | `Dockerfile` | `docker build -f identity/Middt.Identity/Dockerfile .` (from the repository root). |
 
@@ -39,7 +39,7 @@ secrets there). The demo uses `demo/identity.json`.
 | Option (`Identity:*`) | Default | |
 |---|---|---|
 | `Issuer` | request host | public URL (`iss`); discovery then advertises every endpoint under it, also when a relying party fetches discovery over an internal address (container network) |
-| `WorkflowSchema` | `wf_idp` | workflow tables (`WorkflowInstances`, `WorkflowInstanceData`, `WorkflowHistory`, `WorkflowJobs`, `WorkflowIncidents`) storing journeys, users (`idp-user`), roles (`idp-role`), and OAuth2 entities (`oauth-application`, `oauth-scope`, `oauth-authorization`, `oauth-token`); ignored by SQLite |
+| `WorkflowSchema` | `wf_idp` | workflow tables (`WorkflowInstances`, `WorkflowInstanceData`, `WorkflowHistory`, `WorkflowJobs`, `WorkflowIncidents`) partitioned by workflow key for journeys, users (`idp-user`), roles (`idp-role`), and OAuth2 entities (`oauth-application`, `oauth-scope`, `oauth-authorization`, `oauth-token`); ignored by SQLite |
 | `AutoCreateSchema` | `false` | creates database, schemas and tables at startup (use migrations in production) |
 | `RequireHttps` | on outside Development | OpenIddict transport security |
 | `AccessTokenLifetime` / `IdentityTokenLifetime` / `RefreshTokenLifetime` / `AuthorizationCodeLifetime` | 15 min / 15 min / 14 days / 5 min | |
@@ -52,8 +52,8 @@ secrets there). The demo uses `demo/identity.json`.
 | `AuthenticatorIssuerName` | `Middt` | issuer shown in authenticator apps |
 
 Lockout: 5 attempts / 5 minutes; e-mail addresses are unique. Users, roles, OAuth2 applications/scopes/authorizations/tokens,
-and authentication journeys all live in the workflow engine tables (schema `wf_idp`, no separate relational Identity or
-OpenIddict tables). Only `OpenIddict.Server.AspNetCore` + `OpenIddict.Core` are referenced (the `OpenIddict.AspNetCore`
+and authentication journeys all live in the partitioned workflow engine tables (schema `wf_idp`, with dedicated PostgreSQL
+list partitions per workflow key and selective B-Tree indexes on lookup fields). Only `OpenIddict.Server.AspNetCore` + `OpenIddict.Core` are referenced (the `OpenIddict.AspNetCore`
 metapackage pulls Polly 7 through the client/validation packages, which clashes with Polly 8).
 
 Seed (`Identity:Seed`), applied idempotently at every start: roles and users are created when missing
@@ -73,7 +73,7 @@ updated (redirect URIs, permissions, consent type, display name) – **an existi
       "ConsentType": "implicit",             // explicit | external | systematic (treated as explicit)
       "RedirectUris": [ "http://localhost:8080/signin-oidc" ],
       "PostLogoutRedirectUris": [ "http://localhost:8080/signout-callback-oidc" ],
-      "GrantTypes": [ "authorization_code", "refresh_token" ],   // default; "client_credentials" for services
+      "GrantTypes": [ "authorization_code", "refresh_token" ],   // default; also "client_credentials", "urn:ietf:params:oauth:grant-type:device_code", "urn:ietf:params:oauth:grant-type:token-exchange", "password"
       "Scopes": [ "openid", "profile", "email", "roles", "offline_access", "api" ]
     } ],
     "Users": [ { "UserName": "test@test.com", "Email": "test@test.com", "Password": "test", "DisplayName": "Test", "Roles": [ "manager", "ui-admin", "idp-admin" ] } ]
@@ -81,8 +81,8 @@ updated (redirect URIs, permissions, consent type, display name) – **an existi
 }
 ```
 
-Client permissions are derived: code flow → authorization, end session, `code` response type, PKCE requirement;
-always token + revocation; confidential clients also introspection; one scope permission per listed scope.
+Client permissions are derived: code flow → authorization, PAR (`/connect/par`), end session, `code` response type, PKCE requirement;
+device flow → device authorization (`/connect/device`); always token + revocation; confidential clients also introspection; one scope permission per listed scope.
 
 ## Protocol
 
@@ -90,7 +90,9 @@ always token + revocation; confidential clients also introspection; one scope pe
 |---|---|
 | `GET /.well-known/openid-configuration`, `/.well-known/jwks` | discovery, signing keys |
 | `GET/POST /connect/authorize` | authorization code flow (PKCE required for every client) |
-| `POST /connect/token` | `authorization_code`, `refresh_token` (rotation), `client_credentials` |
+| `POST /connect/par` | Pushed Authorization Requests (RFC 9126) |
+| `POST /connect/device`, `GET/POST /connect/verify` | Device Authorization Grant (RFC 8628) + user verification (`/account/device`) |
+| `POST /connect/token` | `authorization_code`, `refresh_token` (rotation), `client_credentials`, `urn:ietf:params:oauth:grant-type:device_code`, `urn:ietf:params:oauth:grant-type:token-exchange` (RFC 8693), `password` |
 | `GET/POST /connect/userinfo` | claims of the access token's user |
 | `GET/POST /connect/logout` | RP-initiated logout (`id_token_hint`, `post_logout_redirect_uri`) |
 | `POST /connect/revoke`, `POST /connect/introspect` | token revocation / introspection (introspection: confidential clients) |

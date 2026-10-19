@@ -1,0 +1,30 @@
+{
+  "key": "idp-user",
+  "version": 1,
+  "title": "Kimlik Kullanıcısı",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "userName": { "type": "string", "title": "Kullanıcı Adı" },
+      "normalizedUserName": { "type": "string", "title": "Normalleştirilmiş Kullanıcı Adı", "x-index": true },
+      "email": { "type": "string", "title": "E-posta" },
+      "normalizedEmail": { "type": "string", "title": "Normalleştirilmiş E-posta", "x-index": true },
+      "displayName": { "type": "string", "title": "Ad Soyad" },
+      "emailConfirmed": { "type": "boolean", "title": "E-posta Doğrulandı" },
+      "twoFactorEnabled": { "type": "boolean", "title": "2FA Etkin" },
+      "roles": { "type": "array", "title": "Roller", "items": { "type": "string" } },
+      "passwordHash": { "type": "string", "x-mask": { "pattern": "***" } },
+      "securityStamp": { "type": "string", "x-mask": { "pattern": "***" } },
+      "concurrencyStamp": { "type": "string", "x-mask": { "pattern": "***" } },
+      "authenticatorKeyProtected": { "type": "string", "x-mask": { "pattern": "***" } },
+      "recoveryCodesProtected": { "type": "string", "x-mask": { "pattern": "***" } },
+      "tokensProtected": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "active" },
+  "states": [
+    { "key": "active", "title": "Etkin", "type": "Initial", "subType": "Human" },
+    { "key": "locked", "title": "Kilitli", "type": "Intermediate", "subType": "Human" }
+  ]
+}

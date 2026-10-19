@@ -34,9 +34,11 @@
                 var now = DateTimeOffset.UtcNow;
                 return sp.GetRequiredService<UserManager<MiddtIdentityUser>>().Users.LongCountAsync(u => u.LockoutEnd != null && u.LockoutEnd > now);
             })),
+            new("Rol", admin + "/roles", await CountAsync(sp => sp.GetRequiredService<RoleManager<IdentityRole>>().Roles.LongCountAsync())),
             new("Uygulama", admin + "/clients", await CountAsync(sp => sp.GetRequiredService<IOpenIddictApplicationManager>().CountAsync().AsTask())),
             new("Kapsam", admin + "/scopes", await CountAsync(sp => sp.GetRequiredService<IOpenIddictScopeManager>().CountAsync().AsTask())),
             new("Yetkilendirme", admin + "/sessions", await CountAsync(sp => sp.GetRequiredService<IOpenIddictAuthorizationManager>().CountAsync().AsTask())),
+            new("Token", admin + "/sessions", await CountAsync(sp => sp.GetRequiredService<IOpenIddictTokenManager>().CountAsync().AsTask())),
             new("Süren akış", admin + "/journeys", await CountAsync(ActiveJourneysAsync)),
         ];
     }

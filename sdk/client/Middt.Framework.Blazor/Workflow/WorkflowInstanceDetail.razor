@@ -49,6 +49,8 @@
                 <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" title="Yenile" aria-label="Detayı yenile" Click="RefreshAsync" />
             </div>
 
+            <WorkflowDiagram Definition="@definition" Instance="@instance" History="@history" IdPrefix="@($"{IdPrefix}-diagram")" />
+
             @if (ShowStepForm && stepTransition is { } stepTr)
             {
                 @* Wizard: the inline transition is the form of this step. *@

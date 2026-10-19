@@ -18,8 +18,10 @@ import {
   validateSchemaFields,
   WORKFLOW_STATUS_OPTIONS,
   WorkflowApiClient,
+  workflowBuildGraph,
   workflowDataColumns,
   workflowDataGet,
+  workflowGraphNodeClass,
   workflowHistoryPointStyle,
   workflowIsPending,
   workflowLayoutVariables,
@@ -581,4 +583,78 @@ test('workflowSearchColumns extracts x-search fields, enum options, numeric rang
     '/api/workflows/customer-onboarding/instances?data.fullName=%C4%B0brahim&data.segment=KOB%C4%B0&data.monthlyIncome_min=25000&data.createdFrom=2026-01-01&page=1&pageSize=10',
   );
 });
+
+test('workflowBuildGraph computes layered nodes, current state, visited states, and traversed edges', () => {
+  assert.equal(workflowBuildGraph(null).isEmpty, true);
+
+  const def: WorkflowDefinitionModel = {
+    key: 'customer-onboarding',
+    version: 1,
+    startState: 'kyc-scoring',
+    states: [
+      { key: 'kyc-scoring', title: 'KYC Skorlama', type: 'Intermediate', subType: 'None', step: 1 },
+      { key: 'kyc-review', title: 'KYC İncelemesi', type: 'Intermediate', subType: 'Human', step: 2 },
+      { key: 'active', title: 'Aktif Müşteri', type: 'Intermediate', subType: 'Human', step: 3 },
+      { key: 'closed', title: 'Kapatıldı', type: 'Finish', subType: 'Cancelled', step: 4 },
+      { key: 'rejected', title: 'Reddedildi', type: 'Finish', subType: 'Error', step: 4 },
+    ],
+    transitions: [
+      { key: 'auto-approve', from: 'kyc-scoring', target: 'active', trigger: 'Automatic' },
+      { key: 'require-review', from: 'kyc-scoring', target: 'kyc-review', trigger: 'Automatic' },
+      { key: 'approve-kyc', title: 'KYC Onayla', from: 'kyc-review', target: 'active', trigger: 'Manual' },
+      { key: 'add-kyc-note', title: 'Not Ekle', from: 'kyc-review', target: '$self', trigger: 'Manual' },
+      { key: 'reject-kyc', title: 'Reddet', from: 'kyc-review', target: 'rejected', trigger: 'Manual' },
+      { key: 'update-income', title: 'Gelir Güncelle', from: 'active', target: 'kyc-scoring', trigger: 'Manual' },
+      { key: 'close-account', title: 'Kapat', from: 'active', target: 'closed', trigger: 'Manual' },
+    ],
+  };
+
+  const inst = instance({
+    workflow: 'customer-onboarding',
+    state: 'kyc-review',
+    status: 'Active',
+    availableTransitions: [
+      { key: 'approve-kyc', title: 'KYC Onayla', target: 'active' },
+      { key: 'add-kyc-note', title: 'Not Ekle', target: '$self' },
+      { key: 'reject-kyc', title: 'Reddet', target: 'rejected' },
+    ],
+  });
+
+  const hist: WorkflowHistoryModel[] = [
+    { transitionKey: 'start', fromState: null, toState: 'kyc-scoring', trigger: 'Start', startedAt: '2026-04-01T10:00:00Z', finishedAt: '2026-04-01T10:00:00Z', dataVersion: 1 },
+    { transitionKey: 'require-review', fromState: 'kyc-scoring', toState: 'kyc-review', trigger: 'Automatic', startedAt: '2026-04-01T10:00:01Z', finishedAt: '2026-04-01T10:00:01Z', dataVersion: 1 },
+    { transitionKey: 'add-kyc-note', fromState: 'kyc-review', toState: 'kyc-review', trigger: 'Manual', startedAt: '2026-04-01T10:05:00Z', finishedAt: '2026-04-01T10:05:00Z', dataVersion: 2 },
+  ];
+
+  const graph = workflowBuildGraph(def, inst, hist);
+  assert.equal(graph.isEmpty, false);
+  assert.equal(graph.nodes.length, 5);
+
+  const scoring = graph.nodes.find(n => n.key === 'kyc-scoring')!;
+  const review = graph.nodes.find(n => n.key === 'kyc-review')!;
+  const active = graph.nodes.find(n => n.key === 'active')!;
+  const closed = graph.nodes.find(n => n.key === 'closed')!;
+  const rejected = graph.nodes.find(n => n.key === 'rejected')!;
+
+  assert.equal(scoring.column, 0);
+  assert.equal(review.column, 1);
+  assert.equal(active.column, 2);
+  assert.equal(closed.column, 3);
+  assert.equal(rejected.column, 3);
+
+  assert.equal(scoring.isVisited, true);
+  assert.equal(scoring.isCurrent, false);
+  assert.equal(review.isCurrent, true);
+  assert.equal(review.visitCount, 2);
+  assert.match(workflowGraphNodeClass(review), /middt-wf-node-current/);
+  assert.equal(active.isVisited, false);
+
+  assert.equal(graph.edges.find(e => e.id === '__start->kyc-scoring')?.isTraversed, true);
+  assert.equal(graph.edges.find(e => e.id === 'kyc-scoring->kyc-review')?.orderBadge, '2');
+  assert.equal(graph.edges.find(e => e.id === 'kyc-review->kyc-review')?.isSelfLoop, true);
+  assert.equal(graph.edges.find(e => e.id === 'kyc-review->kyc-review')?.orderBadge, '3');
+  assert.equal(graph.edges.find(e => e.id === 'kyc-review->active')?.isAvailable, true);
+  assert.equal(graph.edges.find(e => e.id === 'active->kyc-scoring')?.isBackEdge, true);
+});
+
 

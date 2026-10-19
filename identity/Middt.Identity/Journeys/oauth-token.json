@@ -1,0 +1,30 @@
+{
+  "key": "oauth-token",
+  "version": 1,
+  "title": "OAuth 2.0 Belirteci (Token)",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "applicationId": { "type": "string", "title": "Uygulama ID", "x-index": true },
+      "authorizationId": { "type": "string", "title": "Yetkilendirme ID", "x-index": true },
+      "subject": { "type": "string", "title": "Kullanıcı (Subject)", "x-index": true },
+      "referenceId": { "type": "string", "title": "Referans ID", "x-index": true },
+      "type": { "type": "string", "title": "Tür", "x-index": true },
+      "status": { "type": "string", "title": "Durum", "x-index": true },
+      "creationDate": { "type": "string", "title": "Oluşturulma Tarihi" },
+      "expirationDate": { "type": "string", "title": "Bitiş Tarihi" },
+      "redemptionDate": { "type": "string", "title": "Kullanım Tarihi" },
+      "payload": { "type": "string", "x-mask": { "pattern": "***" } },
+      "concurrencyToken": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "valid" },
+  "states": [
+    { "key": "valid", "title": "Geçerli", "type": "Initial", "subType": "Human" },
+    { "key": "redeemed", "title": "Kullanıldı", "type": "Finish", "subType": "Success" },
+    { "key": "revoked", "title": "İptal Edildi", "type": "Finish", "subType": "Cancelled" },
+    { "key": "inactive", "title": "Etkin Değil", "type": "Finish", "subType": "Timeout" },
+    { "key": "failed", "title": "Başarısız", "type": "Finish", "subType": "Error" }
+  ]
+}

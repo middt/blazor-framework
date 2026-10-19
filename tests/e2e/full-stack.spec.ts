@@ -253,6 +253,14 @@ test('JSON-backed workflows execute end-to-end with ETag/304, task trace, SubFlo
   creditInstance = (await overrideRes.json()).data;
   expect(creditInstance.state).toBe('disbursed');
 
+  // Verify graphical workflow flow & traversed path diagram in the UI
+  await page.goto(`${angular}/workflow/credit-allocation`);
+  await page.locator(`.middt-wf-grid tr:has-text("CUST-${tcNo}")`).first().click();
+  await expect(page.locator('.middt-wf-diagram')).toBeVisible();
+  await expect(page.locator('.middt-wf-diagram .middt-wf-node-current')).toHaveCount(1);
+  await expect(page.locator('.middt-wf-diagram .middt-wf-node-visited').first()).toBeVisible();
+  await expect(page.locator('.middt-wf-diagram .middt-wf-edge-traversed').first()).toBeVisible();
+
   // 5. Start order-payment-orchestration (fanOut parallel checks + HTTP gateway + cache + RabbitMQ publish)
   const orderCode = `E2E-${Date.now()}`;
   const orderStart = await page.request.post(`${angular}/api/workflows/order-payment-orchestration/instances`, {

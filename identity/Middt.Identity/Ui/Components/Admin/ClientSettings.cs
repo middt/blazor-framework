@@ -15,7 +15,9 @@ public sealed class ClientSettings
     public static IReadOnlyList<KeyValuePair<string, string>> EndpointOptions { get; } =
     [
         new(Permissions.Endpoints.Authorization, "Yetkilendirme (/connect/authorize)"),
+        new(Permissions.Endpoints.PushedAuthorization, "PAR (/connect/par)"),
         new(Permissions.Endpoints.Token, "Token (/connect/token)"),
+        new(Permissions.Endpoints.DeviceAuthorization, "Cihaz yetkilendirme (/connect/device)"),
         new(Permissions.Endpoints.EndSession, "Oturum kapatma (/connect/logout)"),
         new(Permissions.Endpoints.Revocation, "İptal (/connect/revoke)"),
         new(Permissions.Endpoints.Introspection, "İnceleme (/connect/introspect)"),
@@ -27,6 +29,9 @@ public sealed class ClientSettings
         new(Permissions.GrantTypes.AuthorizationCode, "Authorization code"),
         new(Permissions.GrantTypes.RefreshToken, "Refresh token"),
         new(Permissions.GrantTypes.ClientCredentials, "Client credentials"),
+        new(Permissions.GrantTypes.DeviceCode, "Device code (RFC 8628)"),
+        new(Permissions.GrantTypes.TokenExchange, "Token exchange (RFC 8693)"),
+        new(Permissions.GrantTypes.Password, "Password (ROPC)"),
     ];
 
     /// <summary>Standard scopes that need a permission (<c>openid</c>/<c>offline_access</c> do not).</summary>
@@ -49,7 +54,7 @@ public sealed class ClientSettings
     /// <summary>One absolute URI per line.</summary>
     public string? PostLogoutRedirectUris { get; set; }
 
-    public IEnumerable<string> Endpoints { get; set; } = [Permissions.Endpoints.Authorization, Permissions.Endpoints.Token, Permissions.Endpoints.EndSession, Permissions.Endpoints.Revocation];
+    public IEnumerable<string> Endpoints { get; set; } = [Permissions.Endpoints.Authorization, Permissions.Endpoints.PushedAuthorization, Permissions.Endpoints.Token, Permissions.Endpoints.EndSession, Permissions.Endpoints.Revocation];
 
     public IEnumerable<string> GrantTypes { get; set; } = [Permissions.GrantTypes.AuthorizationCode, Permissions.GrantTypes.RefreshToken];
 
@@ -113,6 +118,11 @@ public sealed class ClientSettings
             {
                 errors.Add("Authorization code için en az bir yönlendirme adresi gerekir.");
             }
+        }
+
+        if (GrantTypes.Contains(Permissions.GrantTypes.DeviceCode))
+        {
+            descriptor.Permissions.Add(Permissions.Endpoints.DeviceAuthorization);
         }
 
         if (ClientType == ClientTypes.Public && GrantTypes.Contains(Permissions.GrantTypes.ClientCredentials))

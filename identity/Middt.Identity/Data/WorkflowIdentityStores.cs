@@ -28,15 +28,19 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
     IUserAuthenticatorKeyStore<MiddtIdentityUser>,
     IUserTwoFactorRecoveryCodeStore<MiddtIdentityUser>,
     IUserClaimStore<MiddtIdentityUser>,
-    IUserPhoneNumberStore<MiddtIdentityUser>
+    IUserPhoneNumberStore<MiddtIdentityUser>,
+    IUserLoginStore<MiddtIdentityUser>,
+    IUserAuthenticationTokenStore<MiddtIdentityUser>
 {
     internal const string WorkflowKey = "idp-user";
     private const string AuthenticatorKeyPurpose = "Middt.Identity.WorkflowUserStore.AuthenticatorKey";
     private const string RecoveryCodesPurpose = "Middt.Identity.WorkflowUserStore.RecoveryCodes";
+    private const string UserTokensPurpose = "Middt.Identity.WorkflowUserStore.UserTokens";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDataProtector keyProtector = protection.CreateProtector(AuthenticatorKeyPurpose);
     private readonly IDataProtector codesProtector = protection.CreateProtector(RecoveryCodesPurpose);
+    private readonly IDataProtector tokensProtector = protection.CreateProtector(UserTokensPurpose);
     private readonly ConditionalWeakTable<MiddtIdentityUser, UserExtras> userExtras = new();
     private readonly Dictionary<string, UserExtras> extrasById = new(StringComparer.Ordinal);
 
@@ -44,11 +48,17 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
     {
         public List<string> Roles { get; set; } = [];
         public List<ClaimRecord> Claims { get; set; } = [];
+        public List<LoginRecord> Logins { get; set; } = [];
+        public List<TokenRecord> Tokens { get; set; } = [];
         public string? AuthenticatorKey { get; set; }
         public List<string> RecoveryCodes { get; set; } = [];
     }
 
-    private sealed record ClaimRecord(string Type, string Value);
+    internal sealed record ClaimRecord(string Type, string Value);
+
+    private sealed record LoginRecord(string LoginProvider, string ProviderKey, string? ProviderDisplayName);
+
+    private sealed record TokenRecord(string LoginProvider, string Name, string? Value);
 
     private sealed class UserDocument
     {
@@ -72,6 +82,8 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
         public DateTimeOffset? LastLoginAt { get; set; }
         public List<string> Roles { get; set; } = [];
         public List<ClaimRecord> Claims { get; set; } = [];
+        public List<LoginRecord> Logins { get; set; } = [];
+        public string? TokensProtected { get; set; }
         public string? AuthenticatorKeyProtected { get; set; }
         public string? RecoveryCodesProtected { get; set; }
     }
@@ -520,6 +532,76 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
         return [.. instances.Select(Deserialize).Where(u => GetExtras(u).Claims.Any(c => c.Type == claim.Type && c.Value == claim.Value))];
     }
 
+    // ───────────────────────────── External Logins (IUserLoginStore) ─────────────────────────────
+
+    public Task AddLoginAsync(MiddtIdentityUser user, UserLoginInfo login, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(login);
+        var logins = GetExtras(user).Logins;
+        logins.RemoveAll(l => string.Equals(l.LoginProvider, login.LoginProvider, StringComparison.Ordinal)
+                           && string.Equals(l.ProviderKey, login.ProviderKey, StringComparison.Ordinal));
+        logins.Add(new LoginRecord(login.LoginProvider, login.ProviderKey, login.ProviderDisplayName));
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveLoginAsync(MiddtIdentityUser user, string loginProvider, string providerKey, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        GetExtras(user).Logins.RemoveAll(l =>
+            string.Equals(l.LoginProvider, loginProvider, StringComparison.Ordinal) &&
+            string.Equals(l.ProviderKey, providerKey, StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
+    public Task<IList<UserLoginInfo>> GetLoginsAsync(MiddtIdentityUser user, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        IList<UserLoginInfo> logins = [.. GetExtras(user).Logins.Select(l => new UserLoginInfo(l.LoginProvider, l.ProviderKey, l.ProviderDisplayName))];
+        return Task.FromResult(logins);
+    }
+
+    public async Task<MiddtIdentityUser?> FindByLoginAsync(string loginProvider, string providerKey, CancellationToken cancellationToken)
+    {
+        var instances = await db.Instances.AsNoTracking()
+            .Where(x => x.WorkflowKey == WorkflowKey)
+            .ToListAsync(cancellationToken);
+        return instances.Select(Deserialize).FirstOrDefault(u =>
+            GetExtras(u).Logins.Any(l =>
+                string.Equals(l.LoginProvider, loginProvider, StringComparison.Ordinal) &&
+                string.Equals(l.ProviderKey, providerKey, StringComparison.Ordinal)));
+    }
+
+    // ───────────────────────────── Authentication Tokens (IUserAuthenticationTokenStore) ─────────────────────────────
+
+    public Task SetTokenAsync(MiddtIdentityUser user, string loginProvider, string name, string? value, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        var tokens = GetExtras(user).Tokens;
+        tokens.RemoveAll(t => string.Equals(t.LoginProvider, loginProvider, StringComparison.Ordinal)
+                           && string.Equals(t.Name, name, StringComparison.Ordinal));
+        tokens.Add(new TokenRecord(loginProvider, name, value));
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveTokenAsync(MiddtIdentityUser user, string loginProvider, string name, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        GetExtras(user).Tokens.RemoveAll(t =>
+            string.Equals(t.LoginProvider, loginProvider, StringComparison.Ordinal) &&
+            string.Equals(t.Name, name, StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetTokenAsync(MiddtIdentityUser user, string loginProvider, string name, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        var token = GetExtras(user).Tokens.FirstOrDefault(t =>
+            string.Equals(t.LoginProvider, loginProvider, StringComparison.Ordinal) &&
+            string.Equals(t.Name, name, StringComparison.Ordinal));
+        return Task.FromResult(token?.Value);
+    }
+
     // ───────────────────────────── Phone Number ─────────────────────────────
 
     public Task SetPhoneNumberAsync(MiddtIdentityUser user, string? phoneNumber, CancellationToken cancellationToken)
@@ -608,6 +690,8 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
             LastLoginAt = user.LastLoginAt,
             Roles = [.. extras.Roles],
             Claims = [.. extras.Claims],
+            Logins = [.. extras.Logins],
+            TokensProtected = extras.Tokens.Count == 0 ? null : tokensProtector.Protect(JsonSerializer.Serialize(extras.Tokens, JsonOptions)),
             AuthenticatorKeyProtected = string.IsNullOrEmpty(extras.AuthenticatorKey) ? null : keyProtector.Protect(extras.AuthenticatorKey),
             RecoveryCodesProtected = extras.RecoveryCodes.Count == 0 ? null : codesProtector.Protect(string.Join(';', extras.RecoveryCodes)),
         };
@@ -645,6 +729,10 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
         {
             Roles = [.. doc.Roles],
             Claims = [.. doc.Claims],
+            Logins = [.. doc.Logins],
+            Tokens = UnprotectOrNull(tokensProtector, doc.TokensProtected) is { Length: > 0 } tokensJson
+                ? JsonSerializer.Deserialize<List<TokenRecord>>(tokensJson, JsonOptions) ?? []
+                : [],
             AuthenticatorKey = UnprotectOrNull(keyProtector, doc.AuthenticatorKeyProtected),
             RecoveryCodes = UnprotectOrNull(codesProtector, doc.RecoveryCodesProtected) is { Length: > 0 } codes
                 ? [.. codes.Split(';', StringSplitOptions.RemoveEmptyEntries)]
@@ -678,13 +766,17 @@ internal sealed class WorkflowUserStore(WorkflowDbContext db, IDataProtectionPro
 }
 
 /// <summary>
-/// Workflow-backed <see cref="IRoleStore{TRole}"/> storing <see cref="IdentityRole"/> records as JSON inside
-/// <see cref="WorkflowDbContext.Instances"/> (<c>WorkflowKey = "idp-role"</c>).
+/// Workflow-backed <see cref="IRoleStore{TRole}"/> and <see cref="IRoleClaimStore{TRole}"/> storing <see cref="IdentityRole"/>
+/// records as JSON inside <see cref="WorkflowDbContext.Instances"/> (<c>WorkflowKey = "idp-role"</c>).
 /// </summary>
-internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleStore<IdentityRole>
+internal sealed class WorkflowRoleStore(WorkflowDbContext db) :
+    IQueryableRoleStore<IdentityRole>,
+    IRoleClaimStore<IdentityRole>
 {
     internal const string WorkflowKey = "idp-role";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly ConditionalWeakTable<IdentityRole, List<WorkflowUserStore.ClaimRecord>> roleClaims = new();
+    private readonly Dictionary<string, List<WorkflowUserStore.ClaimRecord>> claimsById = new(StringComparer.Ordinal);
 
     private sealed class RoleDocument
     {
@@ -692,6 +784,7 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
         public string? Name { get; set; }
         public string? NormalizedName { get; set; }
         public string? ConcurrencyStamp { get; set; }
+        public List<WorkflowUserStore.ClaimRecord> Claims { get; set; } = [];
     }
 
     public IQueryable<IdentityRole> Roles
@@ -725,7 +818,7 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
             BusinessKey = role.NormalizedName ?? role.Name ?? role.Id,
             State = "active",
             Status = WorkflowInstanceStatus.Active,
-            Data = Serialize(role),
+            Data = Serialize(role, GetRoleClaims(role)),
             Revision = 1,
             CreatedAt = now,
             UpdatedAt = now,
@@ -747,7 +840,7 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
 
         role.ConcurrencyStamp = Guid.NewGuid().ToString("D");
         instance.BusinessKey = role.NormalizedName ?? role.Name ?? role.Id;
-        instance.Data = Serialize(role);
+        instance.Data = Serialize(role, GetRoleClaims(role));
         instance.Revision++;
         instance.UpdatedAt = DateTime.UtcNow;
 
@@ -765,6 +858,7 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
             await db.SaveChangesAsync(cancellationToken);
         }
 
+        claimsById.Remove(role.Id);
         return IdentityResult.Success;
     }
 
@@ -824,8 +918,59 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
         return all.Select(Deserialize).FirstOrDefault(r => string.Equals(r.NormalizedName, normalizedRoleName, StringComparison.OrdinalIgnoreCase));
     }
 
+    public Task<IList<Claim>> GetClaimsAsync(IdentityRole role, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        IList<Claim> claims = [.. GetRoleClaims(role).Select(c => new Claim(c.Type, c.Value))];
+        return Task.FromResult(claims);
+    }
+
+    public Task AddClaimAsync(IdentityRole role, Claim claim, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(claim);
+        var list = GetRoleClaims(role);
+        if (!list.Any(c => c.Type == claim.Type && c.Value == claim.Value))
+        {
+            list.Add(new WorkflowUserStore.ClaimRecord(claim.Type, claim.Value));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveClaimAsync(IdentityRole role, Claim claim, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        ArgumentNullException.ThrowIfNull(claim);
+        GetRoleClaims(role).RemoveAll(c => c.Type == claim.Type && c.Value == claim.Value);
+        return Task.CompletedTask;
+    }
+
     internal static string? TryGetRoleName(string json) =>
         JsonSerializer.Deserialize<RoleDocument>(json, JsonOptions)?.Name;
+
+    private List<WorkflowUserStore.ClaimRecord> GetRoleClaims(IdentityRole role)
+    {
+        if (roleClaims.TryGetValue(role, out var existing))
+        {
+            return existing;
+        }
+
+        if (!string.IsNullOrEmpty(role.Id) && claimsById.TryGetValue(role.Id, out var byId))
+        {
+            roleClaims.AddOrUpdate(role, byId);
+            return byId;
+        }
+
+        var created = new List<WorkflowUserStore.ClaimRecord>();
+        roleClaims.AddOrUpdate(role, created);
+        if (!string.IsNullOrEmpty(role.Id))
+        {
+            claimsById[role.Id] = created;
+        }
+
+        return created;
+    }
 
     private async Task<WorkflowInstance?> FindInstanceByIdAsync(string roleId, CancellationToken cancellationToken)
     {
@@ -838,25 +983,31 @@ internal sealed class WorkflowRoleStore(WorkflowDbContext db) : IQueryableRoleSt
         return all.FirstOrDefault(x => JsonSerializer.Deserialize<RoleDocument>(x.Data, JsonOptions)?.Id == roleId);
     }
 
-    private static string Serialize(IdentityRole role) =>
+    private static string Serialize(IdentityRole role, List<WorkflowUserStore.ClaimRecord> claims) =>
         JsonSerializer.Serialize(new RoleDocument
         {
             Id = role.Id,
             Name = role.Name,
             NormalizedName = role.NormalizedName,
             ConcurrencyStamp = role.ConcurrencyStamp,
+            Claims = [.. claims],
         }, JsonOptions);
 
-    private static IdentityRole Deserialize(WorkflowInstance instance)
+    private IdentityRole Deserialize(WorkflowInstance instance)
     {
         var doc = JsonSerializer.Deserialize<RoleDocument>(instance.Data, JsonOptions) ?? new RoleDocument();
-        return new IdentityRole
+        var id = string.IsNullOrEmpty(doc.Id) ? instance.Id.ToString("D") : doc.Id;
+        var role = new IdentityRole
         {
-            Id = string.IsNullOrEmpty(doc.Id) ? instance.Id.ToString("D") : doc.Id,
+            Id = id,
             Name = doc.Name,
             NormalizedName = doc.NormalizedName,
             ConcurrencyStamp = doc.ConcurrencyStamp ?? instance.Revision.ToString(CultureInfo.InvariantCulture),
         };
+        var claims = new List<WorkflowUserStore.ClaimRecord>(doc.Claims);
+        roleClaims.AddOrUpdate(role, claims);
+        claimsById[id] = claims;
+        return role;
     }
 }
 

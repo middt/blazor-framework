@@ -1,0 +1,23 @@
+{
+  "key": "oauth-authorization",
+  "version": 1,
+  "title": "OAuth 2.0 Yetkilendirmesi",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "applicationId": { "type": "string", "title": "Uygulama ID", "x-index": true },
+      "subject": { "type": "string", "title": "Kullanıcı (Subject)", "x-index": true },
+      "type": { "type": "string", "title": "Tür", "x-index": true },
+      "status": { "type": "string", "title": "Durum", "x-index": true },
+      "scopes": { "type": "array", "title": "Kapsamlar", "items": { "type": "string" } },
+      "creationDate": { "type": "string", "title": "Oluşturulma Tarihi" },
+      "concurrencyToken": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "valid" },
+  "states": [
+    { "key": "valid", "title": "Geçerli", "type": "Initial", "subType": "Human" },
+    { "key": "revoked", "title": "İptal Edildi", "type": "Finish", "subType": "Cancelled" }
+  ]
+}

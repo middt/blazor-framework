@@ -1,0 +1,23 @@
+{
+  "key": "oauth-application",
+  "version": 1,
+  "title": "OAuth 2.0 Uygulaması",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "clientId": { "type": "string", "title": "İstemci Kimliği", "x-index": true },
+      "displayName": { "type": "string", "title": "Görünen Ad" },
+      "clientType": { "type": "string", "title": "İstemci Türü", "x-index": true },
+      "consentType": { "type": "string", "title": "İzin Türü" },
+      "applicationType": { "type": "string", "title": "Uygulama Türü" },
+      "clientSecret": { "type": "string", "x-mask": { "pattern": "***" } },
+      "jsonWebKeySetJson": { "type": "string", "x-mask": { "pattern": "***" } },
+      "concurrencyToken": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "active" },
+  "states": [
+    { "key": "active", "title": "Etkin", "type": "Initial", "subType": "Human" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "key": "idp-role",
+  "version": 1,
+  "title": "Kimlik Rolü",
+  "roles": [ "idp-admin" ],
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "title": "Rol Adı" },
+      "normalizedName": { "type": "string", "title": "Normalleştirilmiş Ad", "x-index": true },
+      "concurrencyStamp": { "type": "string", "x-mask": { "pattern": "***" } }
+    }
+  },
+  "start": { "key": "start", "target": "active" },
+  "states": [
+    { "key": "active", "title": "Etkin", "type": "Initial", "subType": "Human" }
+  ]
+}

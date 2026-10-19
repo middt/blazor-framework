@@ -1,0 +1,170 @@
+@namespace Middt.Framework.Blazor.Workflow
+@using System.Globalization
+@using Middt.Framework.Model.Workflow
+
+@{
+    var graph = WorkflowGraph.Build(Definition, Instance, History);
+}
+
+@if (!graph.IsEmpty)
+{
+    var orderedEdges = graph.Edges
+        .OrderBy(e => e.IsTraversed ? 2 : e.IsAvailable ? 1 : 0)
+        .ToList();
+
+    <div class="middt-wf-diagram" role="region" aria-label="Akış diyagramı" data-workflow="@Definition?.Key" data-current-state="@Instance?.State">
+        <div class="middt-wf-diagram-header">
+            <span class="middt-wf-diagram-title">Akış Diyagramı</span>
+            <div class="middt-wf-diagram-legend" aria-hidden="true">
+                <span class="middt-wf-legend-item"><span class="middt-wf-legend-dot middt-wf-legend-current"></span>Şu anki adım</span>
+                <span class="middt-wf-legend-item"><span class="middt-wf-legend-dot middt-wf-legend-visited"></span>Geçilen adım / yol</span>
+                <span class="middt-wf-legend-item"><span class="middt-wf-legend-line middt-wf-legend-available"></span>Kullanılabilir geçiş</span>
+                <span class="middt-wf-legend-item"><span class="middt-wf-legend-line middt-wf-legend-upcoming"></span>Diğer yollar</span>
+            </div>
+        </div>
+        <div class="middt-wf-diagram-scroll">
+            <svg class="middt-wf-diagram-svg"
+                 viewBox="@($"0 0 {F(graph.Width)} {F(graph.Height)}")"
+                 style="@($"max-width: {F(graph.Width)}px;")"
+                 role="img"
+                 aria-label="İş akışı durum ve geçiş diyagramı">
+                <defs>
+                    <marker id="@($"{IdPrefix}-arrow-traversed")" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#2e7d32" />
+                    </marker>
+                    <marker id="@($"{IdPrefix}-arrow-traversed-error")" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#c62828" />
+                    </marker>
+                    <marker id="@($"{IdPrefix}-arrow-available")" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#1976d2" />
+                    </marker>
+                    <marker id="@($"{IdPrefix}-arrow-upcoming")" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#94a3b8" />
+                    </marker>
+                </defs>
+
+                <g class="middt-wf-diagram-edges">
+                    @foreach (var edge in orderedEdges)
+                    {
+                        <g class="@($"middt-wf-edge middt-wf-edge-{edge.Tone}")"
+                           data-edge="@edge.Id"
+                           data-traversed="@(edge.IsTraversed ? "true" : "false")"
+                           data-available="@(edge.IsAvailable ? "true" : "false")">
+                            <title>@edge.Tooltip</title>
+                            <path d="@edge.Path"
+                                  class="middt-wf-edge-path"
+                                  marker-end="@($"url(#{IdPrefix}-arrow-{edge.Tone})")" />
+                            @if (edge.IsTraversed && !string.IsNullOrEmpty(edge.OrderBadge))
+                            {
+                                <g class="middt-wf-edge-badge-group">
+                                    <rect x="@F(edge.LabelX - 12)"
+                                          y="@F(edge.LabelY - 8)"
+                                          width="24"
+                                          height="16"
+                                          rx="8"
+                                          class="middt-wf-edge-badge" />
+                                    <text x="@F(edge.LabelX)"
+                                          y="@F(edge.LabelY + 3.5)"
+                                          text-anchor="middle"
+                                          class="middt-wf-edge-badge-text">@edge.OrderBadge</text>
+                                </g>
+                            }
+                        </g>
+                    }
+                </g>
+
+                <g class="middt-wf-start-node">
+                    <circle cx="@F(graph.StartX)"
+                            cy="@F(graph.StartY)"
+                            r="@F(WorkflowGraph.StartRadius)"
+                            class="middt-wf-start-circle">
+                        <title>Başlangıç</title>
+                    </circle>
+                </g>
+
+                <g class="middt-wf-diagram-nodes">
+                    @foreach (var node in graph.Nodes)
+                    {
+                        <g class="@NodeClass(node)"
+                           transform="@($"translate({F(node.X)}, {F(node.Y)})")"
+                           data-state="@node.Key"
+                           data-current="@(node.IsCurrent ? "true" : "false")"
+                           data-visited="@(node.IsVisited ? "true" : "false")">
+                            <title>@node.Tooltip</title>
+                            @if (node.IsCurrent)
+                            {
+                                <rect x="-4"
+                                      y="-4"
+                                      width="@F(node.Width + 8)"
+                                      height="@F(node.Height + 8)"
+                                      rx="@(node.IsFinish ? "22" : "14")"
+                                      class="middt-wf-node-halo" />
+                            }
+                            <rect x="0"
+                                  y="0"
+                                  width="@F(node.Width)"
+                                  height="@F(node.Height)"
+                                  rx="@(node.IsFinish ? "18" : "10")"
+                                  class="middt-wf-node-box" />
+                            <text x="12" y="21" class="middt-wf-node-meta">@NodeMetaText(node)</text>
+                            <text x="@F(node.Width - 12)" y="21" text-anchor="end" class="middt-wf-node-badge">@node.BadgeText</text>
+                            <text x="12" y="43" class="middt-wf-node-title">@TruncateTitle(node.Title, 21)</text>
+                        </g>
+                    }
+                </g>
+            </svg>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public WorkflowDefinitionModel? Definition { get; set; }
+
+    [Parameter]
+    public WorkflowInstanceModel? Instance { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<WorkflowHistoryModel>? History { get; set; }
+
+    [Parameter]
+    public string IdPrefix { get; set; } = "wf";
+
+    private static string F(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static string NodeClass(WorkflowGraphNode node) =>
+        $"middt-wf-node middt-wf-node-{node.StatusKind}"
+        + (node.IsCurrent ? " middt-wf-node-current" : string.Empty)
+        + (node.IsVisited ? " middt-wf-node-visited" : string.Empty)
+        + (node.IsFinish ? " middt-wf-node-finish" : string.Empty);
+
+    private static string NodeMetaText(WorkflowGraphNode node)
+    {
+        if (string.Equals(node.Type, "SubFlow", StringComparison.OrdinalIgnoreCase))
+        {
+            return node.Step is { } s ? $"Adım {s.ToString(CultureInfo.InvariantCulture)} · Alt akış" : "Alt akış";
+        }
+
+        if (node.IsFinish)
+        {
+            return node.SubType switch
+            {
+                "Success" => "Bitiş · Başarılı",
+                "Error" => "Bitiş · Red / Hata",
+                "Cancelled" => "Bitiş · İptal",
+                "Timeout" => "Bitiş · Süre doldu",
+                _ => "Bitiş",
+            };
+        }
+
+        if (node.SubType == "Human")
+        {
+            return node.Step is { } s ? $"Adım {s.ToString(CultureInfo.InvariantCulture)} · Kullanıcı" : "Kullanıcı";
+        }
+
+        return node.Step is { } step ? $"Adım {step.ToString(CultureInfo.InvariantCulture)} · Otomatik" : "Otomatik";
+    }
+
+    private static string TruncateTitle(string title, int maxLength) =>
+        title.Length <= maxLength ? title : string.Concat(title.AsSpan(0, maxLength - 1), "…");
+}

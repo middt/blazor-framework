@@ -25,7 +25,9 @@ import {
   formatWorkflowJson,
   isSuccess,
   schemaHasInput,
+  workflowBuildGraph,
   workflowDataColumns,
+  workflowGraphNodeClass,
   workflowHistoryPointStyle,
   workflowIsPending,
   workflowLayoutVariables,
@@ -126,6 +128,8 @@ export class MiddtWorkflowInstanceDetailComponent {
   protected readonly dataFields = computed<WorkflowDataColumn[]>(() => workflowDataColumns(this.definition(), true));
   protected readonly dataCell = formatWorkflowDataCell;
   protected readonly steps = computed(() => workflowWizardSteps(this.definition(), this.instance(), this.history()));
+  protected readonly graph = computed(() => workflowBuildGraph(this.definition(), this.instance(), this.history()));
+  protected readonly nodeClass = workflowGraphNodeClass;
 
   /** The inline transition rendered as the wizard step form. */
   protected readonly stepTransition = computed(() => workflowStepTransition(this.instance()));

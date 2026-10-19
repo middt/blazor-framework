@@ -13,6 +13,7 @@
         <p>Hoş geldiniz, <strong>@user.Identity.Name</strong>.</p>
         <nav class="idp-link-list" aria-label="Hesap">
             <a href="@MiddtIdentityUi.SecurityPath">Hesap güvenliği</a>
+            <a href="@MiddtIdentityDefaults.DevicePath">Cihaz doğrula</a>
             @if (user.IsInRole(IdentityOptions.Value.AdminRole))
             {
                 <a href="@MiddtIdentityUi.AdminPath">Yönetim</a>

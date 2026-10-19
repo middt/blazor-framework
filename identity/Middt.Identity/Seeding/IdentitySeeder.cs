@@ -141,9 +141,14 @@ internal sealed partial class IdentitySeeder(
             if (grantType == GrantTypes.AuthorizationCode)
             {
                 descriptor.Permissions.Add(Permissions.Endpoints.Authorization);
+                descriptor.Permissions.Add(Permissions.Endpoints.PushedAuthorization);
                 descriptor.Permissions.Add(Permissions.Endpoints.EndSession);
                 descriptor.Permissions.Add(Permissions.ResponseTypes.Code);
                 descriptor.Requirements.Add(Requirements.Features.ProofKeyForCodeExchange);
+            }
+            else if (grantType == GrantTypes.DeviceCode)
+            {
+                descriptor.Permissions.Add(Permissions.Endpoints.DeviceAuthorization);
             }
         }
 

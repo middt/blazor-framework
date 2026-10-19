@@ -337,4 +337,228 @@ public sealed class IdentityProtocolTests
         dataCount.Should().BeGreaterThan(0);
         workflowKeys.Should().Contain(["idp-user", "idp-role", "oauth-application", "oauth-scope", "oauth-authorization", "oauth-token"]);
     }
+
+    [Fact]
+    public async Task Pushed_authorization_request_par_flow_end_to_end()
+    {
+        await using var host = await IdentityTestHost.StartAsync();
+        using var browser = host.NewBrowser();
+        var (verifier, challenge) = Oidc.NewPkce();
+
+        var parResponse = await browser.PostFormAsync("/connect/par", new Dictionary<string, string>
+        {
+            ["response_type"] = "code",
+            ["redirect_uri"] = IdentityTestHost.RedirectUri,
+            ["scope"] = "openid profile email api",
+            ["state"] = "par-state-1",
+            ["code_challenge"] = challenge,
+            ["code_challenge_method"] = "S256",
+        }, Basic("web", IdentityTestHost.WebSecret));
+
+        parResponse.StatusCode.Should().BeOneOf([HttpStatusCode.Created, HttpStatusCode.OK],
+            await parResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var parJson = await Oidc.JsonAsync(parResponse);
+        var requestUri = parJson["request_uri"]!.GetValue<string>();
+        requestUri.Should().NotBeNullOrWhiteSpace();
+
+        var authorizeUrl = $"/connect/authorize?client_id=web&request_uri={Uri.EscapeDataString(requestUri)}";
+        var callback = await SignInThroughJourneyAsync(host, browser, authorizeUrl, "alice", IdentityTestHost.AlicePassword);
+        var query = Oidc.Query(callback);
+        query["state"].Should().Be("par-state-1");
+
+        var tokenResponse = await RedeemAsync(browser, query["code"], verifier);
+        tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var tokens = await Oidc.JsonAsync(tokenResponse);
+        var access = Oidc.Payload(tokens["access_token"]!.GetValue<string>());
+        access["email"]!.GetValue<string>().Should().Be("alice@test.com");
+    }
+
+    [Fact]
+    public async Task Device_authorization_flow_polls_pending_then_succeeds_after_user_verification()
+    {
+        await using var host = await IdentityTestHost.StartAsync(o =>
+        {
+            o.Seed.Clients.Add(new MiddtIdentitySeedClient
+            {
+                ClientId = "tv-device",
+                Type = "public",
+                DisplayName = "Akıllı TV",
+                GrantTypes = [OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.DeviceCode, OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.RefreshToken],
+                Scopes = ["openid", "profile", "email", "roles", "api"],
+            });
+        });
+        using var device = host.NewBrowser();
+        using var userBrowser = host.NewBrowser();
+
+        // 1. Device requests a device_code and user_code
+        var deviceResponse = await device.PostFormAsync("/connect/device", new Dictionary<string, string>
+        {
+            ["client_id"] = "tv-device",
+            ["scope"] = "openid profile email roles api",
+        });
+        deviceResponse.StatusCode.Should().Be(HttpStatusCode.OK, await deviceResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var deviceJson = await Oidc.JsonAsync(deviceResponse);
+        var deviceCode = deviceJson["device_code"]!.GetValue<string>();
+        var userCode = deviceJson["user_code"]!.GetValue<string>();
+        deviceJson["verification_uri"]!.GetValue<string>().Should().Be("http://localhost/connect/verify");
+
+        // 2. Polling before user approval returns authorization_pending
+        var pendingResponse = await device.PostFormAsync("/connect/token", new Dictionary<string, string>
+        {
+            ["grant_type"] = OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.DeviceCode,
+            ["client_id"] = "tv-device",
+            ["device_code"] = deviceCode,
+        });
+        pendingResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Oidc.JsonAsync(pendingResponse))["error"]!.GetValue<string>().Should().Be("authorization_pending");
+
+        // 3. User opens verification_uri_complete -> redirected to login journey -> signs in -> redirected to /account/device?user_code=...
+        var verifyUrl = $"/connect/verify?user_code={Uri.EscapeDataString(userCode)}";
+        var loginRedirect = Oidc.Location(await userBrowser.GetAsync(verifyUrl));
+        var journeyId = Oidc.JourneyId(loginRedirect);
+        var binding = userBrowser.JourneyBinding(journeyId);
+        var state = await host.JourneysAsync(j => j.SubmitAsync(journeyId, binding, "submit-credentials",
+            Oidc.Input(new { userName = "alice", password = IdentityTestHost.AlicePassword }), TestContext.Current.CancellationToken));
+        state!.IsSucceeded.Should().BeTrue();
+
+        var backToVerify = Oidc.Location(await userBrowser.GetAsync(MiddtIdentityDefaults.JourneyCompletePath(journeyId)));
+        backToVerify.AbsolutePath.Should().Be("/connect/verify");
+
+        var toDevicePage = Oidc.Location(await userBrowser.GetAsync(backToVerify.PathAndQuery));
+        toDevicePage.AbsolutePath.Should().Be("/account/device");
+        Oidc.Query(toDevicePage)["user_code"].Should().Be(userCode);
+
+        // 4. User approves the device request at POST /connect/verify
+        var approveResponse = await userBrowser.PostFormAsync("/connect/verify", new Dictionary<string, string>
+        {
+            ["user_code"] = userCode,
+            ["decision"] = "approve",
+        });
+        var approvedRedirect = Oidc.Location(approveResponse);
+        approvedRedirect.PathAndQuery.Should().Be("/account/device?status=approved");
+
+        // 5. Device polls /connect/token again and receives the access token
+        var tokenResponse = await device.PostFormAsync("/connect/token", new Dictionary<string, string>
+        {
+            ["grant_type"] = OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.DeviceCode,
+            ["client_id"] = "tv-device",
+            ["device_code"] = deviceCode,
+        });
+        tokenResponse.StatusCode.Should().Be(HttpStatusCode.OK, await tokenResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var tokens = await Oidc.JsonAsync(tokenResponse);
+        var access = Oidc.Payload(tokens["access_token"]!.GetValue<string>());
+        access["preferred_username"]!.GetValue<string>().Should().Be("alice");
+        access["email"]!.GetValue<string>().Should().Be("alice@test.com");
+    }
+
+    [Fact]
+    public async Task Password_and_token_exchange_flows_issue_tokens_with_expected_claims()
+    {
+        await using var host = await IdentityTestHost.StartAsync(o =>
+        {
+            o.Seed.Clients.Add(new MiddtIdentitySeedClient
+            {
+                ClientId = "legacy-cli",
+                ClientSecret = "cli-secret",
+                DisplayName = "CLI İstemcisi",
+                GrantTypes =
+                [
+                    OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.Password,
+                    OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.TokenExchange,
+                ],
+                Scopes = ["openid", "profile", "email", "roles", "api"],
+            });
+        });
+        using var browser = host.NewBrowser();
+
+        // 1. Password grant (valid credentials)
+        var passwordResponse = await browser.PostFormAsync("/connect/token", new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["username"] = "alice",
+            ["password"] = IdentityTestHost.AlicePassword,
+            ["scope"] = "openid profile email roles api",
+        }, Basic("legacy-cli", "cli-secret"));
+        passwordResponse.StatusCode.Should().Be(HttpStatusCode.OK, await passwordResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var passwordTokens = await Oidc.JsonAsync(passwordResponse);
+        var subjectToken = passwordTokens["access_token"]!.GetValue<string>();
+        var access = Oidc.Payload(subjectToken);
+        access["preferred_username"]!.GetValue<string>().Should().Be("alice");
+
+        // 2. Password grant (invalid password -> invalid_grant)
+        var wrongPassword = await browser.PostFormAsync("/connect/token", new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["username"] = "alice",
+            ["password"] = "wrong-password",
+            ["scope"] = "openid api",
+        }, Basic("legacy-cli", "cli-secret"));
+        wrongPassword.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Oidc.JsonAsync(wrongPassword))["error"]!.GetValue<string>().Should().Be("invalid_grant");
+
+        // 3. Token exchange (RFC 8693)
+        var exchangeResponse = await browser.PostFormAsync("/connect/token", new Dictionary<string, string>
+        {
+            ["grant_type"] = OpenIddict.Abstractions.OpenIddictConstants.GrantTypes.TokenExchange,
+            ["subject_token"] = subjectToken,
+            ["subject_token_type"] = OpenIddict.Abstractions.OpenIddictConstants.TokenTypeIdentifiers.AccessToken,
+            ["scope"] = "openid profile api",
+        }, Basic("legacy-cli", "cli-secret"));
+        exchangeResponse.StatusCode.Should().Be(HttpStatusCode.OK, await exchangeResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var exchangedTokens = await Oidc.JsonAsync(exchangeResponse);
+        var exchangedPayload = Oidc.Payload(exchangedTokens["access_token"]!.GetValue<string>());
+        exchangedPayload["sub"]!.GetValue<string>().Should().Be(access["sub"]!.GetValue<string>());
+        exchangedPayload["act"]!["sub"]!.GetValue<string>().Should().Be("legacy-cli");
+    }
+
+    [Fact]
+    public async Task External_logins_authentication_tokens_and_role_claims_are_persisted_in_workflow_stores()
+    {
+        await using var host = await IdentityTestHost.StartAsync();
+
+        await host.UsersAsync(async users =>
+        {
+            var alice = (await users.FindByNameAsync("alice"))!;
+
+            // External logins (IUserLoginStore)
+            var addLogin = await users.AddLoginAsync(alice, new Microsoft.AspNetCore.Identity.UserLoginInfo("GitHub", "gh-12345", "GitHub"));
+            addLogin.Succeeded.Should().BeTrue();
+
+            var byLogin = await users.FindByLoginAsync("GitHub", "gh-12345");
+            byLogin.Should().NotBeNull();
+            byLogin!.Id.Should().Be(alice.Id);
+
+            var logins = await users.GetLoginsAsync(alice);
+            logins.Should().ContainSingle(l => l.LoginProvider == "GitHub" && l.ProviderKey == "gh-12345");
+
+            (await users.RemoveLoginAsync(alice, "GitHub", "gh-12345")).Succeeded.Should().BeTrue();
+            (await users.FindByLoginAsync("GitHub", "gh-12345")).Should().BeNull();
+
+            // Authentication tokens (IUserAuthenticationTokenStore) - encrypted at rest
+            const string rawTokenSecret = "super-secret-external-token-value";
+            (await users.SetAuthenticationTokenAsync(alice, "GitHub", "access_token", rawTokenSecret)).Succeeded.Should().BeTrue();
+            (await users.GetAuthenticationTokenAsync(alice, "GitHub", "access_token")).Should().Be(rawTokenSecret);
+
+            var dump = await host.DumpJourneyTablesAsync();
+            dump.Should().NotContain(rawTokenSecret, "authentication tokens must be protected with DataProtection at rest");
+
+            (await users.RemoveAuthenticationTokenAsync(alice, "GitHub", "access_token")).Succeeded.Should().BeTrue();
+            (await users.GetAuthenticationTokenAsync(alice, "GitHub", "access_token")).Should().BeNull();
+            return true;
+        });
+
+        await host.WithServiceAsync<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>, bool>(async roles =>
+        {
+            var managerRole = (await roles.FindByNameAsync("manager"))!;
+            var claim = new System.Security.Claims.Claim("permission", "reports.export");
+
+            (await roles.AddClaimAsync(managerRole, claim)).Succeeded.Should().BeTrue();
+            var claims = await roles.GetClaimsAsync(managerRole);
+            claims.Should().ContainSingle(c => c.Type == "permission" && c.Value == "reports.export");
+
+            (await roles.RemoveClaimAsync(managerRole, claim)).Succeeded.Should().BeTrue();
+            (await roles.GetClaimsAsync(managerRole)).Should().BeEmpty();
+            return true;
+        });
+    }
 }

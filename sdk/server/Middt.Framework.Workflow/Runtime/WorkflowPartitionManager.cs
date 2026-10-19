@@ -213,19 +213,51 @@ public static class WorkflowPartitionManager
     private static async Task EnsureFlowPartitionsAsync(WorkflowDbContext db, string schema, string workflowKey, string suffix, ILogger? logger, CancellationToken cancellationToken)
     {
         var escapedKey = workflowKey.Replace("'", "''", StringComparison.Ordinal);
-        var partitionSqls = new[]
-        {
-            $"CREATE TABLE IF NOT EXISTS {schema}.\"WorkflowInstances_{suffix}\" PARTITION OF {schema}.\"WorkflowInstances\" FOR VALUES IN ('{escapedKey}');",
-            $"CREATE TABLE IF NOT EXISTS {schema}.\"WorkflowInstanceData_{suffix}\" PARTITION OF {schema}.\"WorkflowInstanceData\" FOR VALUES IN ('{escapedKey}');",
-            $"CREATE TABLE IF NOT EXISTS {schema}.\"WorkflowHistory_{suffix}\" PARTITION OF {schema}.\"WorkflowHistory\" FOR VALUES IN ('{escapedKey}');",
-            $"CREATE TABLE IF NOT EXISTS {schema}.\"WorkflowJobs_{suffix}\" PARTITION OF {schema}.\"WorkflowJobs\" FOR VALUES IN ('{escapedKey}');",
-            $"CREATE TABLE IF NOT EXISTS {schema}.\"WorkflowIncidents_{suffix}\" PARTITION OF {schema}.\"WorkflowIncidents\" FOR VALUES IN ('{escapedKey}');",
-        };
+        var rawSchema = schema.Trim('"');
+        var migrateAndCreateSql = $"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_class c
+                    JOIN pg_namespace n ON c.relnamespace = n.oid
+                    WHERE n.nspname = '{rawSchema}' AND c.relname = 'WorkflowInstances_{suffix}'
+                ) THEN
+                    CREATE TEMP TABLE "_tmp_wi_{suffix}" ON COMMIT DROP AS
+                        SELECT * FROM {schema}."WorkflowInstances_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    CREATE TEMP TABLE "_tmp_wid_{suffix}" ON COMMIT DROP AS
+                        SELECT * FROM {schema}."WorkflowInstanceData_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    CREATE TEMP TABLE "_tmp_wh_{suffix}" ON COMMIT DROP AS
+                        SELECT * FROM {schema}."WorkflowHistory_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    CREATE TEMP TABLE "_tmp_wj_{suffix}" ON COMMIT DROP AS
+                        SELECT * FROM {schema}."WorkflowJobs_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    CREATE TEMP TABLE "_tmp_winc_{suffix}" ON COMMIT DROP AS
+                        SELECT * FROM {schema}."WorkflowIncidents_Default" WHERE "WorkflowKey" = '{escapedKey}';
 
-        foreach (var sql in partitionSqls)
-        {
-            await ExecuteSafeAsync(db, sql, logger, cancellationToken);
-        }
+                    DELETE FROM {schema}."WorkflowInstanceData_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    DELETE FROM {schema}."WorkflowInstances_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    DELETE FROM {schema}."WorkflowHistory_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    DELETE FROM {schema}."WorkflowJobs_Default" WHERE "WorkflowKey" = '{escapedKey}';
+                    DELETE FROM {schema}."WorkflowIncidents_Default" WHERE "WorkflowKey" = '{escapedKey}';
+
+                    CREATE TABLE IF NOT EXISTS {schema}."WorkflowInstances_{suffix}" PARTITION OF {schema}."WorkflowInstances" FOR VALUES IN ('{escapedKey}');
+                    CREATE TABLE IF NOT EXISTS {schema}."WorkflowInstanceData_{suffix}" PARTITION OF {schema}."WorkflowInstanceData" FOR VALUES IN ('{escapedKey}');
+                    CREATE TABLE IF NOT EXISTS {schema}."WorkflowHistory_{suffix}" PARTITION OF {schema}."WorkflowHistory" FOR VALUES IN ('{escapedKey}');
+                    CREATE TABLE IF NOT EXISTS {schema}."WorkflowJobs_{suffix}" PARTITION OF {schema}."WorkflowJobs" FOR VALUES IN ('{escapedKey}');
+                    CREATE TABLE IF NOT EXISTS {schema}."WorkflowIncidents_{suffix}" PARTITION OF {schema}."WorkflowIncidents" FOR VALUES IN ('{escapedKey}');
+
+                    INSERT INTO {schema}."WorkflowInstances" SELECT * FROM "_tmp_wi_{suffix}";
+                    INSERT INTO {schema}."WorkflowInstanceData" SELECT * FROM "_tmp_wid_{suffix}";
+                    INSERT INTO {schema}."WorkflowHistory" SELECT * FROM "_tmp_wh_{suffix}";
+                    INSERT INTO {schema}."WorkflowJobs" SELECT * FROM "_tmp_wj_{suffix}";
+                    INSERT INTO {schema}."WorkflowIncidents" SELECT * FROM "_tmp_winc_{suffix}";
+
+                    DROP TABLE "_tmp_wi_{suffix}", "_tmp_wid_{suffix}", "_tmp_wh_{suffix}", "_tmp_wj_{suffix}", "_tmp_winc_{suffix}";
+                END IF;
+            END $$;
+            """;
+
+        await ExecuteSafeAsync(db, migrateAndCreateSql, logger, cancellationToken);
     }
 
     private static async Task EnsureFlowIndexesAsync(

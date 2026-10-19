@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Middt.Framework.Blazor.Workflow;
+using Middt.Framework.Model.Workflow;
 
 namespace Middt.Framework.Tests.Blazor;
 
@@ -80,4 +81,88 @@ public sealed class WorkflowStartPrefillTests
     [Fact]
     public void Type_arrays_use_the_first_non_null_type() =>
         WorkflowUi.SchemaType(JsonNode.Parse("""{ "type": ["null", "number"] }""")!.AsObject()).Should().Be("number");
+
+    [Fact]
+    public void WorkflowGraph_computes_layered_nodes_current_state_and_traversed_paths()
+    {
+        var definition = new WorkflowDefinitionModel
+        {
+            Key = "customer-onboarding",
+            Version = 1,
+            StartState = "kyc-scoring",
+            States =
+            [
+                new() { Key = "kyc-scoring", Title = "KYC Skorlama", Type = "Intermediate", SubType = "None", Step = 1 },
+                new() { Key = "kyc-review", Title = "KYC İncelemesi", Type = "Intermediate", SubType = "Human", Step = 2 },
+                new() { Key = "active", Title = "Aktif Müşteri", Type = "Intermediate", SubType = "Human", Step = 3 },
+                new() { Key = "closed", Title = "Kapatıldı", Type = "Finish", SubType = "Cancelled", Step = 4 },
+                new() { Key = "rejected", Title = "Reddedildi", Type = "Finish", SubType = "Error", Step = 4 },
+            ],
+            Transitions =
+            [
+                new() { Key = "auto-approve", From = "kyc-scoring", Target = "active", Trigger = "Automatic" },
+                new() { Key = "require-review", From = "kyc-scoring", Target = "kyc-review", Trigger = "Automatic" },
+                new() { Key = "approve-kyc", Title = "KYC Onayla", From = "kyc-review", Target = "active", Trigger = "Manual" },
+                new() { Key = "add-kyc-note", Title = "Not Ekle", From = "kyc-review", Target = "$self", Trigger = "Manual" },
+                new() { Key = "reject-kyc", Title = "Reddet", From = "kyc-review", Target = "rejected", Trigger = "Manual" },
+                new() { Key = "update-income", Title = "Gelir Güncelle", From = "active", Target = "kyc-scoring", Trigger = "Manual" },
+                new() { Key = "close-account", Title = "Kapat", From = "active", Target = "closed", Trigger = "Manual" },
+            ],
+        };
+
+        var instance = new WorkflowInstanceModel
+        {
+            Id = Guid.NewGuid(),
+            Workflow = "customer-onboarding",
+            WorkflowVersion = 1,
+            State = "kyc-review",
+            Status = WorkflowInstanceStatus.Active,
+            AvailableTransitions =
+            [
+                new() { Key = "approve-kyc", Title = "KYC Onayla", Target = "active" },
+                new() { Key = "add-kyc-note", Title = "Not Ekle", Target = "$self" },
+                new() { Key = "reject-kyc", Title = "Reddet", Target = "rejected" },
+            ],
+        };
+
+        var history = new List<WorkflowHistoryModel>
+        {
+            new() { TransitionKey = "start", FromState = null, ToState = "kyc-scoring", Trigger = "Start" },
+            new() { TransitionKey = "require-review", FromState = "kyc-scoring", ToState = "kyc-review", Trigger = "Automatic" },
+            new() { TransitionKey = "add-kyc-note", FromState = "kyc-review", ToState = "kyc-review", Trigger = "Manual" },
+        };
+
+        var graph = WorkflowGraph.Build(definition, instance, history);
+
+        graph.IsEmpty.Should().BeFalse();
+        graph.Nodes.Should().HaveCount(5);
+
+        var scoringNode = graph.Nodes.Single(n => n.Key == "kyc-scoring");
+        var reviewNode = graph.Nodes.Single(n => n.Key == "kyc-review");
+        var activeNode = graph.Nodes.Single(n => n.Key == "active");
+        var closedNode = graph.Nodes.Single(n => n.Key == "closed");
+        var rejectedNode = graph.Nodes.Single(n => n.Key == "rejected");
+
+        scoringNode.Column.Should().Be(0);
+        reviewNode.Column.Should().Be(1);
+        activeNode.Column.Should().Be(2);
+        closedNode.Column.Should().Be(3);
+        rejectedNode.Column.Should().Be(3);
+
+        scoringNode.IsVisited.Should().BeTrue();
+        scoringNode.IsCurrent.Should().BeFalse();
+        reviewNode.IsCurrent.Should().BeTrue();
+        reviewNode.VisitCount.Should().Be(2);
+        activeNode.IsVisited.Should().BeFalse();
+
+        graph.Edges.Single(e => e.Id == "__start->kyc-scoring").IsTraversed.Should().BeTrue();
+        graph.Edges.Single(e => e.Id == "kyc-scoring->kyc-review").IsTraversed.Should().BeTrue();
+        graph.Edges.Single(e => e.Id == "kyc-scoring->kyc-review").OrderBadge.Should().Be("2");
+        graph.Edges.Single(e => e.Id == "kyc-review->kyc-review").IsSelfLoop.Should().BeTrue();
+        graph.Edges.Single(e => e.Id == "kyc-review->kyc-review").IsTraversed.Should().BeTrue();
+        graph.Edges.Single(e => e.Id == "kyc-review->kyc-review").OrderBadge.Should().Be("3");
+        graph.Edges.Single(e => e.Id == "kyc-review->active").IsAvailable.Should().BeTrue();
+        graph.Edges.Single(e => e.Id == "active->kyc-scoring").IsBackEdge.Should().BeTrue();
+    }
 }
+

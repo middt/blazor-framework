@@ -1,0 +1,137 @@
+@page "/account/device"
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [Authorize(Policy = MiddtIdentityUi.AccountPolicy)]
+@layout AccountLayout
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.Net.Http.Headers
+@using OpenIddict.Abstractions
+@using OpenIddict.Server.AspNetCore
+@inject IOpenIddictApplicationManager Applications
+@inject IOpenIddictScopeManager Scopes
+
+<PageTitle>Cihaz doğrulama</PageTitle>
+
+<section class="idp-card" aria-labelledby="idp-device-title">
+    <h1 id="idp-device-title" class="idp-title">Cihaz doğrulama</h1>
+
+    @if (Status == "approved")
+    {
+        <div class="idp-alert idp-alert-success" role="status">
+            Cihaz yetkilendirildi. Bu pencereyi kapatıp cihazınıza dönebilirsiniz.
+        </div>
+        <p class="idp-alt"><a href="/">Ana sayfaya dön</a></p>
+    }
+    else if (Status == "denied")
+    {
+        <div class="idp-alert" role="status">
+            Cihaz yetkilendirme isteği reddedildi.
+        </div>
+        <p class="idp-alt"><a href="/">Ana sayfaya dön</a></p>
+    }
+    else if (verified)
+    {
+        <p class="idp-subtitle">
+            <strong>@(clientName ?? clientId ?? "Bir cihaz")</strong> hesabınıza erişmek istiyor.
+        </p>
+
+        @if (scopeItems.Count > 0)
+        {
+            <p id="idp-device-scopes-title">Uygulamanın erişmek istedikleri:</p>
+            <ul class="idp-scope-list" aria-labelledby="idp-device-scopes-title">
+                @foreach (var (name, title) in scopeItems)
+                {
+                    <li>
+                        <span class="idp-scope-name">@title</span>
+                        <code class="idp-muted">@name</code>
+                    </li>
+                }
+            </ul>
+        }
+
+        <form method="post" action="/@MiddtIdentityEndpoints.EndUserVerificationPath" class="idp-form">
+            <input type="hidden" name="user_code" value="@UserCode" />
+            <div class="idp-actions">
+                <button type="submit" name="decision" value="approve" class="idp-button idp-button-primary" autofocus>İzin ver</button>
+                <button type="submit" name="decision" value="deny" class="idp-button idp-button-secondary">Reddet</button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <p class="idp-subtitle">Cihazınızda gösterilen doğrulama kodunu girin.</p>
+        <ErrorSummary Errors="errors" Id="idp-device-errors" />
+        <form method="get" action="/@MiddtIdentityEndpoints.EndUserVerificationPath" class="idp-form">
+            <InputField Id="Input_UserCode" Name="user_code" Label="Kullanıcı kodu" Value="@UserCode" Autocomplete="off" Autofocus="true" Required="true" />
+            <button type="submit" class="idp-button idp-button-primary">Devam et</button>
+        </form>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "user_code")]
+    public string? UserCode { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? Status { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private bool verified;
+    private string? clientId;
+    private string? clientName;
+    private List<(string Name, string Title)> scopeItems = [];
+    private IReadOnlyList<string> errors = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        HttpContext.Response.Headers[HeaderNames.CacheControl] = "no-store";
+
+        if (Error == "invalid_code")
+        {
+            errors = ["Geçersiz veya süresi dolmuş cihaz kodu."];
+        }
+
+        if (!string.IsNullOrWhiteSpace(UserCode))
+        {
+            var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            if (result.Succeeded && result.Principal is not null)
+            {
+                verified = true;
+                clientId = result.Principal.GetClaim(OpenIddictConstants.Claims.ClientId);
+                if (!string.IsNullOrEmpty(clientId) && await Applications.FindByClientIdAsync(clientId, HttpContext.RequestAborted) is { } app)
+                {
+                    clientName = await Applications.GetLocalizedDisplayNameAsync(app, HttpContext.RequestAborted) ?? clientId;
+                }
+
+                foreach (var scope in result.Principal.GetScopes())
+                {
+                    string? displayName = null;
+                    if (await Scopes.FindByNameAsync(scope, HttpContext.RequestAborted) is { } scopeEntity)
+                    {
+                        displayName = await Scopes.GetLocalizedDisplayNameAsync(scopeEntity, HttpContext.RequestAborted);
+                    }
+
+                    scopeItems.Add((scope, BuiltInTitle(scope) ?? displayName ?? scope));
+                }
+            }
+            else if (errors.Count == 0)
+            {
+                errors = ["Geçersiz veya süresi dolmuş cihaz kodu."];
+            }
+        }
+    }
+
+    private static string? BuiltInTitle(string scope) => scope switch
+    {
+        "openid" => "Kimliğiniz",
+        "profile" => "Profil bilgileriniz (ad)",
+        "email" => "E-posta adresiniz",
+        "roles" => "Rolleriniz",
+        "offline_access" => "Siz uygulamada değilken erişim (oturumu yenileme)",
+        _ => null,
+    };
+}
