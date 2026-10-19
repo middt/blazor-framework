@@ -3,7 +3,7 @@
   "key": "credit-pipeline",
   "title": "Kredi Tahsis Portföyü (Workflow JSON)",
   "kind": "page",
-  "version": 2,
+  "version": 3,
   "body": [
     { "widget": "heading", "text": "Kredi Tahsis Portföyü (Workflow JSON Verisi)" },
     { "widget": "link", "text": "Yeni Kredi Tahsis Talebi", "href": "/workflow/credit-allocation?start=1", "style": "button" },
@@ -22,7 +22,23 @@
       ],
       "search": [
         { "field": "customerKey", "label": "Müşteri Anahtarı" },
-        { "field": "state", "label": "Durum Kodu" }
+        {
+          "field": "state",
+          "label": "Onay Aşaması",
+          "type": "select",
+          "options": [
+            { "value": "stage1-approval", "text": "1. Onay: Tahsis Yetkilisi" },
+            { "value": "stage2-approval", "text": "2. Onay: Kredi Komitesi (4-Göz İlkesi)" },
+            { "value": "disbursed", "text": "Kredi Kullandırıldı" },
+            { "value": "rejected", "text": "Kredi Reddedildi" }
+          ]
+        },
+        { "field": "amount_min", "label": "Min Kredi Tutarı (≥)", "type": "number" },
+        { "field": "amount_max", "label": "Max Kredi Tutarı (≤)", "type": "number" },
+        { "field": "termMonths_min", "label": "Min Vade (≥)", "type": "integer" },
+        { "field": "termMonths_max", "label": "Max Vade (≤)", "type": "integer" },
+        { "field": "createdAt_from", "label": "Başlangıç Tarihi", "type": "date" },
+        { "field": "createdAt_to", "label": "Bitiş Tarihi", "type": "date" }
       ]
     }
   ]

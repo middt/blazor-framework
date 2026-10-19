@@ -36,6 +36,20 @@ public static partial class JsonSchemaValidator
     /// <summary>Schema keyword controlling whether a property is shown as a column in the workflow instance list (<c>true</c> by default).</summary>
     public const string ListKeyword = "x-list";
 
+    /// <summary>Schema keyword controlling whether a property is shown in the workflow instance list search bar (<c>false</c> by default).</summary>
+    public const string SearchKeyword = "x-search";
+
+    /// <summary>Schema keyword controlling whether a partition functional B-Tree index is created for the property.</summary>
+    public const string IndexKeyword = "x-index";
+
+    /// <summary>Schema keyword on the root <c>dataSchema</c> controlling whether <c>createdFrom</c>/<c>createdTo</c> date range filters are shown.</summary>
+    public const string DateSearchKeyword = "x-date-search";
+
+    private static readonly HashSet<string> SupportedSearchModes =
+    [
+        "text", "select", "range", "min", "max", "gte", "lte", "date-range",
+    ];
+
     private static readonly HashSet<string> SupportedKeywords =
     [
         "$schema", "title", "description", "type", "properties", "required", "additionalProperties", "enum", "const",
@@ -68,11 +82,21 @@ public static partial class JsonSchemaValidator
                     yield return error;
                 }
             }
-            else if (keyword == ListKeyword)
+            else if (keyword is ListKeyword or IndexKeyword or DateSearchKeyword)
             {
                 if (value is not JsonValue lv || lv.GetValueKind() is not (JsonValueKind.True or JsonValueKind.False))
                 {
-                    yield return $"{path}.{ListKeyword}: must be a boolean.";
+                    yield return $"{path}.{keyword}: must be a boolean.";
+                }
+            }
+            else if (keyword == SearchKeyword)
+            {
+                var valid = value is JsonValue sv && (
+                    sv.GetValueKind() is JsonValueKind.True or JsonValueKind.False ||
+                    (sv.GetValueKind() == JsonValueKind.String && sv.TryGetValue<string>(out var mode) && SupportedSearchModes.Contains(mode)));
+                if (!valid)
+                {
+                    yield return $"{path}.{keyword}: must be a boolean or one of {string.Join(", ", SupportedSearchModes)}.";
                 }
             }
             else if (!SupportedKeywords.Contains(keyword))

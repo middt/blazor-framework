@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Expressions;
 using Middt.Framework.Model.Enumerations;
@@ -18,7 +20,7 @@ namespace Middt.Framework.Workflow.Runtime;
 /// suitable for <c>api/v1/{entity}/getall|getitems|getbyid</c>, Server-Driven UI grids/KPIs, and <c>x-lookup</c> selects
 /// without requiring relational domain tables.
 /// </summary>
-public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegistry registry)
+public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegistry registry, IOptions<MiddtWorkflowOptions>? options = null)
 {
     /// <summary>Returns accessible instances of <paramref name="entity"/> (clamped to 200 for unpaged lookups/KPIs) with <c>dataSchema</c> role/mask projection applied.</summary>
     public async Task<BaseResponseDataModel<List<JsonObject>>> GetAllAsync(
@@ -66,8 +68,9 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         var hasActiveFilter = HasNonEmptyFilter(filter);
         var sortProperty = searchRequest?["sortProperty"]?.GetValue<string>();
         var ascending = searchRequest?["sortReverse"]?.GetValue<bool>() ?? false;
+        var defaultSort = string.IsNullOrWhiteSpace(sortProperty) || string.Equals(sortProperty, "createdAt", StringComparison.OrdinalIgnoreCase);
 
-        if (!hasActiveFilter && (string.IsNullOrWhiteSpace(sortProperty) || string.Equals(sortProperty, "createdAt", StringComparison.OrdinalIgnoreCase)))
+        if (!hasActiveFilter && defaultSort)
         {
             var total = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
             var ordered = ascending ? query.OrderBy(i => i.CreatedAt) : query.OrderByDescending(i => i.CreatedAt);
@@ -84,11 +87,20 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
             };
         }
 
+        var workflowKey = ResolveWorkflowKey(entity);
+        var rawDataFilters = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var metaFilters = new List<WorkflowPartitionManager.InMemoryDataCondition>();
+
         if (filter is not null)
         {
             foreach (var (k, v) in filter)
             {
-                var text = v?.ToString().Trim();
+                var text = v switch
+                {
+                    JsonValue jv when jv.GetValueKind() == JsonValueKind.String => jv.GetValue<string>().Trim(),
+                    not null => v.ToString().Trim(),
+                    null => null,
+                };
                 if (string.IsNullOrEmpty(text))
                 {
                     continue;
@@ -96,17 +108,73 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
 
                 if (string.Equals(k, "key", StringComparison.OrdinalIgnoreCase) || string.Equals(k, "businessKey", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(i => i.BusinessKey != null && i.BusinessKey.Contains(text));
+                    metaFilters.Add(new WorkflowPartitionManager.InMemoryDataCondition("key", WorkflowPartitionManager.DataFilterOp.Default, text, ExactString: false));
                 }
                 else if (string.Equals(k, "state", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(i => i.State.Contains(text));
+                    metaFilters.Add(new WorkflowPartitionManager.InMemoryDataCondition("state", WorkflowPartitionManager.DataFilterOp.Default, text, ExactString: false));
+                }
+                else if (string.Equals(k, "status", StringComparison.OrdinalIgnoreCase))
+                {
+                    metaFilters.Add(new WorkflowPartitionManager.InMemoryDataCondition("status", WorkflowPartitionManager.DataFilterOp.Default, text, ExactString: true));
                 }
                 else
                 {
-                    query = query.Where(i => i.InstanceData != null && i.InstanceData.Data.Contains(text));
+                    rawDataFilters[k] = text;
                 }
             }
+        }
+
+        List<WorkflowPartitionManager.InMemoryDataCondition> remainingDataFilters = [];
+        if (workflowKey is not null && rawDataFilters.Count > 0)
+        {
+            var versions = TryGetVersions(workflowKey);
+            var projectedSchema = versions.Count > 0
+                ? JsonSchemaValidator.ProjectSchema(versions[^1].DataSchema, ExpressionUser.FromPrincipal(user))
+                : null;
+            var (sqlConditions, remaining, createdFromUtc, createdToUtc) = WorkflowPartitionManager.ClassifyDataFilters(rawDataFilters, projectedSchema);
+            if (sqlConditions.Count > 0 || createdFromUtc is not null || createdToUtc is not null)
+            {
+                query = WorkflowPartitionManager.ApplySqlDataFilters(query, db, options?.Value.Schema, workflowKey, sqlConditions, createdFromUtc, createdToUtc);
+            }
+
+            remainingDataFilters = remaining;
+        }
+        else if (rawDataFilters.Count > 0)
+        {
+            var (_, remaining, createdFromUtc, createdToUtc) = WorkflowPartitionManager.ClassifyDataFilters(rawDataFilters, null);
+            if (createdFromUtc is { } fromUtc)
+            {
+                query = query.Where(i => i.CreatedAt >= fromUtc);
+            }
+
+            if (createdToUtc is { } toUtc)
+            {
+                query = query.Where(i => i.CreatedAt <= toUtc);
+            }
+
+            remainingDataFilters = remaining;
+        }
+
+        var allRemainingFilters = new List<WorkflowPartitionManager.InMemoryDataCondition>(metaFilters.Count + remainingDataFilters.Count);
+        allRemainingFilters.AddRange(metaFilters);
+        allRemainingFilters.AddRange(remainingDataFilters);
+
+        if (allRemainingFilters.Count == 0 && defaultSort)
+        {
+            var total = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
+            var ordered = ascending ? query.OrderBy(i => i.CreatedAt) : query.OrderByDescending(i => i.CreatedAt);
+            var rows = await ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return new BaseResponseDataModel<List<JsonObject>>
+            {
+                Result = ResultEnum.Success,
+                Count = total,
+                Data = ProjectRows(rows, user),
+            };
         }
 
         var candidateRows = await query
@@ -115,9 +183,9 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
             .ToListAsync(cancellationToken);
 
         var items = ProjectRows(candidateRows, user);
-        if (filter is not null)
+        if (allRemainingFilters.Count > 0)
         {
-            items = [.. items.Where(item => MatchesFilter(item, filter))];
+            items = [.. items.Where(item => WorkflowPartitionManager.MatchesDataFilters(item, allRemainingFilters))];
         }
 
         if (!string.IsNullOrWhiteSpace(sortProperty))
@@ -321,31 +389,6 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         flat["createdAt"] = new DateTimeOffset(DateTime.SpecifyKind(instance.CreatedAt, DateTimeKind.Utc));
         flat["updatedAt"] = new DateTimeOffset(DateTime.SpecifyKind(instance.UpdatedAt, DateTimeKind.Utc));
         return flat;
-    }
-
-    private static bool MatchesFilter(JsonObject item, JsonObject filter)
-    {
-        foreach (var (key, expected) in filter)
-        {
-            if (expected is null)
-            {
-                continue;
-            }
-
-            var expectedText = expected.ToString().Trim();
-            if (string.IsNullOrEmpty(expectedText))
-            {
-                continue;
-            }
-
-            var actualText = item[key]?.ToString() ?? string.Empty;
-            if (!actualText.Contains(expectedText, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static string SortKey(JsonObject item, string property) =>

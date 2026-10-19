@@ -82,9 +82,10 @@ public static class WorkflowEndpoints
             return Results.Ok(body);
         }).WithName("StartWorkflowInstance");
 
-        group.MapGet("{workflow}/instances", async (string workflow, string? state, WorkflowInstanceStatus? status, string? key, int? page, int? pageSize, WorkflowEngine engine, ClaimsPrincipal principal, CancellationToken ct) =>
+        group.MapGet("{workflow}/instances", async (string workflow, string? state, WorkflowInstanceStatus? status, string? key, int? page, int? pageSize, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
-            var (items, count) = await engine.ListAsync(workflow, WorkflowUser.From(principal), state, status, key, page ?? 1, pageSize ?? 20, ct);
+            var filter = ExtractDataFilter(http.Request.Query);
+            var (items, count) = await engine.ListAsync(workflow, WorkflowUser.From(principal), state, status, key, page ?? 1, pageSize ?? 20, filter, ct);
             return BaseResponseDataModel<List<WorkflowInstanceModel>>.Success(items, count);
         }).WithName("ListWorkflowInstances");
 
@@ -187,6 +188,48 @@ public static class WorkflowEndpoints
             })
             .ToList(),
     };
+
+    private static readonly HashSet<string> ReservedInstanceQueryKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "state", "status", "key", "page", "pageSize",
+    };
+
+    private static Dictionary<string, string?>? ExtractDataFilter(IQueryCollection query)
+    {
+        if (query.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string?>? result = null;
+        foreach (var (rawKey, values) in query)
+        {
+            if (string.IsNullOrWhiteSpace(rawKey) || ReservedInstanceQueryKeys.Contains(rawKey))
+            {
+                continue;
+            }
+
+            var value = values.FirstOrDefault()?.Trim();
+            if (string.IsNullOrEmpty(value))
+            {
+                continue;
+            }
+
+            var fieldKey = rawKey.StartsWith("data.", StringComparison.OrdinalIgnoreCase)
+                ? rawKey[5..]
+                : rawKey.StartsWith("filter.", StringComparison.OrdinalIgnoreCase)
+                    ? rawKey[7..]
+                    : rawKey;
+
+            if (!string.IsNullOrWhiteSpace(fieldKey))
+            {
+                result ??= new Dictionary<string, string?>(StringComparer.Ordinal);
+                result[fieldKey] = value;
+            }
+        }
+
+        return result;
+    }
 
     private static string ComputeInstanceETag(WorkflowInstanceModel instance) =>
         $"\"{instance.Id:N}-v{instance.DataVersion}-{instance.State}-{instance.Status}-{instance.UpdatedAt.Ticks}-{instance.ActiveSubFlow?.DataVersion}-{instance.ActiveSubFlow?.State}\"";

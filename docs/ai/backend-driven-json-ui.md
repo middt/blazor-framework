@@ -40,11 +40,11 @@ A workflow definition automatically registers:
     "type": "object",
     "required": ["fullName", "identityNumber", "segment"],
     "properties": {
-      "fullName":       { "type": "string", "title": "Ad Soyad / Ünvan" },
+      "fullName":       { "type": "string", "title": "Ad Soyad / Ünvan", "x-search": true },
       "identityNumber": { "type": "string", "title": "TCKN / VKN", "x-mask": "middle" },
-      "segment":        { "type": "string", "title": "Segment", "enum": ["Bireysel", "KOBİ", "Kurumsal"] },
+      "segment":        { "type": "string", "title": "Segment", "enum": ["Bireysel", "KOBİ", "Kurumsal"], "x-search": true },
       "kycScore":       { "type": "integer", "title": "KYC Skoru" },
-      "riskLevel":      { "type": "string", "title": "Risk Seviyesi" },
+      "riskLevel":      { "type": "string", "title": "Risk Seviyesi", "enum": ["Düşük", "Orta", "Yüksek"], "x-search": true },
       "approvalNote":   { "type": "string", "title": "Uyum Onay Notu", "x-list": false }
     }
   }
@@ -53,6 +53,7 @@ A workflow definition automatically registers:
 
 ### `dataSchema` Extensions
 - **`"x-list": false`**: Hides the property from the workflow instance table (`/workflow/{key}`) while keeping it in the schema for documentation, validation, and detail layouts.
+- **`"x-search": true`**: Adds a filter control to the workflow instance list toolbar (`WorkflowInstanceList` in Blazor & Angular). Properties with `"enum": [...]` render as a selectable dropdown (`AllowClear`); other scalar properties render as a text search box.
 - **`"x-mask": "middle" | "end"`**: Masks sensitive values when returned by `WorkflowInstanceDataQuery`.
 - **`"x-roles": ["manager"]`**: Restricts field visibility to specific roles.
 - **`"x-lookup"`**: Populates dropdown options dynamically from an entity endpoint in transition forms:

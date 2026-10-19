@@ -167,6 +167,8 @@ export interface WorkflowInstanceQuery {
   state?: string | null;
   status?: WorkflowInstanceStatusName | null;
   key?: string | null;
+  /** Data property filters (`{ fullName: 'Ayşe', segment: 'Kurumsal' }` → `?data.fullName=…&data.segment=…`). */
+  data?: Readonly<Record<string, string | null | undefined>> | null;
   page?: number;
   pageSize?: number;
 }
@@ -182,7 +184,7 @@ function query(values: Record<string, string | number | null | undefined>): stri
   const parts: string[] = [];
   for (const [name, value] of Object.entries(values)) {
     if (value !== undefined && value !== null && value !== '') {
-      parts.push(`${name}=${encodeURIComponent(String(value))}`);
+      parts.push(`${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`);
     }
   }
 
@@ -219,13 +221,23 @@ export class WorkflowApiClient extends ApiClientBase {
 
   /** One page of instances; `count` is the total count. */
   listInstances(workflow: string, filter: WorkflowInstanceQuery = {}, signal?: AbortSignal): Promise<BaseResponseDataModel<WorkflowInstanceModel[]>> {
-    const suffix = query({
+    const params: Record<string, string | number | null | undefined> = {
       state: filter.state,
       status: filter.status,
       key: filter.key,
-      page: Math.trunc(filter.page ?? 1),
-      pageSize: Math.trunc(filter.pageSize ?? 20),
-    });
+    };
+    if (filter.data) {
+      for (const [field, value] of Object.entries(filter.data)) {
+        const trimmedField = field.trim();
+        const trimmedValue = typeof value === 'string' ? value.trim() : '';
+        if (trimmedField !== '' && trimmedValue !== '') {
+          params[`data.${trimmedField}`] = trimmedValue;
+        }
+      }
+    }
+    params['page'] = Math.trunc(filter.page ?? 1);
+    params['pageSize'] = Math.trunc(filter.pageSize ?? 20);
+    const suffix = query(params);
     return this.send('GET', `${this.workflowRoute(workflow)}/instances${suffix}`, undefined, signal);
   }
 

@@ -201,8 +201,42 @@ public sealed class WorkflowPersistenceTests
     [Fact]
     public async Task Flow_specific_indexes_and_workflow_keys_are_created_for_registered_workflows()
     {
-        await using var host = await WorkflowTestHost.StartAsync([TestWorkflows.Pipeline]);
-        var started = await host.StartInstanceAsync("pipeline", new { name = "road-bike", amount = 250 }, user: WorkflowTestHost.User("alice"));
+        const string indexedWorkflow = """
+        {
+          "key": "pipeline-indexed",
+          "version": 1,
+          "title": "Indexed Pipeline",
+          "dataSchema": {
+            "type": "object",
+            "properties": {
+              "fullName": { "type": "string", "title": "Full Name", "x-search": true },
+              "segment": { "type": "string", "title": "Segment", "enum": [ "Bireysel", "Kurumsal" ], "x-search": true },
+              "amount": { "type": "number", "title": "Amount", "x-search": true },
+              "externalRef": { "type": "string", "title": "Ref", "x-index": true },
+              "secretToken": { "type": "string", "title": "Token", "x-index": true, "x-mask": { "pattern": "last4" } },
+              "notes": { "type": "string", "title": "Notes" }
+            }
+          },
+          "start": {
+            "key": "start",
+            "target": "done",
+            "input": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inputOnly": { "type": "string" }
+                }
+              }
+            }
+          },
+          "states": [
+            { "key": "done", "type": "Finish", "subType": "Success" }
+          ]
+        }
+        """;
+
+        await using var host = await WorkflowTestHost.StartAsync([indexedWorkflow]);
+        var started = await host.StartInstanceAsync("pipeline-indexed", new { inputOnly = "road-bike", amount = 250 }, user: WorkflowTestHost.User("alice"));
 
         var (indexes, hist) = await host.WithDbAsync(async db =>
         {
@@ -214,9 +248,12 @@ public sealed class WorkflowPersistenceTests
             return (idxs, h);
         });
 
-        indexes.Should().Contain(name => name.Contains("IX_Part_Pipeline"));
+        // Only enum + x-search (segment), numeric + x-search (amount), and explicit x-index (externalRef) get B-Tree indexes.
+        // Free-text (fullName), unindexed (notes), masked (secretToken), and start.input.schema (inputOnly) are NOT indexed.
+        indexes.Should().Contain(["IX_Part_PipelineIndexed_segment", "IX_Part_PipelineIndexed_amount", "IX_Part_PipelineIndexed_externalRef"]);
+        indexes.Should().NotContain(["IX_Part_PipelineIndexed_fullName", "IX_Part_PipelineIndexed_notes", "IX_Part_PipelineIndexed_secretToken", "IX_Part_PipelineIndexed_inputOnly"]);
         hist.Should().NotBeEmpty();
-        hist.Should().AllSatisfy(h => h.WorkflowKey.Should().Be("pipeline"));
+        hist.Should().AllSatisfy(h => h.WorkflowKey.Should().Be("pipeline-indexed"));
     }
 
     /// <summary>Simulates a concurrent writer: increments the revision right before the next claim UPDATE runs.</summary>

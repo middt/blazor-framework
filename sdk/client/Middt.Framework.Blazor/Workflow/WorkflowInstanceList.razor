@@ -6,6 +6,43 @@
     <div class="middt-wf-toolbar">
         <h2 class="middt-wf-heading">@(Title ?? definition?.Title ?? Workflow)</h2>
         <div class="middt-wf-toolbar-actions">
+            @foreach (var col in searchColumns)
+            {
+                var currentCol = col;
+                var filterId = $"{IdPrefix}-filter-{currentCol.Key}";
+                @if (currentCol.Options is { Count: > 0 } options)
+                {
+                    <RadzenDropDown @key="currentCol.Key" id="@filterId" Name="@filterId" TValue="string" Data="@options"
+                                    Value="@GetDataFilter(currentCol.Key)" Change="@(v => OnDataFilterChanged(currentCol.Key, v as string))"
+                                    AllowClear="true" Placeholder="@($"Tüm {currentCol.Title}")" aria-label="@($"{currentCol.Title} filtrele")" title="@($"{currentCol.Title} filtrele")"
+                                    class="middt-wf-filter" />
+                }
+                else if (currentCol.Type is "number" or "integer")
+                {
+                    <input @key="currentCol.Key" type="number" step="@(currentCol.Type == "integer" ? "1" : "any")"
+                           id="@filterId" name="@filterId"
+                           value="@(GetDataFilter(currentCol.Key) ?? string.Empty)"
+                           @onchange="@(e => OnDataFilterChanged(currentCol.Key, e.Value?.ToString()))"
+                           placeholder="@currentCol.Title" aria-label="@currentCol.Title" title="@currentCol.Title"
+                           class="rz-textbox middt-wf-filter middt-wf-filter-number" />
+                }
+                else if (currentCol.Type == "date")
+                {
+                    <input @key="currentCol.Key" type="date"
+                           id="@filterId" name="@filterId"
+                           value="@(GetDataFilter(currentCol.Key) ?? string.Empty)"
+                           @onchange="@(e => OnDataFilterChanged(currentCol.Key, e.Value?.ToString()))"
+                           placeholder="@currentCol.Title" aria-label="@currentCol.Title" title="@currentCol.Title"
+                           class="rz-textbox middt-wf-filter middt-wf-filter-date" />
+                }
+                else
+                {
+                    <RadzenTextBox @key="currentCol.Key" Name="@filterId" id="@filterId"
+                                   Value="@(GetDataFilter(currentCol.Key) ?? string.Empty)" Change="@(v => OnDataFilterChanged(currentCol.Key, v))"
+                                   Placeholder="@($"{currentCol.Title} ara...")" aria-label="@($"{currentCol.Title} ara")" title="@($"{currentCol.Title} ara")"
+                                   class="middt-wf-filter middt-wf-filter-search" />
+                }
+            }
             @if (ShowStatusFilter)
             {
                 <RadzenDropDown TValue="WorkflowInstanceStatus?" Data="@WorkflowUi.StatusOptions" TextProperty="Value" ValueProperty="Key"

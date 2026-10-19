@@ -17,6 +17,8 @@ public partial class WorkflowInstanceList
     private JsonSchemaForm? startForm;
     private WorkflowDefinitionModel? definition;
     private IReadOnlyList<WorkflowDataColumn> dataColumns = [];
+    private IReadOnlyList<WorkflowDataColumn> searchColumns = [];
+    private readonly Dictionary<string, string?> dataFilters = new(StringComparer.Ordinal);
     private List<WorkflowInstanceModel> items = [];
     private IList<WorkflowInstanceModel> selection = [];
     private int count;
@@ -159,11 +161,13 @@ public partial class WorkflowInstanceList
     {
         loadedWorkflow = Workflow;
         page = 1;
+        dataFilters.Clear();
         var response = await WorkflowClient.GetDefinitionAsync(Workflow, cancellationToken: ComponentCancellation);
         if (response.IsSuccess)
         {
             definition = response.Data;
             dataColumns = WorkflowUi.DataColumns(definition);
+            searchColumns = WorkflowUi.SearchColumns(definition);
             if (definition is not null)
             {
                 await OnDefinitionLoaded.InvokeAsync(definition);
@@ -173,6 +177,7 @@ public partial class WorkflowInstanceList
         {
             definition = null;
             dataColumns = [];
+            searchColumns = [];
             Notification.ShowErrorMessage("Akış tanımı alınamadı", response.ErrorText);
         }
 
@@ -212,7 +217,7 @@ public partial class WorkflowInstanceList
         loading = true;
         try
         {
-            var response = await WorkflowClient.ListInstancesAsync(Workflow, State, statusFilter, null, page, CurrentPageSize, ComponentCancellation);
+            var response = await WorkflowClient.ListInstancesAsync(Workflow, State, statusFilter, null, page, CurrentPageSize, dataFilters.Count > 0 ? dataFilters : null, ComponentCancellation);
             if (response.IsSuccess)
             {
                 items = response.Data ?? [];
@@ -244,6 +249,25 @@ public partial class WorkflowInstanceList
         var top = args.Top is > 0 ? args.Top.Value : CurrentPageSize;
         pageSize = top;
         page = ((args.Skip ?? 0) / top) + 1;
+        await ExecuteMethod(LoadPageAsync);
+    }
+
+    private string? GetDataFilter(string key) =>
+        dataFilters.TryGetValue(key, out var val) ? val : null;
+
+    private async Task OnDataFilterChanged(string key, string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            dataFilters.Remove(key);
+        }
+        else
+        {
+            dataFilters[key] = trimmed;
+        }
+
+        await ResetPagerAsync();
         await ExecuteMethod(LoadPageAsync);
     }
 

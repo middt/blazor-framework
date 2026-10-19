@@ -43,6 +43,18 @@
     width: 170px;
 }
 
+.middt-wf-filter-search {
+    width: 200px;
+}
+
+.middt-wf-filter-number {
+    width: 155px;
+}
+
+.middt-wf-filter-date {
+    width: 150px;
+}
+
 .middt-wf-heading {
     margin: 0;
     font-size: 1.25rem;

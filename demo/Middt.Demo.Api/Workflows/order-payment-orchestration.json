@@ -11,9 +11,9 @@
   "dataSchema": {
     "type": "object",
     "properties": {
-      "customerName": { "type": "string", "title": "Müşteri Adı" },
-      "amount": { "type": "number", "title": "Sipariş Tutarı (₺)" },
-      "paymentMethod": { "type": "string", "title": "Ödeme Yöntemi" }
+      "customerName": { "type": "string", "title": "Müşteri Adı", "x-search": true },
+      "amount": { "type": "number", "title": "Sipariş Tutarı (₺)", "x-search": true },
+      "paymentMethod": { "type": "string", "title": "Ödeme Yöntemi", "enum": [ "Kredi Kartı", "Havale / FAST", "Kurumsal Açık Hesap" ], "x-search": true }
     }
   },
   "start": {

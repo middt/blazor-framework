@@ -12,7 +12,7 @@ async function signIn(page: Page): Promise<void> {
 }
 
 for (const [name, base] of [['Blazor', blazor], ['Angular', angular]] as const) {
-  test(`${name}: signed-in page uses the identity provider and renders JSON-backed workflows & layouts`, async ({ page }) => {
+  test(`${name}: signed-in page uses the identity provider and renders JSON-backed workflows & layouts with rich filters`, async ({ page }) => {
     await page.goto(base);
     await signIn(page);
     const approve = page.getByRole('button', { name: 'İzin ver' });
@@ -23,13 +23,73 @@ for (const [name, base] of [['Blazor', blazor], ['Angular', angular]] as const) 
       expect(user.ok()).toBeTruthy();
       expect((await user.json()).isAuthenticated).toBe(true);
     }
+
+    // 1. Workflow list: customer-onboarding (text + dropdowns + numeric >=/<= + date range)
     await page.goto(`${base}/workflow/customer-onboarding`);
     await expect(page.locator('.middt-wf-layout')).toBeVisible();
+    await expect(page.locator('#wf-filter-fullName')).toBeVisible();
+    await expect(page.getByLabel('Segment filtrele')).toBeVisible();
+    await expect(page.getByLabel('Risk Seviyesi filtrele')).toBeVisible();
+    await expect(page.locator('#wf-filter-monthlyIncome_min')).toBeVisible();
+    await expect(page.locator('#wf-filter-monthlyIncome_max')).toBeVisible();
+    await expect(page.locator('#wf-filter-createdFrom')).toBeVisible();
+    await expect(page.locator('#wf-filter-createdTo')).toBeVisible();
+
+    // 2. Workflow list: credit-allocation (text + numeric >=/<= + date range + start dialog)
     await page.goto(`${base}/workflow/credit-allocation?start=1`);
     await expect(page.getByRole('dialog', { name: /Yeni başlat/ })).toBeVisible();
     await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).click();
+    await expect(page.locator('#wf-filter-customerKey')).toBeVisible();
+    await expect(page.locator('#wf-filter-amount_min')).toBeVisible();
+    await expect(page.locator('#wf-filter-amount_max')).toBeVisible();
+    await expect(page.locator('#wf-filter-termMonths_min')).toBeVisible();
+    await expect(page.locator('#wf-filter-termMonths_max')).toBeVisible();
+    await expect(page.locator('#wf-filter-createdFrom')).toBeVisible();
+    await expect(page.locator('#wf-filter-createdTo')).toBeVisible();
+
+    // 3. Workflow list: order-payment-orchestration, risk-limit-eval, sla-escalation
+    await page.goto(`${base}/workflow/order-payment-orchestration`);
+    await expect(page.locator('#wf-filter-customerName')).toBeVisible();
+    await expect(page.getByLabel('Ödeme Yöntemi filtrele')).toBeVisible();
+    await expect(page.locator('#wf-filter-amount_min')).toBeVisible();
+    await expect(page.locator('#wf-filter-createdFrom')).toBeVisible();
+
+    await page.goto(`${base}/workflow/risk-limit-eval`);
+    await expect(page.locator('#wf-filter-customerKey')).toBeVisible();
+    await expect(page.getByLabel('Kontrol Tipi filtrele')).toBeVisible();
+    await expect(page.locator('#wf-filter-amount_min')).toBeVisible();
+    await expect(page.locator('#wf-filter-riskScore_min')).toBeVisible();
+
+    await page.goto(`${base}/workflow/sla-escalation`);
+    await expect(page.locator('#wf-filter-ticketTitle')).toBeVisible();
+    await expect(page.getByLabel('Öncelik Seviyesi filtrele')).toBeVisible();
+    await expect(page.getByLabel('Atanan Ekip filtrele')).toBeVisible();
+    await expect(page.locator('#wf-filter-amount_min')).toBeVisible();
+
+    // 4. Layout grids: customer-directory, credit-pipeline, order-monitor
     await page.goto(`${base}/ui/customer-directory`);
-    await expect(page.locator('.middt-ui-page-header, .middt-ui-grid').first()).toBeVisible();
+    await expect(page.locator('.middt-ui-grid')).toBeVisible();
+    await expect(page.locator('[data-field="fullName"]')).toBeVisible();
+    await expect(page.locator('[data-field="segment"]')).toBeVisible();
+    await expect(page.locator('[data-field="riskLevel"]')).toBeVisible();
+    await expect(page.locator('[data-field="monthlyIncome_min"]')).toBeVisible();
+    await expect(page.locator('[data-field="monthlyIncome_max"]')).toBeVisible();
+    await expect(page.locator('[data-field="createdAt_from"]')).toBeVisible();
+    await expect(page.locator('[data-field="createdAt_to"]')).toBeVisible();
+
+    await page.goto(`${base}/ui/credit-pipeline`);
+    await expect(page.locator('[data-field="customerKey"]')).toBeVisible();
+    await expect(page.locator('[data-field="state"]')).toBeVisible();
+    await expect(page.locator('[data-field="amount_min"]')).toBeVisible();
+    await expect(page.locator('[data-field="termMonths_min"]')).toBeVisible();
+    await expect(page.locator('[data-field="createdAt_from"]')).toBeVisible();
+
+    await page.goto(`${base}/ui/order-monitor`);
+    await expect(page.locator('[data-field="customerName"]')).toBeVisible();
+    await expect(page.locator('[data-field="paymentMethod"]')).toBeVisible();
+    await expect(page.locator('[data-field="amount_min"]')).toBeVisible();
+    await expect(page.locator('[data-field="createdAt_from"]')).toBeVisible();
+
     await page.goto(`${base}/ui-admin`);
     await expect(page.locator('#ui-layout-json')).toBeVisible();
   });
@@ -86,6 +146,37 @@ test('JSON-backed workflows execute end-to-end with ETag/304, task trace, SubFlo
   expect(custListRes.ok()).toBeTruthy();
   const custList = (await custListRes.json()).data as Array<Record<string, unknown>>;
   expect(custList.some((c) => c.key === `CUST-${tcNo}` && c.fullName === 'E2E JSON Müşteri')).toBe(true);
+
+  // 2b. Verify PostgreSQL JSONB + SQL-pushed filters (text, dropdown, numeric range, date range)
+  const wfFilterRes = await page.request.get(
+    `${angular}/api/workflows/customer-onboarding/instances?key=CUST-${tcNo}&data.segment=Bireysel&data.riskLevel=D%C3%BC%C5%9F%C3%BCk&data.monthlyIncome_min=50000&data.monthlyIncome_max=100000&data.createdFrom=2025-01-01&data.createdTo=2030-12-31`,
+    { headers: { 'X-CSRF': '1' } },
+  );
+  expect(wfFilterRes.ok()).toBeTruthy();
+  const wfFiltered = await wfFilterRes.json();
+  expect(wfFiltered.count).toBe(1);
+  expect(wfFiltered.data[0].key).toBe(`CUST-${tcNo}`);
+
+  const gridFilterRes = await page.request.post(`${angular}/api/v1/CustomerOnboarding/getitems`, {
+    headers: { 'X-CSRF': '1' },
+    data: {
+      currentPage: 1,
+      requestItemSize: 20,
+      requestModel: {
+        fullName: 'E2E JSON',
+        segment: 'Bireysel',
+        riskLevel: 'Düşük',
+        monthlyIncome_min: 50000,
+        monthlyIncome_max: 100000,
+        createdAt_from: '2025-01-01',
+        createdAt_to: '2030-12-31',
+      },
+    },
+  });
+  expect(gridFilterRes.ok()).toBeTruthy();
+  const gridFiltered = await gridFilterRes.json();
+  expect(gridFiltered.count).toBeGreaterThanOrEqual(1);
+  expect((gridFiltered.data as Array<Record<string, unknown>>).some((c) => c.key === `CUST-${tcNo}`)).toBe(true);
 
   // 3. ETag & 304 Not Modified + Task-level execution trace on customer-onboarding
   const getRes = await page.request.get(`${angular}/api/workflows/customer-onboarding/instances/${custInstance.id}`, {

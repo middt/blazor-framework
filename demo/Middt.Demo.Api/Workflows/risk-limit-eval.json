@@ -6,10 +6,22 @@
   "dataSchema": {
     "type": "object",
     "properties": {
-      "customerKey": { "type": "string", "title": "Müşteri Anahtarı" },
-      "checkType": { "type": "string", "title": "Kontrol Tipi" },
-      "amount": { "type": "number", "title": "Talep Edilen Tutar (₺)" },
-      "riskScore": { "type": "integer", "title": "Risk Skoru" },
+      "customerKey": { "type": "string", "title": "Müşteri Anahtarı", "x-search": true },
+      "checkType": {
+        "type": "string",
+        "title": "Kontrol Tipi",
+        "enum": [
+          "Kredi Tahsis Limit Kontrolü",
+          "Kredi Limit Analizi",
+          "Fraud Kontrolü",
+          "Stok & Depo Kontrolü",
+          "Limit & Uyum Kontrolü",
+          "Genel Risk Kontrolü"
+        ],
+        "x-search": true
+      },
+      "amount": { "type": "number", "title": "Talep Edilen Tutar (₺)", "x-search": true },
+      "riskScore": { "type": "integer", "title": "Risk Skoru", "x-search": true },
       "recommendedLimit": { "type": "number", "title": "Önerilen Limit (₺)" }
     }
   },

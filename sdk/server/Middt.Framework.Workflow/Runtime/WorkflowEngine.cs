@@ -342,6 +342,17 @@ public sealed partial class WorkflowEngine(
         return await ToModelAsync(instance, user, cancellationToken);
     }
 
+    public Task<(List<WorkflowInstanceModel> Items, int Count)> ListAsync(
+        string workflow,
+        WorkflowUser user,
+        string? state,
+        WorkflowInstanceStatus? status,
+        string? key,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        ListAsync(workflow, user, state, status, key, page, pageSize, null, cancellationToken);
+
     public async Task<(List<WorkflowInstanceModel> Items, int Count)> ListAsync(
         string workflow,
         WorkflowUser user,
@@ -350,6 +361,7 @@ public sealed partial class WorkflowEngine(
         string? key,
         int page,
         int pageSize,
+        IReadOnlyDictionary<string, string?>? filter,
         CancellationToken cancellationToken = default)
     {
         var versions = registry.GetVersions(workflow);
@@ -395,19 +407,48 @@ public sealed partial class WorkflowEngine(
             query = query.Where(i => i.BusinessKey == key);
         }
 
-        var count = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
-        pageSize = Math.Clamp(pageSize, 1, 200);
-        var items = await query.OrderByDescending(i => i.CreatedAt)
-            .Skip((Math.Max(page, 1) - 1) * pageSize).Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var models = new List<WorkflowInstanceModel>(items.Count);
-        foreach (var item in items)
+        var projectedSchema = JsonSchemaValidator.ProjectSchema(readable[^1].DataSchema, user);
+        var (sqlConditions, remainingFilters, createdFromUtc, createdToUtc) = WorkflowPartitionManager.ClassifyDataFilters(filter, projectedSchema);
+        if (sqlConditions.Count > 0 || createdFromUtc is not null || createdToUtc is not null)
         {
-            models.Add(ToModel(item, user, []));
+            query = WorkflowPartitionManager.ApplySqlDataFilters(query, db, options.Value.Schema, workflow, sqlConditions, createdFromUtc, createdToUtc);
         }
 
-        return (models, count);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var currentPage = Math.Max(page, 1);
+
+        if (remainingFilters.Count == 0)
+        {
+            var count = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
+            var items = await query.OrderByDescending(i => i.CreatedAt)
+                .Skip((currentPage - 1) * pageSize).Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            var models = new List<WorkflowInstanceModel>(items.Count);
+            foreach (var item in items)
+            {
+                models.Add(ToModel(item, user, []));
+            }
+
+            return (models, count);
+        }
+
+        var candidates = await query.OrderByDescending(i => i.CreatedAt)
+            .Take(1000)
+            .ToListAsync(cancellationToken);
+
+        var matched = new List<WorkflowInstanceModel>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            var model = ToModel(candidate, user, []);
+            if (WorkflowPartitionManager.MatchesDataFilters(model.Data, remainingFilters))
+            {
+                matched.Add(model);
+            }
+        }
+
+        var paged = matched.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+        return (paged, matched.Count);
     }
 
     public Task<List<WorkflowHistoryModel>> HistoryAsync(Guid instanceId, WorkflowUser user, CancellationToken cancellationToken = default) =>

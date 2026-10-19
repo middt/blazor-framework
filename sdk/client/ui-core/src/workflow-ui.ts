@@ -872,11 +872,13 @@ export function schemaValuesFromQuery(schema: WorkflowData | null | undefined, v
 
 // ------------------------------------------------------------------------------------------- data schema list columns
 
-/** Column definition extracted from a workflow's JSON data schema for instance list grids. */
+/** Column/field definition extracted from a workflow's JSON data schema for instance list grids and search bars. */
 export interface WorkflowDataColumn {
   key: string;
   title: string;
   type: string;
+  searchable?: boolean;
+  options?: string[];
 }
 
 const trNumberFormat0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
@@ -905,10 +907,66 @@ export function workflowDataColumns(definition: WorkflowDefinitionModel | null |
     }
 
     const title = getString(node, 'title');
-    columns.push({ key, title: title && title.trim() !== '' ? title : key, type });
+    const rawSearch = node['x-search'];
+    const searchable = rawSearch === true || (typeof rawSearch === 'string' && rawSearch.trim() !== '');
+    const rawEnum = node['enum'];
+    const options = Array.isArray(rawEnum)
+      ? rawEnum.map(e => (typeof e === 'string' ? e : e !== null && e !== undefined ? String(e) : '')).filter(s => s.trim() !== '')
+      : undefined;
+
+    columns.push({
+      key,
+      title: title && title.trim() !== '' ? title : key,
+      type,
+      ...(searchable ? { searchable: true } : {}),
+      ...(options && options.length > 0 ? { options } : {}),
+    });
   }
 
   return columns;
+}
+
+/**
+ * Extracts searchable fields (`"x-search"`) from `definition.dataSchema`, expanding numeric properties into `_min` (`≥`)
+ * and `_max` (`≤`) bounds and appending `createdFrom`/`createdTo` date range filters when searchable fields exist.
+ */
+export function workflowSearchColumns(definition: WorkflowDefinitionModel | null | undefined): WorkflowDataColumn[] {
+  const schema = definition?.dataSchema ?? definition?.startInputSchema;
+  const properties = schema?.['properties'];
+  if (!isObject(properties)) {
+    return [];
+  }
+
+  const result: WorkflowDataColumn[] = [];
+  for (const col of workflowDataColumns(definition, true)) {
+    if (col.searchable !== true) {
+      continue;
+    }
+
+    const prop = properties[col.key];
+    const mode = isObject(prop) && typeof prop['x-search'] === 'string' ? prop['x-search'] : null;
+
+    if (col.options && col.options.length > 0) {
+      result.push(col);
+    } else if (col.type === 'number' || col.type === 'integer' || mode === 'range' || mode === 'min' || mode === 'max' || mode === 'gte' || mode === 'lte') {
+      if (mode !== 'max' && mode !== 'lte') {
+        result.push({ key: `${col.key}_min`, title: `Min ${col.title} (≥)`, type: col.type, searchable: true });
+      }
+      if (mode !== 'min' && mode !== 'gte') {
+        result.push({ key: `${col.key}_max`, title: `Max ${col.title} (≤)`, type: col.type, searchable: true });
+      }
+    } else {
+      result.push(col);
+    }
+  }
+
+  const dateSearchFlag = schema?.['x-date-search'];
+  if (dateSearchFlag === true || (dateSearchFlag !== false && result.length > 0)) {
+    result.push({ key: 'createdFrom', title: 'Başlangıç tarihi', type: 'date', searchable: true });
+    result.push({ key: 'createdTo', title: 'Bitiş tarihi', type: 'date', searchable: true });
+  }
+
+  return result;
 }
 
 /** Formats a projected workflow data property value for display in the instance grid. */

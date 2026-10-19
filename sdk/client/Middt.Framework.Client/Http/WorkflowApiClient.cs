@@ -57,12 +57,35 @@ public class WorkflowApiClient(
         string? key = null,
         int page = 1,
         int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        ListInstancesAsync(workflow, state, status, key, page, pageSize, null, cancellationToken);
+
+    /// <summary>Lists instances (one page) with optional workflow data property filters; <see cref="BaseResponseDataModel{T}.Count"/> is the total count.</summary>
+    public virtual Task<BaseResponseDataModel<List<WorkflowInstanceModel>>> ListInstancesAsync(
+        string workflow,
+        string? state,
+        WorkflowInstanceStatus? status,
+        string? key,
+        int page,
+        int pageSize,
+        IReadOnlyDictionary<string, string?>? filter,
         CancellationToken cancellationToken = default)
     {
         var query = new StringBuilder();
         AppendQuery(query, "state", state);
         AppendQuery(query, "status", status?.ToString());
         AppendQuery(query, "key", key);
+        if (filter is not null)
+        {
+            foreach (var (field, value) in filter)
+            {
+                if (!string.IsNullOrWhiteSpace(field) && !string.IsNullOrWhiteSpace(value))
+                {
+                    AppendQuery(query, $"data.{field.Trim()}", value.Trim());
+                }
+            }
+        }
+
         AppendQuery(query, "page", page.ToString(CultureInfo.InvariantCulture));
         AppendQuery(query, "pageSize", pageSize.ToString(CultureInfo.InvariantCulture));
         return SendAsync<BaseResponseDataModel<List<WorkflowInstanceModel>>>(HttpMethod.Get, $"{WorkflowRoute(workflow)}/instances{query}", null, cancellationToken);

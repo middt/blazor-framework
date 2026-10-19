@@ -10,11 +10,11 @@
   "dataSchema": {
     "type": "object",
     "properties": {
-      "ticketTitle": { "type": "string", "title": "Talep / Çağrı Başlığı" },
-      "customerName": { "type": "string", "title": "Müşteri / Kurum" },
-      "severity": { "type": "string", "title": "Öncelik Seviyesi" },
-      "assignedQueue": { "type": "string", "title": "Atanan Ekip" },
-      "amount": { "type": "number", "title": "Etkilenen Tutar (₺)" }
+      "ticketTitle": { "type": "string", "title": "Talep / Çağrı Başlığı", "x-search": true },
+      "customerName": { "type": "string", "title": "Müşteri / Kurum", "x-search": true },
+      "severity": { "type": "string", "title": "Öncelik Seviyesi", "enum": [ "Normal", "Yüksek", "Kritik" ], "x-search": true },
+      "assignedQueue": { "type": "string", "title": "Atanan Ekip", "enum": [ "Standart Destek", "Kıdemli Operasyon", "Kriz Masası" ], "x-search": true },
+      "amount": { "type": "number", "title": "Etkilenen Tutar (₺)", "x-search": true }
     }
   },
   "start": {

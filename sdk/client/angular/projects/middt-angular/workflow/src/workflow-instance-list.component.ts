@@ -15,6 +15,7 @@ import {
   schemaHasInput,
   schemaValuesFromQuery,
   workflowDataColumns,
+  workflowSearchColumns,
   WORKFLOW_STATUS_OPTIONS,
   workflowStatusBadge,
   workflowStatusText,
@@ -54,6 +55,40 @@ export interface WorkflowStartOpened {
         <div class="middt-wf-toolbar">
           <h2 class="middt-wf-heading">{{ title() ?? definition()?.title ?? workflow() }}</h2>
           <div class="middt-wf-toolbar-actions">
+            @for (col of searchColumns(); track col.key) {
+              @if (col.options && col.options.length > 0) {
+                <mat-form-field class="middt-wf-filter" subscriptSizing="dynamic">
+                  <mat-select [id]="idPrefix() + '-filter-' + col.key" [value]="dataFilterValue(col.key)" (selectionChange)="onDataFilterChanged(col.key, $event.value || null)"
+                              [placeholder]="'Tüm ' + col.title" [aria-label]="col.title + ' filtrele'" [attr.title]="col.title + ' filtrele'">
+                    <mat-option value="">Tüm {{ col.title }}</mat-option>
+                    @for (option of col.options; track option) {
+                      <mat-option [value]="option">{{ option }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              } @else if (col.type === 'number' || col.type === 'integer') {
+                <mat-form-field class="middt-wf-filter middt-wf-filter-number" subscriptSizing="dynamic">
+                  <input matInput type="number" [step]="col.type === 'integer' ? 1 : 'any'" [id]="idPrefix() + '-filter-' + col.key"
+                         [value]="dataFilterValue(col.key)"
+                         (change)="onDataFilterChanged(col.key, $any($event.target).value || null)"
+                         (keydown.enter)="$event.preventDefault(); onDataFilterChanged(col.key, $any($event.target).value || null)"
+                         [placeholder]="col.title" [attr.aria-label]="col.title" [attr.title]="col.title" />
+                </mat-form-field>
+              } @else if (col.type === 'date') {
+                <mat-form-field class="middt-wf-filter middt-wf-filter-date" subscriptSizing="dynamic">
+                  <input matInput type="date" [id]="idPrefix() + '-filter-' + col.key" [value]="dataFilterValue(col.key)"
+                         (change)="onDataFilterChanged(col.key, $any($event.target).value || null)"
+                         [placeholder]="col.title" [attr.aria-label]="col.title" [attr.title]="col.title" />
+                </mat-form-field>
+              } @else {
+                <mat-form-field class="middt-wf-filter middt-wf-filter-search" subscriptSizing="dynamic">
+                  <input matInput type="search" [id]="idPrefix() + '-filter-' + col.key" [value]="dataFilterValue(col.key)"
+                         (change)="onDataFilterChanged(col.key, $any($event.target).value || null)"
+                         (keydown.enter)="$event.preventDefault(); onDataFilterChanged(col.key, $any($event.target).value || null)"
+                         [placeholder]="col.title + ' ara...'" [attr.aria-label]="col.title + ' ara'" [attr.title]="col.title + ' ara'" />
+                </mat-form-field>
+              }
+            }
             @if (showStatusFilter()) {
               <mat-form-field class="middt-wf-filter" subscriptSizing="dynamic">
                 <mat-select [value]="statusFilter() ?? ''" (selectionChange)="onStatusFilterChanged($event.value || null)" placeholder="Tüm durumlar"
@@ -150,6 +185,9 @@ export interface WorkflowStartOpened {
     WF_SHARED_STYLES,
     `
     .middt-wf-filter { width: 170px; }
+    .middt-wf-filter-search { width: 200px; }
+    .middt-wf-filter-number { width: 155px; }
+    .middt-wf-filter-date { width: 150px; }
     .middt-wf-grid { overflow-x: auto; }
     .middt-wf-table { width: 100%; }
     .middt-wf-row { cursor: pointer; }
@@ -205,6 +243,8 @@ export class MiddtWorkflowInstanceListComponent {
 
   protected readonly definition = signal<WorkflowDefinitionModel | null>(null);
   protected readonly dataColumns = computed<WorkflowDataColumn[]>(() => workflowDataColumns(this.definition()));
+  protected readonly searchColumns = computed<WorkflowDataColumn[]>(() => workflowSearchColumns(this.definition()));
+  protected readonly dataFilters = signal<Readonly<Record<string, string>>>({});
   protected readonly columns = computed<string[]>(() => {
     const cols = this.dataColumns();
     return ['key', ...cols.map(c => 'data:' + c.key), 'state', 'status', ...(cols.length === 0 ? ['createdAt'] : []), 'updatedAt'];
@@ -297,6 +337,7 @@ export class MiddtWorkflowInstanceListComponent {
     this.#abort = new AbortController();
     this.definition.set(null);
     this.#definitions.set(new Map());
+    this.dataFilters.set({});
     this.page.set(1);
     const response = await this.#client.getDefinition(workflow, null, this.#abort.signal).catch(() => null);
     if (response === null) {
@@ -319,9 +360,16 @@ export class MiddtWorkflowInstanceListComponent {
     const signal = this.#abort.signal;
     this.loading.set(true);
     try {
+      const filters = this.dataFilters();
       const response = await this.#client.listInstances(
         this.workflow(),
-        { state: this.state(), status: this.statusFilter(), page: this.page(), pageSize: this.currentPageSize() },
+        {
+          state: this.state(),
+          status: this.statusFilter(),
+          data: Object.keys(filters).length > 0 ? filters : null,
+          page: this.page(),
+          pageSize: this.currentPageSize(),
+        },
         signal,
       );
       if (request !== this.#pageRequest) {
@@ -365,6 +413,29 @@ export class MiddtWorkflowInstanceListComponent {
   protected onPage(event: PageEvent): void {
     this.#pageSize.set(event.pageSize);
     this.page.set(event.pageIndex + 1);
+    void this.#loadPage();
+  }
+
+  protected dataFilterValue(key: string): string {
+    return this.dataFilters()[key] ?? '';
+  }
+
+  protected onDataFilterChanged(key: string, value: string | null): void {
+    const trimmed = value?.trim() ?? '';
+    const current = this.dataFilters();
+    if ((current[key] ?? '') === trimmed) {
+      return;
+    }
+
+    const next = { ...current };
+    if (trimmed === '') {
+      delete next[key];
+    } else {
+      next[key] = trimmed;
+    }
+
+    this.dataFilters.set(next);
+    this.page.set(1);
     void this.#loadPage();
   }
 

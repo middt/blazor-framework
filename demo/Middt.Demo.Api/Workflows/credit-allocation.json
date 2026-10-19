@@ -9,9 +9,9 @@
   "dataSchema": {
     "type": "object",
     "properties": {
-      "customerKey": { "type": "string", "title": "Müşteri Anahtarı" },
-      "amount": { "type": "number", "title": "Kredi Tutarı" },
-      "termMonths": { "type": "integer", "title": "Vade (Ay)" },
+      "customerKey": { "type": "string", "title": "Müşteri Anahtarı", "x-search": true },
+      "amount": { "type": "number", "title": "Kredi Tutarı", "x-search": true },
+      "termMonths": { "type": "integer", "title": "Vade (Ay)", "x-search": true },
       "collateralAmount": { "type": "number", "title": "Teminat Tutarı" },
       "ltvRatio": { "type": "number", "title": "Kredi / Teminat Oranı (%)" },
       "iban": {

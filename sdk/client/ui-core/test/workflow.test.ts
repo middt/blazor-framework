@@ -18,10 +18,12 @@ import {
   validateSchemaFields,
   WORKFLOW_STATUS_OPTIONS,
   WorkflowApiClient,
+  workflowDataColumns,
   workflowDataGet,
   workflowHistoryPointStyle,
   workflowIsPending,
   workflowLayoutVariables,
+  workflowSearchColumns,
   workflowStateTitle,
   workflowStatusBadge,
   workflowStartQuery,
@@ -538,3 +540,45 @@ test('start link query: values converted by the start input schema', () => {
   assert.equal(schemaQueryValue({ type: 'integer' }, '-3'), -3);
   assert.equal(schemaQueryValue({ type: 'object' }, '{}'), undefined);
 });
+
+test('workflowSearchColumns extracts x-search fields, enum options, numeric range, and date range, and listInstances encodes data filters', async () => {
+  const def: WorkflowDefinitionModel = {
+    ...definition,
+    dataSchema: {
+      type: 'object',
+      properties: {
+        fullName: { type: 'string', title: 'Ad Soyad / Ünvan', 'x-search': true },
+        segment: { type: 'string', title: 'Segment', enum: ['Bireysel', 'KOBİ', 'Kurumsal'], 'x-search': true },
+        monthlyIncome: { type: 'number', title: 'Aylık Gelir / Ciro', 'x-search': true },
+        riskLevel: { type: 'string', title: 'Risk Seviyesi', enum: ['Düşük', 'Orta', 'Yüksek'], 'x-search': true },
+        email: { type: 'string', title: 'E-posta', 'x-list': false },
+      },
+    },
+  };
+
+  const cols = workflowDataColumns(def);
+  assert.equal(cols.length, 4);
+  const searchCols = workflowSearchColumns(def);
+  assert.deepEqual(searchCols, [
+    { key: 'fullName', title: 'Ad Soyad / Ünvan', type: 'string', searchable: true },
+    { key: 'segment', title: 'Segment', type: 'string', searchable: true, options: ['Bireysel', 'KOBİ', 'Kurumsal'] },
+    { key: 'monthlyIncome_min', title: 'Min Aylık Gelir / Ciro (≥)', type: 'number', searchable: true },
+    { key: 'monthlyIncome_max', title: 'Max Aylık Gelir / Ciro (≤)', type: 'number', searchable: true },
+    { key: 'riskLevel', title: 'Risk Seviyesi', type: 'string', searchable: true, options: ['Düşük', 'Orta', 'Yüksek'] },
+    { key: 'createdFrom', title: 'Başlangıç tarihi', type: 'date', searchable: true },
+    { key: 'createdTo', title: 'Bitiş tarihi', type: 'date', searchable: true },
+  ]);
+
+  const { fetch, calls } = fakeFetch(ok([], 0));
+  const client = new WorkflowApiClient({ fetch });
+  await client.listInstances('customer-onboarding', {
+    data: { fullName: 'İbrahim', segment: 'KOBİ', monthlyIncome_min: '25000', createdFrom: '2026-01-01', riskLevel: '' },
+    page: 1,
+    pageSize: 10,
+  });
+  assert.equal(
+    calls[0]!.url,
+    '/api/workflows/customer-onboarding/instances?data.fullName=%C4%B0brahim&data.segment=KOB%C4%B0&data.monthlyIncome_min=25000&data.createdFrom=2026-01-01&page=1&pageSize=10',
+  );
+});
+

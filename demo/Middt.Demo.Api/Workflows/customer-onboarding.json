@@ -10,7 +10,7 @@
   "dataSchema": {
     "type": "object",
     "properties": {
-      "fullName": { "type": "string", "title": "Ad Soyad / Ünvan" },
+      "fullName": { "type": "string", "title": "Ad Soyad / Ünvan", "x-search": true },
       "identityNumber": {
         "type": "string",
         "title": "T.C. Kimlik / Vergi No",
@@ -28,10 +28,10 @@
         "x-list": false,
         "x-mask": { "pattern": "last4", "exceptRoles": [ "manager", "idp-admin" ] }
       },
-      "segment": { "type": "string", "title": "Segment" },
-      "monthlyIncome": { "type": "number", "title": "Aylık Gelir / Ciro" },
+      "segment": { "type": "string", "title": "Segment", "enum": [ "Bireysel", "KOBİ", "Kurumsal" ], "x-search": true },
+      "monthlyIncome": { "type": "number", "title": "Aylık Gelir / Ciro", "x-search": true },
       "kycScore": { "type": "integer", "title": "KYC Skoru" },
-      "riskLevel": { "type": "string", "title": "Risk Seviyesi" },
+      "riskLevel": { "type": "string", "title": "Risk Seviyesi", "enum": [ "Düşük", "Orta", "Yüksek" ], "x-search": true },
       "internalRiskNote": {
         "type": "string",
         "title": "İç Denetim Notu (Sadece Yönetici)",

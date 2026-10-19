@@ -290,10 +290,88 @@ public static class WorkflowUi
             var title = prop["title"] is JsonValue titleNode && titleNode.GetValueKind() == JsonValueKind.String
                 ? titleNode.GetValue<string>()
                 : name;
-            columns.Add(new WorkflowDataColumn(name, string.IsNullOrWhiteSpace(title) ? name : title, type));
+            var searchable = prop["x-search"] switch
+            {
+                JsonValue searchFlag when searchFlag.TryGetValue<bool>(out var isSearch) => isSearch,
+                JsonValue searchMode when searchMode.GetValueKind() == JsonValueKind.String => !string.IsNullOrWhiteSpace(searchMode.GetValue<string>()),
+                _ => false,
+            };
+            IReadOnlyList<string>? options = null;
+            if (prop["enum"] is JsonArray enumArr && enumArr.Count > 0)
+            {
+                var list = enumArr
+                    .Select(e => e is JsonValue ev && ev.GetValueKind() == JsonValueKind.String ? ev.GetValue<string>() : e?.ToString())
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s!)
+                    .ToList();
+                if (list.Count > 0)
+                {
+                    options = list;
+                }
+            }
+
+            columns.Add(new WorkflowDataColumn(name, string.IsNullOrWhiteSpace(title) ? name : title, type, searchable, options));
         }
 
         return columns;
+    }
+
+    /// <summary>
+    /// Extracts searchable fields (<c>"x-search"</c>) from <see cref="WorkflowDefinitionModel.DataSchema"/>, expanding numeric
+    /// properties into <c>_min</c> (<c>≥</c>) and <c>_max</c> (<c>≤</c>) bounds and appending <c>createdFrom</c>/<c>createdTo</c>
+    /// date range filters when searchable fields exist.
+    /// </summary>
+    public static IReadOnlyList<WorkflowDataColumn> SearchColumns(WorkflowDefinitionModel? definition)
+    {
+        var schema = definition?.DataSchema ?? definition?.StartInputSchema;
+        if (schema?["properties"] is not JsonObject properties || properties.Count == 0)
+        {
+            return [];
+        }
+
+        var result = new List<WorkflowDataColumn>();
+        foreach (var col in DataColumns(definition, includeAll: true))
+        {
+            if (!col.Searchable)
+            {
+                continue;
+            }
+
+            var prop = properties[col.Key] as JsonObject;
+            var mode = prop?["x-search"] is JsonValue sv && sv.GetValueKind() == JsonValueKind.String
+                ? sv.GetValue<string>()
+                : null;
+
+            if (col.Options is { Count: > 0 })
+            {
+                result.Add(col);
+            }
+            else if (col.Type is "number" or "integer" || mode is "range" or "min" or "max" or "gte" or "lte")
+            {
+                if (mode is not ("max" or "lte"))
+                {
+                    result.Add(new WorkflowDataColumn($"{col.Key}_min", $"Min {col.Title} (≥)", col.Type, Searchable: true));
+                }
+
+                if (mode is not ("min" or "gte"))
+                {
+                    result.Add(new WorkflowDataColumn($"{col.Key}_max", $"Max {col.Title} (≤)", col.Type, Searchable: true));
+                }
+            }
+            else
+            {
+                result.Add(col);
+            }
+        }
+
+        var dateSearchFlag = schema["x-date-search"] is JsonValue dv && dv.TryGetValue<bool>(out var df) ? df : (bool?)null;
+        if (dateSearchFlag == true || (dateSearchFlag != false && result.Count > 0))
+        {
+            result.Add(new WorkflowDataColumn("createdFrom", "Başlangıç tarihi", "date", Searchable: true));
+            result.Add(new WorkflowDataColumn("createdTo", "Bitiş tarihi", "date", Searchable: true));
+        }
+
+        return result;
     }
 
     /// <summary>Formats a projected workflow data property value for display in the instance grid.</summary>
@@ -324,6 +402,11 @@ public static class WorkflowUi
     }
 }
 
-/// <summary>Column definition extracted from a workflow's JSON data schema for instance list grids.</summary>
-public sealed record WorkflowDataColumn(string Key, string Title, string Type);
+/// <summary>Column/field definition extracted from a workflow's JSON data schema for instance list grids and search bars.</summary>
+public sealed record WorkflowDataColumn(
+    string Key,
+    string Title,
+    string Type,
+    bool Searchable = false,
+    IReadOnlyList<string>? Options = null);
 

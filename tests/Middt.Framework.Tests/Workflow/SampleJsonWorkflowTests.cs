@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -494,5 +495,120 @@ public sealed class SampleJsonWorkflowTests
 
         rejected.State.Should().Be("rejected");
         rejected.StateSubType.Should().Be("Error");
+    }
+
+    [Fact]
+    public async Task Customer_onboarding_supports_search_by_fullName_segment_and_riskLevel()
+    {
+        await using var host = await CreateHostAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // 1. Bireysel + Düşük risk (monthlyIncome = 65000 >= 50000)
+        await host.StartInstanceAsync(
+            "customer-onboarding",
+            new
+            {
+                fullName = "Zeynep Kaya",
+                identityNumber = "11111111111",
+                email = "zeynep@kaya.com",
+                phone = "05321111111",
+                segment = "Bireysel",
+                monthlyIncome = 65000,
+            },
+            user: Alice);
+
+        // 2. KOBİ + Orta risk (monthlyIncome = 30000 >= 20000)
+        await host.StartInstanceAsync(
+            "customer-onboarding",
+            new
+            {
+                fullName = "İbrahim Öztürk Ticaret",
+                identityNumber = "22222222222",
+                email = "ibrahim@ozturk.com",
+                phone = "05322222222",
+                segment = "KOBİ",
+                monthlyIncome = 30000,
+            },
+            user: Alice);
+
+        // 3. Kurumsal + Yüksek risk (monthlyIncome = 12000 < 20000)
+        await host.StartInstanceAsync(
+            "customer-onboarding",
+            new
+            {
+                fullName = "Anadolu Lojistik A.Ş.",
+                identityNumber = "33333333333",
+                email = "info@anadolu.com",
+                phone = "05323333333",
+                segment = "Kurumsal",
+                monthlyIncome = 12000,
+            },
+            user: Alice);
+
+        // Filter by segment (uses partition B-Tree index pushdown)
+        var (kobiItems, kobiCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["segment"] = "KOBİ" }, ct));
+        kobiCount.Should().Be(1);
+        kobiItems.Should().ContainSingle().Which.Data["fullName"]!.GetValue<string>().Should().Be("İbrahim Öztürk Ticaret");
+
+        // Filter by riskLevel (uses partition B-Tree index pushdown)
+        var (highRiskItems, highRiskCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["riskLevel"] = "Yüksek" }, ct));
+        highRiskCount.Should().Be(1);
+        highRiskItems.Should().ContainSingle().Which.Data["fullName"]!.GetValue<string>().Should().Be("Anadolu Lojistik A.Ş.");
+
+        // Filter by fullName (Turkish case-insensitive substring match: "ibrahim" matches "İbrahim")
+        var (nameItems, nameCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["fullName"] = "ibrahim", ["segment"] = "KOBİ", ["riskLevel"] = "Orta" }, ct));
+        nameCount.Should().Be(1);
+        nameItems.Should().ContainSingle().Which.Key.Should().Be("CUST-22222222222");
+
+        // Filter by numeric range (monthlyIncome_min & monthlyIncome_max pushed to SQL)
+        var (midIncomeItems, midIncomeCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["monthlyIncome_min"] = "20000", ["monthlyIncome_max"] = "50000" }, ct));
+        midIncomeCount.Should().Be(1);
+        midIncomeItems.Should().ContainSingle().Which.Key.Should().Be("CUST-22222222222");
+
+        // Filter by date range (createdFrom & createdTo pushed to SQL)
+        var (dateItems, dateCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["createdFrom"] = "2026-01-01", ["createdTo"] = "2026-12-31" }, ct));
+        dateCount.Should().Be(3);
+        dateItems.Should().HaveCount(3);
+
+        var (_, futureCount) = await host.WithEngineAsync(e =>
+            e.ListAsync("customer-onboarding", Alice, null, null, null, 1, 20, new Dictionary<string, string?> { ["createdFrom"] = "2030-01-01" }, ct));
+        futureCount.Should().Be(0);
+
+        // Verify selective indexing: only enum/numeric x-search properties are indexed, not fullName or masked identityNumber
+        var indexes = await host.WithDbAsync(db =>
+            db.Database.SqlQueryRaw<string>("SELECT name AS \"Value\" FROM sqlite_master WHERE type = 'index'").ToListAsync(ct));
+        indexes.Should().Contain(["IX_Part_CustomerOnboarding_segment", "IX_Part_CustomerOnboarding_riskLevel", "IX_Part_CustomerOnboarding_monthlyIncome"]);
+        indexes.Should().NotContain(["IX_Part_CustomerOnboarding_fullName", "IX_Part_CustomerOnboarding_identityNumber", "IX_Part_CustomerOnboarding_email"]);
+
+        // Also verify WorkflowInstanceDataQuery (used by customer-directory.json grid) with text, dropdown, numeric range, and date range
+        await using var scope = host.Services.CreateAsyncScope();
+        var dataQuery = scope.ServiceProvider.GetRequiredService<WorkflowInstanceDataQuery>();
+        var directoryFiltered = await dataQuery.GetItemsAsync(
+            "CustomerOnboarding",
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["currentPage"] = 1,
+                ["requestItemSize"] = 10,
+                ["requestModel"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["fullName"] = "ibrahim",
+                    ["segment"] = "KOBİ",
+                    ["riskLevel"] = "Orta",
+                    ["monthlyIncome_min"] = 25000,
+                    ["monthlyIncome_max"] = 40000,
+                    ["createdAt_from"] = "2026-01-01",
+                    ["createdAt_to"] = "2026-12-31",
+                },
+            },
+            ManagerPrincipal,
+            ct);
+        directoryFiltered.Result.Should().Be(ResultEnum.Success);
+        directoryFiltered.Count.Should().Be(1);
+        directoryFiltered.Data.Should().ContainSingle().Which["fullName"]!.GetValue<string>().Should().Be("İbrahim Öztürk Ticaret");
     }
 }

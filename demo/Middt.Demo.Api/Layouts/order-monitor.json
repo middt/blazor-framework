@@ -3,7 +3,7 @@
   "key": "order-monitor",
   "title": "Sipariş & Ödeme İzleme (Workflow JSON)",
   "kind": "page",
-  "version": 2,
+  "version": 3,
   "body": [
     { "widget": "heading", "text": "Sipariş & Ödeme İzleme (Workflow JSON Verisi)" },
     { "widget": "link", "text": "Yeni Sipariş & Ödeme Başlat", "href": "/workflow/order-payment-orchestration?start=1", "style": "button" },
@@ -21,7 +21,11 @@
       ],
       "search": [
         { "field": "customerName", "label": "Müşteri Adı" },
-        { "field": "paymentMethod", "label": "Ödeme Yöntemi" }
+        { "field": "paymentMethod", "label": "Ödeme Yöntemi", "type": "select", "options": [ "Kredi Kartı", "Havale / FAST", "Kurumsal Açık Hesap" ] },
+        { "field": "amount_min", "label": "Min Tutar (≥)", "type": "number" },
+        { "field": "amount_max", "label": "Max Tutar (≤)", "type": "number" },
+        { "field": "createdAt_from", "label": "Başlangıç Tarihi", "type": "date" },
+        { "field": "createdAt_to", "label": "Bitiş Tarihi", "type": "date" }
       ]
     }
   ]
