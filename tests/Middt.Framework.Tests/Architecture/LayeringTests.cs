@@ -13,9 +13,7 @@ public sealed class LayeringTests
         "Middt.Framework.Client",
         "Middt.Framework.Bff",
         "Middt.Framework.Blazor.Web",
-        "Middt.Framework.Workflow.Razor",
         "Radzen.Blazor",
-        "Syncfusion.Blazor",
     ];
 
     public static TheoryData<string> Contracts() =>
@@ -24,13 +22,10 @@ public sealed class LayeringTests
     public static TheoryData<string> Backend() =>
         [
             "Middt.Framework.Common",
-            "Middt.Framework.Data",
             "Middt.Framework.Api",
             "Middt.Framework.Workflow",
             "Middt.Framework.Ui.Server",
-            "Middt.Framework.Plugin.Redis",
             "Middt.Framework.Plugin.Rebus",
-            "Middt.Framework.Plugin.SyncfusionExport",
         ];
 
     [Theory]
@@ -42,10 +37,6 @@ public sealed class LayeringTests
     [MemberData(nameof(Backend))]
     public void Backend_does_not_depend_on_frontends(string assembly) =>
         References(assembly).Should().NotContain(r => IsFrontend(r));
-
-    [Fact]
-    public void Sample_common_does_not_depend_on_client_or_frontends() =>
-        References("Middt.Sample.Common").Should().NotContain(r => IsFrontend(r));
 
     [Fact]
     public void Sample_api_backend_does_not_depend_on_client_or_blazor_web() =>
@@ -61,17 +52,16 @@ public sealed class LayeringTests
     [Theory]
     [InlineData("Middt.Framework.Bff")]
     [InlineData("Middt.Framework.Blazor.Web")]
-    [InlineData("Middt.Framework.Workflow.Razor")]
     public void Frontends_do_not_depend_on_backend_engines(string assembly) =>
         References(assembly).Should().NotContain(r => IsBackendEngine(r));
 
     // Expression trees (NotContain) cannot contain 'is' patterns, hence the helper methods.
     private static bool IsBackendOrUiTechnology(string r) =>
-        r is "Middt.Framework.Common" or "Middt.Framework.Data" or "Middt.Framework.Api" or "Middt.Framework.Workflow" or "Middt.Framework.Ui.Server"
+        r is "Middt.Framework.Common" or "Middt.Framework.Api" or "Middt.Framework.Workflow" or "Middt.Framework.Ui.Server"
         || r.StartsWith("Microsoft.AspNetCore.Components", StringComparison.Ordinal) || IsFrontend(r);
 
     private static bool IsBackendEngine(string r) =>
-        r is "Middt.Framework.Data" or "Middt.Framework.Api" or "Middt.Framework.Workflow" or "Middt.Framework.Ui.Server" || r.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal);
+        r is "Middt.Framework.Api" or "Middt.Framework.Workflow" or "Middt.Framework.Ui.Server" || r.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal);
 
     private static bool IsFrontend(string reference) =>
         FrontendAssemblies.Any(f => reference == f || reference.StartsWith(f + ".", StringComparison.Ordinal));

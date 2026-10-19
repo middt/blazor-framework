@@ -11,7 +11,6 @@ using Middt.Framework.Ui.Model;
 using Middt.Framework.Ui.Rendering;
 using Middt.Framework.Ui.Server;
 using Middt.Framework.Ui.Server.Rendering;
-using Middt.Framework.Workflow.Razor;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Runtime;
 
@@ -229,33 +228,5 @@ public sealed class WorkflowLayoutTests
         var plain = await host.TransitionAsync(review.Id, "next");
         (await RenderAsync(host, plain)).Should().Be("<p>plain</p>");
         log.Calls.Should().Equal("layout", "review-late", "plain");
-    }
-
-    [Fact]
-    public async Task Component_views_and_layouts_render_side_by_side()
-    {
-        const string mixed = """
-            { "key": "mixed-flow",
-              "start": { "key": "start", "target": "component",
-                         "input": { "schema": { "type": "object", "properties": { "customer": { "type": "string" } } } } },
-              "states": [
-                { "key": "component", "view": { "component": "test-state" }, "transitions": [ { "key": "next", "target": "review" } ] },
-                { "key": "review", "view": { "layout": "wf-review" }, "transitions": [ { "key": "finish", "target": "done" } ] },
-                { "key": "done", "type": "Finish" } ] }
-            """;
-        await using var host = await WorkflowTestHost.StartAsync([mixed],
-            configure: o => o.UseViews(WorkflowViewCatalog.FromAssemblyOf<TestStateView>().Views),
-            services: s =>
-            {
-                FakeWorkflowLayoutRenderer.Layouts["wf-review"] = ReviewLayout;
-                s.AddSingleton<ViewRendererLog>();
-                s.AddSingleton<IWorkflowViewRenderer, FakeWorkflowLayoutRenderer>();
-            });
-
-        var instance = await host.StartInstanceAsync("mixed-flow", new { customer = "<Ada>" });
-        (await RenderAsync(host, instance)).Should().Be("<p class=\"static\">Customer: &lt;Ada&gt; / n/a</p>");
-
-        var review = await host.TransitionAsync(instance.Id, "next");
-        (await RenderAsync(host, review, WorkflowTestHost.User("bob"))).Should().Contain("Customer &lt;Ada&gt;").And.Contain("mixed-flow/review for bob");
     }
 }

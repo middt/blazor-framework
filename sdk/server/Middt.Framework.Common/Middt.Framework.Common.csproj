@@ -2,16 +2,12 @@
 
   <PropertyGroup>
     <Product>Middt Framework Common</Product>
-    <Description>Shared server side services for Middt hosts (API and server hosted frontends): security headers, forwarded headers, SignalR hub base, e-mail, document export, helpers.</Description>
+    <Description>Shared server side services for Middt hosts (API and server hosted frontends): security headers, forwarded headers, local URL checks and SignalR hub base.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Syncfusion.Licensing" />
   </ItemGroup>
 
   <ItemGroup>

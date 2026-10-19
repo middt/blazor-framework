@@ -74,7 +74,7 @@ public partial class UiDataClient(
     public virtual Task<BaseResponseDataModel<JsonObject>> DeleteAsync(string entity, JsonObject model, CancellationToken cancellationToken = default) =>
         SendAsync<BaseResponseDataModel<JsonObject>>(HttpMethod.Post, Route(entity, "delete"), model, cancellationToken);
 
-    /// <summary>Builds a search request (<see cref="BaseSearchRequestModel{T}"/> wire format).</summary>
+    /// <summary>Builds a paged search request (<c>getitems</c> wire format).</summary>
     public static JsonObject SearchRequest(JsonObject filter, int page, int pageSize, string? sortProperty, bool ascending) => new()
     {
         ["currentPage"] = page,

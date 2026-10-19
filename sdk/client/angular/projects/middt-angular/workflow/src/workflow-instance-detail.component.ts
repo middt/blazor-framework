@@ -59,24 +59,21 @@ import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
 import { WORKFLOW_API_CLIENT } from './workflow-client';
 import { MiddtWorkflowDialogComponent } from './workflow-dialog.component';
 import { WF_SHARED_STYLES } from './workflow-styles';
-import { MiddtWorkflowViewOutletComponent } from './workflow-view-outlet.component';
-import { findWorkflowView, WORKFLOW_VIEWS } from './workflow-views';
 
 const POLL_ATTEMPTS = 15;
 const POLL_INTERVAL_MS = 1000;
 
 /**
  * One workflow instance (counterpart of WorkflowInstanceDetail.razor): current state, the transitions the user may execute
- * (input forms built from their JSON Schema or registered transition views), scheduled transitions, history and incidents.
+ * (input forms built from their JSON Schema), scheduled transitions, history and incidents.
  * Wizard workflows (states with a `step`) get a step indicator, and an `inline` transition is rendered as the step form inside
- * the screen. The state is shown by its registered Angular view, else its JSON layout, else the server rendered view
- * (`GET …/view`), else as raw JSON.
+ * the screen. The state is shown by its JSON layout, else the server rendered view (`GET …/view`), else as raw JSON.
  */
 @Component({
   selector: 'middt-workflow-instance-detail',
   imports: [
     MatCardModule, MatButtonModule, MatIconModule, MiddtJsonSchemaFormComponent, MiddtWorkflowDialogComponent,
-    MiddtWorkflowViewOutletComponent, MiddtLayoutHostComponent,
+    MiddtLayoutHostComponent,
   ],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -104,10 +101,9 @@ export class MiddtWorkflowInstanceDetailComponent {
   protected readonly pendingTransition = signal<AvailableTransitionModel | null>(null);
   protected readonly transitionErrors = signal<string[]>([]);
   protected readonly stepErrors = signal<string[]>([]);
-  /** Server rendered HTML of the state view (when no Angular view is registered for it). */
+  /** Server rendered HTML of the state view (when no JSON layout is configured for it). */
   protected readonly serverHtml = signal<string | null>(null);
 
-  readonly #views = inject(WORKFLOW_VIEWS);
   readonly #client = inject(WORKFLOW_API_CLIENT);
   readonly #notify = inject(NotifyService);
   readonly #injector = inject(Injector);
@@ -119,7 +115,6 @@ export class MiddtWorkflowInstanceDetailComponent {
 
   private readonly stepForm = viewChild<MiddtJsonSchemaFormComponent>('stepForm');
   private readonly transitionForm = viewChild<MiddtJsonSchemaFormComponent>('transitionForm');
-  private readonly stepViewElement = viewChild<ElementRef<HTMLElement>>('stepViewElement');
   private readonly stateHeading = viewChild<ElementRef<HTMLElement>>('stateHeading');
 
   /** Definition of the instance's version (instances keep running on the version they were started with). */
@@ -145,9 +140,6 @@ export class MiddtWorkflowInstanceDetailComponent {
     return instance === null || step === null ? [] : [`${instance.id}:${instance.state}:${instance.dataVersion}:${step.key}`];
   });
 
-  protected readonly stateView = computed(() => findWorkflowView(this.#views, this.instance()?.view, 'state'));
-  protected readonly stepViewType = computed(() => findWorkflowView(this.#views, this.stepTransition()?.view, 'transition'));
-  protected readonly transitionView = computed(() => findWorkflowView(this.#views, this.pendingTransition()?.view, 'transition'));
   protected readonly pendingHasInput = computed(() => schemaHasInput(this.pendingTransition()?.inputSchema));
 
   /** Transitions shown as buttons: all available ones except the inline step transition. */
@@ -308,9 +300,9 @@ export class MiddtWorkflowInstanceDetailComponent {
     }
   }
 
-  /** The state has a view but no Angular view is registered (and no layout): use the server rendered HTML. */
+  /** The state has a view and no layout: use the server rendered HTML. */
   async #loadServerHtml(workflow: string, instance: WorkflowInstanceModel, signal: AbortSignal): Promise<string | null> {
-    if (!instance.view || instance.layout || findWorkflowView(this.#views, instance.view, 'state') !== null) {
+    if (!instance.view || instance.layout) {
       return null;
     }
 
@@ -369,24 +361,6 @@ export class MiddtWorkflowInstanceDetailComponent {
     }
 
     void this.#execute(transition, hasInput ? (form?.getValue() ?? null) : null, true);
-  }
-
-  protected submitCustomForm(body: WorkflowData): void {
-    const transition = this.pendingTransition();
-    if (transition !== null && !this.executing()) {
-      void this.#execute(transition, body, false);
-    }
-  }
-
-  protected submitCustomStep(body: WorkflowData): void {
-    const transition = this.stepTransition();
-    if (transition !== null && !this.executing()) {
-      void this.#execute(transition, body, true);
-    }
-  }
-
-  protected clearStepErrors(): void {
-    this.stepErrors.set([]);
   }
 
   /**
@@ -499,15 +473,13 @@ export class MiddtWorkflowInstanceDetailComponent {
     }
   }
 
-  /** After a step: focus the first field of the next step form (or the custom step view / the state heading) for keyboard users. */
+  /** After a step: focus the first field of the next step form (or the state heading) for keyboard users. */
   #focusStep(): void {
     afterNextRender(
       () => {
         const form = this.stepForm();
-        if (this.stepTransition() !== null && this.stepViewType() === null && form?.hasFields()) {
+        if (this.stepTransition() !== null && form?.hasFields()) {
           form.focusFirst();
-        } else if (this.stepTransition() !== null && this.stepViewType() !== null) {
-          this.stepViewElement()?.nativeElement.focus();
         } else {
           this.stateHeading()?.nativeElement.focus();
         }

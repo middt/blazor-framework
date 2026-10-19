@@ -1,7 +1,0 @@
-@inherits BaseComponent
-
-@if (TotalPage > 1)
-{
-    <RadzenPager Count="@Count" PageSize="@PageSize" PageSizeOptions="@PageSizeOptions" ShowPagingSummary="true"
-                 PagingSummaryFormat="Sayfa {0} / {1} ({2} kayıt)" PageNumbersCount="5" PageChanged="HandlePageChanged" />
-}

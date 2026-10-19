@@ -14,7 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\sdk\client\blazor\Middt.Framework.Blazor.Web\Middt.Framework.Blazor.Web.csproj" />
-    <ProjectReference Include="..\..\..\shared\Middt.Sample.Common\Middt.Sample.Common.csproj" />
     <ProjectReference Include="..\..\..\shared\Middt.Sample.ServiceDefaults\Middt.Sample.ServiceDefaults.csproj" />
   </ItemGroup>
 

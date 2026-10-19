@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Product>Middt Framework Api</Product>
-    <Description>ASP.NET Core building blocks for Middt APIs: generic CRUD controllers, JWT token endpoints, versioning, OpenAPI and ProblemDetails.</Description>
+    <Description>ASP.NET Core building blocks for Middt APIs: base controllers, JWT token endpoints, versioning, OpenAPI and ProblemDetails.</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
@@ -16,13 +16,11 @@
     <PackageReference Include="Asp.Versioning.OpenApi" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Middt.Framework.Common\Middt.Framework.Common.csproj" />
-    <ProjectReference Include="..\Middt.Framework.Data\Middt.Framework.Data.csproj" />
   </ItemGroup>
 
 </Project>

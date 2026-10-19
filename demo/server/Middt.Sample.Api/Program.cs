@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Api.DependencyInjection;
 using Middt.Framework.Plugin.Rebus;
-using Middt.Framework.Plugin.Redis;
 using Middt.Framework.Ui.Server.DependencyInjection;
 using Middt.Framework.Ui.Server.Endpoints;
 using Middt.Framework.Workflow.DependencyInjection;
@@ -22,9 +21,8 @@ var signalR = builder.Services.AddSignalR();
 // Optional infrastructure: enabled only when a connection string is configured (Aspire / Docker Compose injects them).
 if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
 {
-    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis); // L2 for HybridCache / IBaseCache / CacheTask
+    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis); // L2 for CacheTask / RefreshTokenStore
     signalR.AddStackExchangeRedis(redis);                                       // SignalR backplane
-    builder.Services.AddMiddtRedisCache(o => o.ConnectionString = redis);       // distributed lock + cache plugin
 }
 
 // Messaging (Rebus): RabbitMQ when a connection string is configured, otherwise the in-memory transport for local runs.

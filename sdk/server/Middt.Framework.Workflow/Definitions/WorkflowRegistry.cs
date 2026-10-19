@@ -118,7 +118,7 @@ public sealed class WorkflowRegistry
         using var scope = services.CreateScope();
         foreach (var definition in result.Values.SelectMany(v => v.Values))
         {
-            errors.AddRange(WorkflowDefinitionValidator.Validate(definition, expressions, tasks, scope.ServiceProvider, key => result.ContainsKey(key), options.ViewTypes)
+            errors.AddRange(WorkflowDefinitionValidator.Validate(definition, expressions, tasks, scope.ServiceProvider, key => result.ContainsKey(key))
                 .Select(e => $"{definition.Key} v{definition.Version}: {e}"));
         }
 
@@ -146,25 +146,6 @@ public sealed class WorkflowTaskRegistry(IOptions<MiddtWorkflowOptions> options)
         ["start-workflow"] = typeof(StartWorkflowTask),
         ["setKey"] = typeof(SetKeyTask),
         ["set-key"] = typeof(SetKeyTask),
-        // Generic DB / Entity tasks
-        ["entity-create"] = typeof(EntityCreateTask),
-        ["entity-insert"] = typeof(EntityCreateTask),
-        ["entityCreate"] = typeof(EntityCreateTask),
-        ["entityInsert"] = typeof(EntityCreateTask),
-        ["entity-update"] = typeof(EntityUpdateTask),
-        ["entityUpdate"] = typeof(EntityUpdateTask),
-        ["entity-load"] = typeof(EntityLoadTask),
-        ["entity-find"] = typeof(EntityLoadTask),
-        ["entityLoad"] = typeof(EntityLoadTask),
-        ["entityFind"] = typeof(EntityLoadTask),
-        ["entity-delete"] = typeof(EntityDeleteTask),
-        ["entityDelete"] = typeof(EntityDeleteTask),
-        ["db-sql"] = typeof(DbSqlTask),
-        ["db-execute"] = typeof(DbSqlTask),
-        ["dbSql"] = typeof(DbSqlTask),
-        ["dbExecute"] = typeof(DbSqlTask),
-        ["db-query"] = typeof(DbQueryTask),
-        ["dbQuery"] = typeof(DbQueryTask),
         ["fanOut"] = typeof(FanOutTask),
         ["fan-out"] = typeof(FanOutTask),
         ["cache"] = typeof(CacheTask),
@@ -207,10 +188,9 @@ internal static class WorkflowDefinitionValidator
         WorkflowExpressionEngine expressions,
         WorkflowTaskRegistry tasks,
         IServiceProvider services,
-        Func<string, bool> workflowExists,
-        IReadOnlyDictionary<string, Type> views)
+        Func<string, bool> workflowExists)
     {
-        foreach (var error in ValidateViews(wf, views))
+        foreach (var error in ValidateViews(wf))
         {
             yield return error;
         }
@@ -355,11 +335,7 @@ internal static class WorkflowDefinitionValidator
         }
     }
 
-    /// <summary>
-    /// View names must be registered (when the host registered any views) and of the right kind:
-    /// state views take <c>Instance</c>, transition views additionally take <c>Transition</c>.
-    /// </summary>
-    private static IEnumerable<string> ValidateViews(WorkflowDefinition wf, IReadOnlyDictionary<string, Type> views)
+    private static IEnumerable<string> ValidateViews(WorkflowDefinition wf)
     {
         var references = wf.States.Where(s => s.View is not null).Select(s => (Where: $"state '{s.Key}'", View: s.View!, Transition: false))
             .Concat(wf.States.SelectMany(s => s.Transitions).Concat(wf.SharedTransitions).Append(wf.Start)
@@ -391,28 +367,12 @@ internal static class WorkflowDefinitionValidator
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(view.Component))
+            if (string.IsNullOrWhiteSpace(view.Component) && !view.Inline)
             {
-                if (!view.Inline)
-                {
-                    yield return $"{where}: view.component or view.layout is required.";
-                }
-            }
-            else if (views.Count > 0)
-            {
-                if (!views.TryGetValue(view.Component, out var type))
-                {
-                    yield return $"{where}: view '{view.Component}' is not registered.";
-                }
-                else if (IsTransitionView(type) != isTransition)
-                {
-                    yield return $"{where}: view '{view.Component}' is a {(isTransition ? "state" : "transition")} view.";
-                }
+                yield return $"{where}: view.component or view.layout is required.";
             }
         }
     }
-
-    internal static bool IsTransitionView(Type type) => type.GetProperty("Transition") is not null;
 
     private static IEnumerable<string> ValidateTransition(
         TransitionDefinition t,

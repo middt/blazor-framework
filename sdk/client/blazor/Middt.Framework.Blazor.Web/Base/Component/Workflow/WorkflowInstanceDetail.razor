@@ -1,6 +1,5 @@
 @namespace Middt.Framework.Blazor.Web.Base.Component.Workflow
 @using Middt.Framework.Model.Workflow
-@using Middt.Framework.Workflow.Razor
 @inherits BaseComponent
 
 <section class="middt-wf-detail" aria-live="polite">
@@ -55,25 +54,16 @@
                 @* Wizard: the inline transition is the form of this step. *@
                 <form class="middt-wf-step-form" aria-labelledby="@($"{IdPrefix}-state-title")" novalidate
                       data-transition="@stepTr.Key" @onsubmit="SubmitStepAsync" @onsubmit:preventDefault>
-                    @if (StepViewType is { } stepViewType)
+                    <JsonSchemaForm @key="@($"{instance.Id}:{instance.State}:{instance.DataVersion}:{stepTr.Key}")" @ref="stepForm"
+                                    Schema="@stepTr.InputSchema" Value="@stepPrefill" IdPrefix="@($"{IdPrefix}-step-{stepTr.Key}")" Disabled="@executing" />
+                    @if (stepErrors.Count > 0)
                     {
-                        <div @ref="stepFormElement" tabindex="-1" class="middt-wf-step-view">
-                            <DynamicComponent Type="@stepViewType" Parameters="@StepViewParameters" />
-                        </div>
-                    }
-                    else
-                    {
-                        <JsonSchemaForm @key="@($"{instance.Id}:{instance.State}:{instance.DataVersion}:{stepTr.Key}")" @ref="stepForm"
-                                        Schema="@stepTr.InputSchema" Value="@stepPrefill" IdPrefix="@($"{IdPrefix}-step-{stepTr.Key}")" Disabled="@executing" />
-                        @if (stepErrors.Count > 0)
-                        {
-                            <ul class="middt-wf-errors" role="alert">
-                                @foreach (var error in stepErrors)
-                                {
-                                    <li>@error</li>
-                                }
-                            </ul>
-                        }
+                        <ul class="middt-wf-errors" role="alert">
+                            @foreach (var error in stepErrors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
                     }
                     <div class="middt-wf-step-actions">
                         @foreach (var transition in ButtonTransitions.Where(RunsDirectly))
@@ -83,11 +73,8 @@
                                           title="@($"{text} → {StateTitle(transition.Target)}")" Click="@(() => OnTransitionClick(transition))"
                                           Disabled="@executing" data-transition="@transition.Key" class="middt-wf-step-secondary" />
                         }
-                        @if (StepViewType is null)
-                        {
-                            <RadzenButton ButtonType="ButtonType.Submit" Text="@(stepTr.Title ?? stepTr.Key)" Icon="arrow_forward" ButtonStyle="ButtonStyle.Primary"
-                                          IsBusy="@executing" BusyText="İşleniyor..." data-transition="@stepTr.Key" class="middt-wf-step-submit" />
-                        }
+                        <RadzenButton ButtonType="ButtonType.Submit" Text="@(stepTr.Title ?? stepTr.Key)" Icon="arrow_forward" ButtonStyle="ButtonStyle.Primary"
+                                      IsBusy="@executing" BusyText="İşleniyor..." data-transition="@stepTr.Key" class="middt-wf-step-submit" />
                     </div>
                 </form>
             }
@@ -156,18 +143,7 @@
         </RadzenCard>
 
         <RadzenCard class="middt-wf-card">
-            @if (StateViewType is { } viewType)
-            {
-                @* Server driven UI: the state's registered view renders the instance. *@
-                <div class="middt-wf-view" data-view="@instance.View">
-                    <DynamicComponent Type="@viewType" Parameters="@StateViewParameters" />
-                </div>
-                <details class="middt-wf-raw">
-                    <summary>Ham veri</summary>
-                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
-                </details>
-            }
-            else if (instance.Layout is { } layoutKey)
+            @if (instance.Layout is { } layoutKey)
             {
                 @* Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). *@
                 <div class="middt-wf-view" data-layout="@layoutKey">
@@ -271,12 +247,7 @@
     <ChildContent>
         @if (pendingTransition is not null)
         {
-            @if (TransitionViewType is { } formType)
-            {
-                @* Server driven UI: custom input form registered for this transition (renders its own buttons). *@
-                <DynamicComponent Type="@formType" Parameters="@TransitionViewParameters" />
-            }
-            else if (pendingHasInput)
+            @if (pendingHasInput)
             {
                 <JsonSchemaForm @ref="transitionForm" Schema="@pendingTransition.InputSchema" IdPrefix="@($"{IdPrefix}-tr-{pendingTransition.Key}")" Disabled="@executing" />
             }
@@ -284,7 +255,7 @@
             {
                 <p>"@(pendingTransition.Title ?? pendingTransition.Key)" işlemi uygulanacak. Onaylıyor musunuz?</p>
             }
-            @if (transitionErrors.Count > 0 && TransitionViewType is null)
+            @if (transitionErrors.Count > 0)
             {
                 <ul class="middt-wf-errors" role="alert">
                     @foreach (var error in transitionErrors)
@@ -296,11 +267,8 @@
         }
     </ChildContent>
     <FooterContent>
-        @if (TransitionViewType is null)
-        {
         <RadzenButton Text="Vazgeç" ButtonStyle="ButtonStyle.Light" Click="CloseTransition" Disabled="@executing" />
         <RadzenButton Text="@(pendingTransition?.Title ?? "Uygula")" Icon="check" ButtonStyle="@(pendingTransition is null ? ButtonStyle.Primary : TransitionStyle(pendingTransition))"
                       Click="ExecuteTransitionAsync" IsBusy="@executing" BusyText="İşleniyor..." class="middt-wf-transition-submit" />
-        }
     </FooterContent>
 </WorkflowDialog>

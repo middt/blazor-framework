@@ -27,15 +27,13 @@ up without reinstalling.
 
 New applications should import from `@middt/angular/core`, `@middt/angular/ui`,
 `@middt/angular/workflow`, and `@middt/angular/signalr`. The root `@middt/angular`
-entry point remains available for existing applications. Register workflow views in
-a lazy workflow route so the workflow package stays out of the initial bundle.
+entry point remains available for existing applications.
 
 ```ts
 // app.config.ts
 providers: [
   provideRouter(routes, withComponentInputBinding()),
   provideMiddt({ locale: 'tr-TR', apiVersion: '1.0' }),           // BFF defaults: /api, /bff/user, /Account/Login
-  provideWorkflowViews([{ name: 'order-review', kind: 'state', component: OrderReviewView }]),
   provideMiddtUiWidgets({ name: 'chart', component: ChartWidget, interactive: false, description: 'Chart.' }),
 ]
 
@@ -47,7 +45,6 @@ providers: [
 - **Layouts**: `<middt-layout-host layoutKey="order-escalated" [variables]="{ data, instance }" />` embeds a layout;
   widgets map by name (`MIDDT_UI_WIDGETS`); expressions, templates and formats come from `@middt/ui-core` and behave
   exactly like the .NET side (shared conformance suite).
-- **Workflows**: `<middt-workflow-instance-list>` + `<middt-workflow-instance-detail>`; state views resolve in the order
-  registered Angular view → JSON layout (`view.layout`) → server HTML (`…/view`) → raw data.
-- **Custom widgets / views** must also be known by the API (`MiddtUiOptions.AddWidget`, workflow view names).
+- **Workflows**: `<middt-workflow-instance-list>` + `<middt-workflow-instance-detail>`; state views render their JSON layout (`view.layout`).
+- **Custom widgets** must also be known by the API (`MiddtUiOptions.AddWidget`).
 

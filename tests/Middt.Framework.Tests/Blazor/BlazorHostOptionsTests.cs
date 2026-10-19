@@ -1,9 +1,8 @@
 using System.Net;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Middt.Framework.Tests.Blazor;
 
-/// <summary>Opt-in/opt-out features of <c>AddMiddtBlazor</c>/<c>UseMiddtBlazor</c>: Syncfusion and response compression.</summary>
+/// <summary>Opt-in/opt-out features of <c>AddMiddtBlazor</c>/<c>UseMiddtBlazor</c>: response compression.</summary>
 public sealed class BlazorHostOptionsTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -13,26 +12,6 @@ public sealed class BlazorHostOptionsTests
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.TryAddWithoutValidation("Accept-Encoding", encoding);
         return await host.CreateBrowser().SendAsync(request);
-    }
-
-    private static bool HasSyncfusion(BlazorTestHost host)
-    {
-        using var scope = host.App.Services.CreateScope();
-        return scope.ServiceProvider.GetService<Syncfusion.Blazor.SyncfusionBlazorService>() is not null;
-    }
-
-    [Fact]
-    public async Task Syncfusion_is_not_registered_unless_enabled()
-    {
-        await using (var host = await BlazorTestHost.StartAsync(configure: o => o.UseSyncfusion = false))
-        {
-            HasSyncfusion(host).Should().BeFalse();
-        }
-
-        await using (var host = await BlazorTestHost.StartAsync(configure: o => o.UseSyncfusion = true))
-        {
-            HasSyncfusion(host).Should().BeTrue();
-        }
     }
 
     [Fact]

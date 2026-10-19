@@ -38,23 +38,16 @@
           <!-- Wizard: the inline transition is the form of this step. -->
           <form class="middt-wf-step-form" [attr.aria-labelledby]="idPrefix() + '-state-title'" novalidate [attr.data-transition]="stepTr.key"
                 (submit)="$event.preventDefault(); submitStep()">
-            @if (stepViewType(); as stepType) {
-              <div #stepViewElement tabindex="-1" class="middt-wf-step-view">
-                <middt-wf-view-outlet [component]="stepType" kind="transition" [instance]="instance" [transition]="stepTr" [errors]="stepErrors()"
-                                      [busy]="executing()" (submitted)="submitCustomStep($event)" (cancelled)="clearStepErrors()" />
-              </div>
-            } @else {
-              @for (key of stepFormKey(); track key) {
-                <middt-json-schema-form #stepForm [schema]="stepTr.inputSchema" [value]="stepPrefill()" [idPrefix]="idPrefix() + '-step-' + stepTr.key"
-                                        [disabled]="executing()" />
-              }
-              @if (stepErrors().length > 0) {
-                <ul class="middt-wf-errors" role="alert">
-                  @for (error of stepErrors(); track $index) {
-                    <li>{{ error }}</li>
-                  }
-                </ul>
-              }
+            @for (key of stepFormKey(); track key) {
+              <middt-json-schema-form #stepForm [schema]="stepTr.inputSchema" [value]="stepPrefill()" [idPrefix]="idPrefix() + '-step-' + stepTr.key"
+                                      [disabled]="executing()" />
+            }
+            @if (stepErrors().length > 0) {
+              <ul class="middt-wf-errors" role="alert">
+                @for (error of stepErrors(); track $index) {
+                  <li>{{ error }}</li>
+                }
+              </ul>
             }
             <div class="middt-wf-step-actions">
               @for (transition of directTransitions(); track transition.key) {
@@ -63,12 +56,10 @@
                   <mat-icon>arrow_back</mat-icon>{{ transitionText(transition) }}
                 </button>
               }
-              @if (stepViewType() === null) {
-                <button mat-flat-button type="submit" class="middt-wf-step-submit" [attr.data-transition]="stepTr.key" [disabled]="executing()"
-                        [attr.aria-busy]="executing()">
-                  {{ executing() ? 'İşleniyor...' : transitionText(stepTr) }}<mat-icon iconPositionEnd>{{ executing() ? 'hourglass_empty' : 'arrow_forward' }}</mat-icon>
-                </button>
-              }
+              <button mat-flat-button type="submit" class="middt-wf-step-submit" [attr.data-transition]="stepTr.key" [disabled]="executing()"
+                      [attr.aria-busy]="executing()">
+                {{ executing() ? 'İşleniyor...' : transitionText(stepTr) }}<mat-icon iconPositionEnd>{{ executing() ? 'hourglass_empty' : 'arrow_forward' }}</mat-icon>
+              </button>
             </div>
           </form>
         }
@@ -138,16 +129,7 @@
 
     <mat-card appearance="outlined" class="middt-wf-card">
       <mat-card-content>
-        @if (stateView(); as viewType) {
-          <!-- Server driven UI: the state's registered Angular view renders the instance. -->
-          <div class="middt-wf-view" [attr.data-view]="instance.view">
-            <middt-wf-view-outlet [component]="viewType" kind="state" [instance]="instance" [interactive]="true" />
-          </div>
-          <details class="middt-wf-raw">
-            <summary>Ham veri</summary>
-            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
-          </details>
-        } @else if (instance.layout) {
+        @if (instance.layout) {
           <!-- Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). -->
           <div class="middt-wf-view" [attr.data-layout]="instance.layout">
             @for (key of layoutKeyId(); track key) {
@@ -159,7 +141,7 @@
             <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
           </details>
         } @else if (serverHtml(); as html) {
-          <!-- Server rendered state view (Razor view rendered by the API); inserted through Angular's HTML sanitizer. -->
+          <!-- Server rendered state view; inserted through Angular's HTML sanitizer. -->
           <div class="middt-wf-view middt-wf-server-view" [attr.data-view]="instance.view" [innerHTML]="html"></div>
           <details class="middt-wf-raw">
             <summary>Ham veri</summary>
@@ -247,28 +229,22 @@
 <middt-wf-dialog [dialogId]="idPrefix() + '-transition-dialog'" [visible]="pendingTransition() !== null"
                  [title]="pendingTransition()?.title ?? pendingTransition()?.key" [busy]="executing()" (closed)="closeTransition()">
   @if (pendingTransition(); as pending) {
-    @if (transitionView(); as formType) {
-      <!-- Server driven UI: custom input form registered for this transition (renders its own buttons). -->
-      <middt-wf-view-outlet [component]="formType" kind="transition" [instance]="instance()!" [transition]="pending" [errors]="transitionErrors()"
-                            [busy]="executing()" (submitted)="submitCustomForm($event)" (cancelled)="closeTransition()" />
-    } @else {
-      <form [id]="idPrefix() + '-transition-form'" novalidate (submit)="$event.preventDefault(); executePending()">
-        @if (pendingHasInput()) {
-          <middt-json-schema-form #transitionForm [schema]="pending.inputSchema" [idPrefix]="idPrefix() + '-tr-' + pending.key" [disabled]="executing()" />
-        } @else {
-          <p>"{{ transitionText(pending) }}" işlemi uygulanacak. Onaylıyor musunuz?</p>
-        }
-        @if (transitionErrors().length > 0) {
-          <ul class="middt-wf-errors" role="alert">
-            @for (error of transitionErrors(); track $index) {
-              <li>{{ error }}</li>
-            }
-          </ul>
-        }
-      </form>
-    }
+    <form [id]="idPrefix() + '-transition-form'" novalidate (submit)="$event.preventDefault(); executePending()">
+      @if (pendingHasInput()) {
+        <middt-json-schema-form #transitionForm [schema]="pending.inputSchema" [idPrefix]="idPrefix() + '-tr-' + pending.key" [disabled]="executing()" />
+      } @else {
+        <p>"{{ transitionText(pending) }}" işlemi uygulanacak. Onaylıyor musunuz?</p>
+      }
+      @if (transitionErrors().length > 0) {
+        <ul class="middt-wf-errors" role="alert">
+          @for (error of transitionErrors(); track $index) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      }
+    </form>
   }
-  @if (pendingTransition() !== null && transitionView() === null) {
+  @if (pendingTransition() !== null) {
     <ng-container footer>
       <button mat-button type="button" (click)="closeTransition()" [disabled]="executing()">Vazgeç</button>
       <button mat-flat-button type="submit" [attr.form]="idPrefix() + '-transition-form'" class="middt-wf-transition-submit middt-wf-btn-{{ transitionStyle(pendingTransition()!) }}"

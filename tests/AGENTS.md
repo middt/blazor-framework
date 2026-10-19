@@ -7,7 +7,7 @@ dotnet test --project tests/Middt.Framework.Tests
 dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*SpaBffHardeningTests"
 ```
 
-- Folders mirror the code: Api, Data, Workflow, Ui, Bff, Blazor, Client, Security, Messaging, Expressions,
+- Folders mirror the code: Api, Workflow, Ui, Bff, Blazor, Client, Security, Messaging, Expressions,
   Architecture (layering), Infrastructure.
 - Use the existing hosts instead of inventing new ones: `TestApiHost`, `WorkflowTestHost`, `UiTestHost`,
   `SpaBffTestHost`, `BlazorTestHost`; SQLite in-memory (keep the connection open), `FakeTimeProvider`,

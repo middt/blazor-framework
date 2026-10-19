@@ -42,7 +42,6 @@ public static class WorkflowServiceCollectionExtensions
         services.AddScoped<WorkflowEngine>();
         services.AddScoped<WorkflowInstanceDataQuery>();
         services.AddScoped<WorkflowViewRenderer>();
-        services.AddScoped<IWorkflowViewRenderer, ComponentWorkflowViewRenderer>();
 
         services.AddMemoryCache();
         services.TryAddTransient<SetTask>();

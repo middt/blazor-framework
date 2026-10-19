@@ -341,36 +341,6 @@ export function workflowLayoutVariables(instance: WorkflowInstanceModel): Record
   };
 }
 
-// ---------------------------------------------------------------------------------------------- view data (WorkflowViewBase)
-
-/** Value at a dot path as display text, or `fallback`. */
-export function workflowViewText(data: WorkflowData | null | undefined, path: string, fallback = '-'): string {
-  const value = workflowDataGet(data, path);
-  if (value === null || value === undefined) {
-    return fallback;
-  }
-
-  return typeof value === 'object' ? JSON.stringify(value) : String(value);
-}
-
-export function workflowViewNumber(data: WorkflowData | null | undefined, path: string): number | null {
-  const value = workflowDataGet(data, path);
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  if (typeof value === 'string' && /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(value)) {
-    return Number(value);
-  }
-
-  return null;
-}
-
-export function workflowViewDate(data: WorkflowData | null | undefined, path: string): Date | null {
-  const value = workflowDataGet(data, path);
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? parseWorkflowDate(value) : null;
-}
-
 // ------------------------------------------------------------------------------------------------------ JSON Schema form
 
 export type SchemaFieldKind = 'text' | 'longText' | 'enum' | 'dateTime' | 'date' | 'number' | 'integer' | 'boolean' | 'json';

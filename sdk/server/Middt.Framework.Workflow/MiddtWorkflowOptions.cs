@@ -51,35 +51,9 @@ public sealed class MiddtWorkflowOptions
 
     internal Dictionary<string, Type> TaskTypes { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    internal Dictionary<string, Type> ViewTypes { get; } = new(StringComparer.OrdinalIgnoreCase);
-
     public MiddtWorkflowOptions UseDbContext(Action<DbContextOptionsBuilder> configure)
     {
         ConfigureDbContext = configure;
-        return this;
-    }
-
-    /// <summary>Types of application DbContexts used by generic entity workflow tasks (<c>entity-create</c>, <c>entity-update</c>, etc.).</summary>
-    public List<Type> ApplicationDbContextTypes { get; } = [];
-
-    /// <summary>Registers an application DbContext type used by generic entity workflow tasks.</summary>
-    public MiddtWorkflowOptions UseApplicationDbContext<TDbContext>() where TDbContext : DbContext =>
-        UseApplicationDbContext(typeof(TDbContext));
-
-    /// <summary>Registers an application DbContext type used by generic entity workflow tasks.</summary>
-    public MiddtWorkflowOptions UseApplicationDbContext(Type dbContextType)
-    {
-        ArgumentNullException.ThrowIfNull(dbContextType);
-        if (!typeof(DbContext).IsAssignableFrom(dbContextType))
-        {
-            throw new ArgumentException($"Type '{dbContextType.FullName}' must inherit from {nameof(DbContext)}.", nameof(dbContextType));
-        }
-
-        if (!ApplicationDbContextTypes.Contains(dbContextType))
-        {
-            ApplicationDbContextTypes.Add(dbContextType);
-        }
-
         return this;
     }
 
@@ -116,21 +90,6 @@ public sealed class MiddtWorkflowOptions
     public MiddtWorkflowOptions AddDefinition(string json, string source = "inline")
     {
         DefinitionSources.Add(_ => [(source, json)]);
-        return this;
-    }
-
-    /// <summary>
-    /// Registers view components by name (e.g. Razor views: <c>WorkflowViewCatalog.FromAssemblyOf&lt;MyView&gt;().Views</c> from
-    /// Middt.Framework.Workflow.Razor). Definitions are then validated against them and state views can be rendered to HTML
-    /// by <c>GET …/instances/{id}/view</c>. Optional: frontends that use JSON layouts (<c>view.layout</c>) need no components.
-    /// </summary>
-    public MiddtWorkflowOptions UseViews(IEnumerable<KeyValuePair<string, Type>> views)
-    {
-        foreach (var (name, type) in views)
-        {
-            ViewTypes[name] = type;
-        }
-
         return this;
     }
 

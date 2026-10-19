@@ -6,24 +6,23 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 
 ```
                          ┌────────────────────────────── 1. Contracts (no UI technology) ──────────────────────────────┐
-                         │ Middt.Framework.Model            wire DTOs: envelope, search, auth, workflow, SignalR          │
+                         │ Middt.Framework.Model            wire DTOs: envelope, auth, workflow, SignalR                │
                          │ Middt.Framework.Expressions      portable expression language (+ DynamicExpresso for workflows)│
                          │ Middt.Framework.Ui.Abstractions  layout model, widget specs, validator, formats, JSON Schema   │
                          │ spec/                            expressions.conformance.json, ui-layout.schema.json           │
                          └───────────────▲───────────────────────────────▲──────────────────────────────▲───────────────┘
                                          │                               │                              │ same rules
 ┌──────────── 2. Backend ────────────────┴───┐   ┌──── 3. .NET client SDK ──┴──────┐   ┌──── TypeScript ───┴────────────┐
-│ Api, Data, Common (server helpers)          │   │ Middt.Framework.Client           │   │ sdk/client/typescript/ui-core     │
-│ Workflow   (engine; IWorkflowViewRenderer)  │   │ typed CRUD/workflow/layout       │   │ @middt/ui-core: types,         │
-│ Ui.Server  (layout store, REST, schema,     │   │ clients, token refresh, SignalR  │   │ expressions, formats, clients  │
-│            plain C# static HTML renderer)   │   └───────────────▲──────────────────┘   └───────────────▲────────────────┘
-│ Plugins: Redis, Rebus, SyncfusionExport     │                   │                                      │
-└─────────────────────▲───────────────────────┘   ┌──── 4. Blazor frontend ┴──────────┐   ┌──── Angular frontend ─────────┴┐
-                      │  HTTPS / JSON (REST,      │ Blazor.Web  BFF auth, pages,      │   │ @middt/angular: widgets as     │
-                      │  ProblemDetails)          │             workflow screens      │   │ Angular components, BFF/cookie │
-                      └───────────────────────────│   layout widgets + editor (Ui/)   │   │ auth, workflow screens         │
-                                                  │ Workflow.Razor  Razor state views │   └────────────────────────────────┘
-                                                  └───────────────────────────────────┘
+│ Api, Common (server helpers)               │   │ Middt.Framework.Client           │   │ sdk/client/typescript/ui-core     │
+│ Workflow   (engine; IWorkflowViewRenderer, │   │ typed workflow/layout/data       │   │ @middt/ui-core: types,         │
+│             WorkflowInstanceDataQuery)      │   │ clients, token refresh, SignalR  │   │ expressions, formats, clients  │
+│ Ui.Server  (layout store, REST, schema,    │   └───────────────▲──────────────────┘   └───────────────▲────────────────┘
+│            plain C# static HTML renderer)  │                   │                                      │
+│ Plugins: Rebus                             │   ┌──── 4. Blazor frontend ┴──────────┐   ┌──── Angular frontend ─────────┴┐
+└─────────────────────▲──────────────────────┘   │ Blazor.Web  BFF auth, workflow    │   │ @middt/angular: widgets as     │
+                      │  HTTPS / JSON (REST,     │             screens, layout       │   │ Angular components, BFF/cookie │
+                      │  ProblemDetails)         │             widgets + editor (Ui/)│   │ auth, workflow screens         │
+                      └──────────────────────────└───────────────────────────────────┘   └────────────────────────────────┘
 ```
 
 ## Dependency rules
@@ -31,17 +30,14 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 | Layer | May reference | Must not reference |
 |---|---|---|
 | Contracts | BCL, each other (Model ← Expressions ← Ui.Abstractions) | ASP.NET Core UI, Razor, Radzen, EF Core |
-| Backend | Contracts, EF Core, ASP.NET Core | Client, Blazor.Web, Workflow.Razor (*) |
+| Backend | Contracts, EF Core, ASP.NET Core | Client, Bff, Blazor.Web, Radzen |
 | Client SDK | Contracts | Backend, any UI technology |
-| Blazor frontend | Contracts, Client, Common (host helpers) | Backend engine packages (Workflow, Ui.Server, Data, Api) |
-
-(*) The only Razor in a backend process is opt-in: an API may reference a Razor view library to render
-`view.component` workflow states to HTML (`MiddtWorkflowOptions.UseViews`). Frontend independent screens use layouts.
+| Blazor frontend | Contracts, Client, Bff, Common (host helpers) | Backend engine packages (Workflow, Ui.Server, Api) |
 
 ## What is the contract between backend and frontends?
 
 1. **REST + JSON** – every API returns `BaseResponseDataModel<T>` (`result`, `messageList`, `count`, `data`); errors are
-   RFC 9457 ProblemDetails. CRUD: `api/v{version}/{entity}/getitems|getall|getbyid|insert|update|delete`; workflows:
+   RFC 9457 ProblemDetails. Workflow data queries: `api/v{version}/{entity}/getitems|getall|getbyid|insert|update|delete`; workflows:
    `api/workflows/...`; layouts: `api/ui/...` (incl. `GET api/ui/widgets`, `GET api/ui/schema`).
 2. **Layouts** – JSON documents validated against `spec/ui-layout.schema.json` (generated from the widget catalog)
    and the server validator. A layout names widgets; every frontend has its own implementation of each widget name.
@@ -78,13 +74,12 @@ widgets can also be defined in pure JSON (`kind: "view"`) and embedded via `{ "w
    formats exactly like .NET; the same CSS classes (`middt-ui-*`) and E2E selectors work in both frontends.
    The Angular package has focused `core`, `ui`, `workflow`, and `signalr` entry points; the root entry point remains
    an aggregate for compatibility.
-4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; all demo workflow states use `view.layout`
+4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; all workflow states use `view.layout`
    JSON layouts (`kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`) rendered by
-   the layout host in both frontends (the SDK also supports optional `view.component` registrations via `provideWorkflowViews()`);
-   unregistered views fall back to the server rendered HTML.
-   Transition input schemas are rendered as forms; a property with `x-lookup` (`endpoint`, `valueField`, `displayField`)
+   the layout host in both frontends.
+   Transition input schemas are rendered as forms; a property with `x-lookup` (`entity`, `valueField`, `textField`)
    becomes a select loaded dynamically from the endpoint – the engine only checks the hint's shape.
-5. **Editor**: the layout API is frontend independent; both frontends ship an editor (`/admin/layouts`).
+5. **Editor**: the layout API is frontend independent; both frontends ship an editor (`/ui-admin`).
 
 For a third frontend (e.g. React) repeat 1–4: reuse `@middt/ui-core` and a BFF host built with `AddMiddtSpaBff()`.
 
@@ -120,17 +115,15 @@ Folders follow the layers: `sdk/shared` (contracts), `sdk/server` (backend + plu
 
 | Project | Layer | Notes |
 |---|---|---|
-| Middt.Framework.Model | contracts | DTOs, settings, query attributes, SignalR contracts |
+| Middt.Framework.Model | contracts | DTOs, settings, SignalR contracts |
 | Middt.Framework.Expressions | contracts | portable language + DynamicExpresso evaluator (workflows) |
 | Middt.Framework.Ui.Abstractions | contracts | layout model, specs, validator, formats, schema generator |
-| Middt.Framework.Common | backend / host helpers | security headers, forwarded headers, SignalR hub base, e-mail, export |
-| Middt.Framework.Data | backend | repositories, query builder |
+| Middt.Framework.Common | backend / host helpers | security headers, forwarded headers, local URL check, SignalR hub base |
 | Middt.Framework.Api | backend | hosting, controllers, JWT, ProblemDetails, OpenAPI |
-| Middt.Framework.Workflow | backend | engine, endpoints, `IWorkflowViewRenderer` |
+| Middt.Framework.Workflow | backend | engine, endpoints, `IWorkflowViewRenderer`, `WorkflowInstanceDataQuery` |
 | Middt.Framework.Ui.Server | backend | layout store, endpoints, `UiHtmlRenderer` |
 | Middt.Framework.Client | client SDK | typed API clients, token refresh, SignalR client |
 | Middt.Framework.Bff | frontends | cookie session, token store + refresh, login pages, `/bff/user`, `/api` + `/hubs` proxy (YARP) |
-| Middt.Framework.Blazor.Web | Blazor | BFF auth, base pages, workflow screens, layout widgets/hosts/editor (`Ui/`) |
-| Middt.Framework.Workflow.Razor | Blazor | Razor workflow view base classes and catalog – separate so the API and shared view libraries can use them without the Blazor frontend |
+| Middt.Framework.Blazor.Web | Blazor | BFF auth, workflow screens, layout widgets/hosts/editor (`Ui/`) |
 | sdk/client/typescript/ui-core | TypeScript | `@middt/ui-core` – contract, expressions, formats, layout/data/workflow clients |
 | sdk/client/angular | Angular | `@middt/angular` library workspace (demo app: `demo/client/angular/app`) |

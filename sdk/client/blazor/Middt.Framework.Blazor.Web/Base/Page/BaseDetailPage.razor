@@ -1,9 +1,0 @@
-@typeparam TService where TService : IListApiClient<TModel>
-@typeparam TModel where TModel : BaseRequestModel, new()
-@inherits BaseDetailPageComponentClass<TService, TModel>
-
-@if (Model is not null)
-{
-    @DetailContent
-}
-<BaseLoadingModal @ref="LoadingModal" />

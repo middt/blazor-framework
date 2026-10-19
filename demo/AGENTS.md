@@ -1,6 +1,6 @@
 # demo – workflow & server-driven UI sample (read the root AGENTS.md first)
 
-Same shape as `sdk/`: `shared/` (Sample.Common, ServiceDefaults), `server/Middt.Sample.Api`,
+Same shape as `sdk/`: `shared/` (ServiceDefaults), `server/Middt.Sample.Api`,
 `client/blazor/Middt.Sample.BlazorServer`, `client/angular/{Middt.Sample.Angular (BFF host), app (Angular demo)}`,
 `Middt.Sample.AppHost` (Aspire). The demo shows framework usage – keep framework logic in `sdk/`.
 

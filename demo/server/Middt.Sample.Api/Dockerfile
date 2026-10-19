@@ -11,15 +11,11 @@ COPY sdk/shared/Middt.Framework.Model/*.csproj sdk/shared/Middt.Framework.Model/
 COPY sdk/shared/Middt.Framework.Expressions/*.csproj sdk/shared/Middt.Framework.Expressions/
 COPY sdk/shared/Middt.Framework.Ui.Abstractions/*.csproj sdk/shared/Middt.Framework.Ui.Abstractions/
 COPY sdk/server/Middt.Framework.Common/*.csproj sdk/server/Middt.Framework.Common/
-COPY sdk/server/Middt.Framework.Data/*.csproj sdk/server/Middt.Framework.Data/
 COPY sdk/server/Middt.Framework.Api/*.csproj sdk/server/Middt.Framework.Api/
 COPY sdk/client/dotnet/Middt.Framework.Client/*.csproj sdk/client/dotnet/Middt.Framework.Client/
 COPY sdk/server/Middt.Framework.Workflow/*.csproj sdk/server/Middt.Framework.Workflow/
 COPY sdk/server/Middt.Framework.Ui.Server/*.csproj sdk/server/Middt.Framework.Ui.Server/
-COPY sdk/server/plugins/Middt.Framework.Plugin.Redis/*.csproj sdk/server/plugins/Middt.Framework.Plugin.Redis/
 COPY sdk/server/plugins/Middt.Framework.Plugin.Rebus/*.csproj sdk/server/plugins/Middt.Framework.Plugin.Rebus/
-COPY sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/*.csproj sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/
-COPY demo/shared/Middt.Sample.Common/*.csproj demo/shared/Middt.Sample.Common/
 COPY demo/shared/Middt.Sample.ServiceDefaults/*.csproj demo/shared/Middt.Sample.ServiceDefaults/
 COPY demo/server/Middt.Sample.Api/*.csproj demo/server/Middt.Sample.Api/
 RUN dotnet restore demo/server/Middt.Sample.Api/Middt.Sample.Api.csproj

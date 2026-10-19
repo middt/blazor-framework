@@ -1,28 +1,15 @@
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using System.IO.Compression;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.ResponseCompression;
-using System.IO.Compression;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Blazor.Web.Base.Notification;
 using Middt.Framework.Blazor.Web.Security;
 using Middt.Framework.Bff.DependencyInjection;
-using Middt.Framework.Common.DependencyInjection;
-using Middt.Framework.Common.License;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Common.Web;
-using Middt.Framework.Model.Configuration;
 using Radzen;
-using Syncfusion.Blazor;
-using Middt.Framework.Client.DependencyInjection;
 
 namespace Middt.Framework.Blazor.Web.DependencyInjection;
 
@@ -34,14 +21,6 @@ public sealed class MiddtBlazorOptions
 
     /// <summary>Login attempts per client IP per minute.</summary>
     public int LoginAttemptsPerMinute { get; set; } = 10;
-
-    /// <summary>
-    /// Registers the Syncfusion Blazor services and licence (configuration key <c>Syncfusion:LicenseKey</c>), needed only by
-    /// <see cref="Base.Component.FileUpload.BaseFileUploadComponent"/>. Off by default: Syncfusion's theme (~4.7 MB) and script
-    /// (~6.9 MB) must then also be added to the host page, which costs every page load. Same as calling
-    /// <see cref="MiddtBlazorExtensions.AddMiddtSyncfusion"/>.
-    /// </summary>
-    public bool UseSyncfusion { get; set; }
 
     /// <summary>
     /// Brotli/Gzip compression (fastest level) of dynamic responses such as the prerendered host page and JSON. Static web
@@ -57,7 +36,6 @@ public sealed class MiddtBlazorOptions
 /// tokens, so no token is ever exposed to browser JavaScript or storage.
 /// <code>
 /// builder.AddMiddtBlazor();
-/// builder.Services.AddMiddtApiClient&lt;CategoryService&gt;();
 /// var app = builder.Build();
 /// app.UseMiddtBlazor();
 /// app.Run();
@@ -74,7 +52,6 @@ public static class MiddtBlazorExtensions
         configure?.Invoke(options);
 
         var services = builder.Services;
-        var configuration = builder.Configuration;
 
         // Cookie session, server side token store, login/logout pages, token client, rate limiting (shared with SPA hosts).
         builder.AddMiddtBff(bff => bff.LoginAttemptsPerMinute = options.LoginAttemptsPerMinute);
@@ -83,10 +60,6 @@ public static class MiddtBlazorExtensions
         services.AddServerSideBlazor(o => o.DetailedErrors = builder.Environment.IsDevelopment());
 
         services.AddRadzenComponents();
-        if (options.UseSyncfusion)
-        {
-            services.AddMiddtSyncfusion(configuration);
-        }
 
         if (options.UseResponseCompression)
         {
@@ -109,26 +82,6 @@ public static class MiddtBlazorExtensions
 
         return builder;
     }
-
-    /// <summary>
-    /// Registers Syncfusion Blazor (services + licence from <c>Syncfusion:LicenseKey</c>) for
-    /// <see cref="Base.Component.FileUpload.BaseFileUploadComponent"/>. Pages using it must also include
-    /// <c>_content/Syncfusion.Blazor.Themes/bootstrap5.css</c> and <c>_content/Syncfusion.Blazor.Core/scripts/syncfusion-blazor.min.js</c>
-    /// (ideally only on those pages, e.g. via <c>HeadContent</c>/a dedicated layout, not in the shared host page).
-    /// </summary>
-    public static IServiceCollection AddMiddtSyncfusion(this IServiceCollection services, IConfiguration configuration)
-    {
-        services.AddSyncfusionBlazor();
-        SyncfusionLicenseHelper.Register(configuration["Syncfusion:LicenseKey"]);
-        return services;
-    }
-
-    /// <summary>
-    /// Registers the workflow view components (server driven UI) used by <c>WorkflowInstanceDetail</c>:
-    /// <c>builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf&lt;OrderReviewView&gt;());</c>
-    /// </summary>
-    public static IServiceCollection AddMiddtWorkflowViews(this IServiceCollection services, Middt.Framework.Workflow.Razor.WorkflowViewCatalog catalog) =>
-        services.AddSingleton(catalog);
 
     public static WebApplication UseMiddtBlazor(this WebApplication app, string hostPage = "/_Host")
     {

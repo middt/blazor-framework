@@ -1,7 +1,6 @@
 # sdk/client/blazor – Blazor frontend (read the root AGENTS.md first)
 
-`Middt.Framework.Blazor.Web` (Blazor Server + Radzen) and `Middt.Framework.Workflow.Razor` (Razor workflow view base
-classes – kept separate because the API and shared view libraries reference it without the frontend).
+`Middt.Framework.Blazor.Web` (Blazor Server + Radzen).
 
 - Authentication comes from `Middt.Framework.Bff`; `ServerSessionState` reads tokens from the server store for the
   circuit, API calls go through `Middt.Framework.Client` typed clients.
@@ -15,6 +14,5 @@ classes – kept separate because the API and shared view libraries reference it
 - Performance rules: no per-render allocations of parameter dictionaries/contexts, no JS interop on every render,
   cancellation-safe caches (`UiLookupCache`), `PersistentComponentState` for prerender → circuit hand-over,
   fingerprinted assets (`~/` URLs + `WithStaticAssets`).
-- Syncfusion is **opt-in** (`UseSyncfusion` / `AddMiddtSyncfusion`); don't reintroduce it into default pages.
 - Workflow screens: `Base/Component/Workflow/` (list, detail with stepper/wizard, JSON Schema form, dialogs).
 - Tests: `tests/…/Blazor` and `tests/…/Ui/UiBlazorRenderingTests.cs` (HtmlRenderer with `UiBlazorWidgets` registered).

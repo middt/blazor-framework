@@ -1,8 +1,0 @@
-@inherits BaseComponent
-
-@if (Result is not null)
-{
-    <div class="col-10 alert @(Result.IsSuccess ? "alert-info" : "alert-danger")" role="alert">
-        <span>@(Result.IsSuccess ? "İşlem başarı ile gerçekleştirildi." : "İşlem gerçekleştirilemedi, bir hata oluştu.")</span>
-    </div>
-}

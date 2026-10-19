@@ -6,7 +6,6 @@
     <AspNetCoreVersion>10.0.13</AspNetCoreVersion>
     <EfCoreVersion>10.0.13</EfCoreVersion>
     <ExtensionsVersion>10.10.0</ExtensionsVersion>
-    <SyncfusionVersion>35.1.40</SyncfusionVersion>
     <AspireVersion>13.6.1</AspireVersion>
     <OpenTelemetryVersion>1.19.0</OpenTelemetryVersion>
   </PropertyGroup>
@@ -19,7 +18,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="$(AspNetCoreVersion)" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="$(ExtensionsVersion)" />
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <PackageVersion Include="OpenIddict.AspNetCore" Version="7.7.2" />
     <!-- The identity provider uses the server package only: the OpenIddict.AspNetCore metapackage pulls Polly 7 (client/validation), which clashes with Polly 8 types. -->
@@ -36,35 +34,23 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.18.0" />
   </ItemGroup>
 
-  <!-- Data -->
+  <!-- Data / Expressions -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
-    <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.4" />
-    <!-- Workflow rule/mapping expressions (MIT, reflection disabled by default) -->
     <PackageVersion Include="DynamicExpresso.Core" Version="2.19.6" />
   </ItemGroup>
 
-  <!-- UI / Export -->
+  <!-- UI -->
   <ItemGroup>
     <PackageVersion Include="Radzen.Blazor" Version="12.1.2" />
-    <PackageVersion Include="Syncfusion.Blazor.Inputs" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.Blazor.Themes" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.DocIO.Net.Core" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.DocIORenderer.Net.Core" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.XlsIORenderer.Net.Core" Version="$(SyncfusionVersion)" />
   </ItemGroup>
 
   <!-- Plugins -->
   <ItemGroup>
-    <!-- StackExchange.Redis 2.x: RedLock.net and Microsoft caching packages are built against the 2.x line -->
-    <PackageVersion Include="StackExchange.Redis" Version="2.13.17" />
-    <PackageVersion Include="RedLock.net" Version="2.3.2" />
     <!-- Rebus (MIT): messaging over RabbitMQ; RabbitMQ.Client is pinned to the latest 7.x patch for the transport. -->
     <PackageVersion Include="Rebus" Version="8.9.5" />
     <PackageVersion Include="Rebus.RabbitMq" Version="10.1.2" />

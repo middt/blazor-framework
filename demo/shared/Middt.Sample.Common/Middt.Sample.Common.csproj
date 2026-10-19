@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\sdk\server\Middt.Framework.Common\Middt.Framework.Common.csproj" />
-  </ItemGroup>
-
-</Project>

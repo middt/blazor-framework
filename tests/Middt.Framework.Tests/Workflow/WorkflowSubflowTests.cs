@@ -201,7 +201,7 @@ public sealed class WorkflowSubflowTests
     }
 
     [Fact]
-    public async Task Subflow_can_encapsulate_reusable_database_query_and_return_data_to_parent()
+    public async Task Subflow_can_encapsulate_reusable_lookup_and_return_data_to_parent()
     {
         const string subflowDef = """
             {
@@ -219,11 +219,12 @@ public sealed class WorkflowSubflowTests
                   "key": "query",
                   "onEntry": [
                     {
-                      "task": "db-query",
+                      "task": "set",
                       "config": {
-                        "sql": "SELECT 101 AS id, 'Ali Veli' AS name WHERE 1 = {0}",
-                        "parameters": [ "{{ data.branchId }}" ],
-                        "into": "items"
+                        "values": {
+                          "staffId": "101",
+                          "staffName": "\"Ali Veli\""
+                        }
                       }
                     }
                   ],
@@ -262,9 +263,7 @@ public sealed class WorkflowSubflowTests
             }
             """;
 
-        await using var host = await WorkflowTestHost.StartAsync(
-            [subflowDef, parentDef],
-            configure: options => options.UseApplicationDbContext<WorkflowDbContext>());
+        await using var host = await WorkflowTestHost.StartAsync([subflowDef, parentDef]);
 
         // 1. Success case: valid branchId retrieves data and resumes parent
         var parent = await host.StartInstanceAsync("onboarding-parent", new { branchId = 1 });
@@ -277,9 +276,8 @@ public sealed class WorkflowSubflowTests
 
         parent.State.Should().Be("assigned");
         parent.Status.Should().Be(WorkflowInstanceStatus.Completed);
-        parent.Data["availableStaff"]!["items"]!.AsArray().Should().HaveCount(1);
-        parent.Data["availableStaff"]!["items"]![0]!["id"]!.GetValue<long>().Should().Be(101);
-        parent.Data["availableStaff"]!["items"]![0]!["name"]!.GetValue<string>().Should().Be("Ali Veli");
+        parent.Data["availableStaff"]!["staffId"]!.GetValue<int>().Should().Be(101);
+        parent.Data["availableStaff"]!["staffName"]!.GetValue<string>().Should().Be("Ali Veli");
 
         // 2. Failure case: invalid branchId causes child error and parent routes to fallback
         var failedParent = await host.StartInstanceAsync("onboarding-parent", new { branchId = 0 });

@@ -17,7 +17,6 @@ using Middt.Framework.Bff.Oidc;
 using Middt.Framework.Bff.Proxy;
 using Middt.Framework.Bff.Security;
 using Middt.Framework.Client.DependencyInjection;
-using Middt.Framework.Common.DependencyInjection;
 using Middt.Framework.Common.Web;
 using Middt.Framework.Model.Configuration;
 
@@ -108,7 +107,6 @@ public static class MiddtBffExtensions
         services.Configure<GeneralSettings>(configuration.GetSection(GeneralSettings.SectionName));
         services.Configure<SecuritySettings>(configuration.GetSection(SecuritySettings.SectionName));
         services.TryAddSingleton(TimeProvider.System);
-        services.AddServicesFromConfiguration(configuration);
         services.AddMiddtForwardedHeaders(configuration);
 
         // Keys protect the auth cookie and the server side token store. Persist them (e.g. PersistKeysToStackExchangeRedis)

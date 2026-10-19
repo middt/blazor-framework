@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -20,13 +19,6 @@ public sealed class UiBlazorHelperTests
     private static UiField Field(string json) => UiField.Parse(JsonNode.Parse(json)!.AsObject());
 
     private static string? Validate(UiField field, string value) => field.Validate(new JsonObject { [field.Field] = JsonNode.Parse(value) });
-
-    public sealed class SearchFilter
-    {
-        public string? Name { get; set; }
-
-        public int? CategoryId { get; set; }
-    }
 
     [Fact]
     public void Field_parse_reads_all_properties_with_defaults()
@@ -145,14 +137,12 @@ public sealed class UiBlazorHelperTests
     {
         var request = UiDataClient.SearchRequest(new JsonObject { ["name"] = "bike", ["categoryId"] = 3 }, 2, 25, "CategoryName", ascending);
 
-        var model = request.Deserialize<BaseSearchRequestModel<SearchFilter>>(JsonSerializerOptions.Web)!;
-
-        model.CurrentPage.Should().Be(2);
-        model.RequestItemSize.Should().Be(25);
-        model.SortProperty.Should().Be("CategoryName");
-        model.SortReverse.Should().Be(ascending, "the legacy wire format uses sortReverse = true for ascending");
-        model.RequestModel.Name.Should().Be("bike");
-        model.RequestModel.CategoryId.Should().Be(3);
+        request["currentPage"]!.GetValue<int>().Should().Be(2);
+        request["requestItemSize"]!.GetValue<int>().Should().Be(25);
+        request["sortProperty"]!.GetValue<string>().Should().Be("CategoryName");
+        request["sortReverse"]!.GetValue<bool>().Should().Be(ascending, "the wire format uses sortReverse = true for ascending");
+        request["requestModel"]!["name"]!.GetValue<string>().Should().Be("bike");
+        request["requestModel"]!["categoryId"]!.GetValue<int>().Should().Be(3);
     }
 
     private static UiDataClient DataClient(ClientHttpHandler handler) =>

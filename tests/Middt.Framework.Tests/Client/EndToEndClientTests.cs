@@ -29,7 +29,7 @@ public sealed class EndToEndClientTests(DevelopmentApiFixture fixture) : IClassF
         var inserted = await client.InsertAsync(new ApiItem { Name = "E2E", Quantity = 4 }, ct);
         inserted.IsSuccess.Should().BeTrue(inserted.ErrorText);
 
-        var search = await client.GetItemsAsync(new BaseSearchRequestModel<ApiItem> { RequestModel = new ApiItem { Name = "E2E" } }, ct);
+        var search = await client.GetAllAsync(ct);
         search.IsSuccess.Should().BeTrue();
         search.Data.Should().ContainSingle(i => i.Id == inserted.Data!.Id);
 

@@ -35,9 +35,6 @@ import {
   workflowTransitionStyle,
   workflowTransitionTitle,
   workflowTriggerText,
-  workflowViewDate,
-  workflowViewNumber,
-  workflowViewText,
   workflowWizardSteps,
 } from '../src/index.ts';
 import type { WorkflowDefinitionModel, WorkflowHistoryModel, WorkflowInstanceModel } from '../src/index.ts';
@@ -322,21 +319,13 @@ test('step prefill, inline transition and pending state', () => {
   assert.equal(workflowIsPending(instance()), false);
 });
 
-test('layout variables and view data helpers', () => {
+test('layout variables and data helpers', () => {
   const model = instance({ data: { orderId: 7, amount: 25000.5, credit: { score: 42, checkedAt: '2026-03-04T05:06:07Z' }, flag: true } });
   const variables = workflowLayoutVariables(model);
   assert.deepEqual(variables['instance'], { id: ID, key: 'K-1', state: 'customer', stateTitle: 'Müşteri bilgileri', workflow: 'order-approval', status: 'Active', startedBy: 'alice' });
   assert.deepEqual(variables['data'], model.data);
   assert.notEqual(variables['data'], model.data, 'data is a copy');
-
-  assert.equal(workflowViewText(model.data, 'orderId'), '7');
-  assert.equal(workflowViewText(model.data, 'credit.missing'), '-');
-  assert.equal(workflowViewText(model.data, 'credit.missing', ''), '');
-  assert.equal(workflowViewText(model.data, 'credit'), JSON.stringify(model.data['credit']));
-  assert.equal(workflowViewNumber(model.data, 'credit.score'), 42);
-  assert.equal(workflowViewNumber(model.data, 'flag'), null);
-  assert.equal(workflowViewDate(model.data, 'credit.checkedAt')?.toISOString(), '2026-03-04T05:06:07.000Z');
-  assert.equal(workflowViewDate(model.data, 'orderId'), null);
+  assert.equal(workflowDataGet(model.data, 'credit.score'), 42);
   assert.equal(workflowDataGet(model.data, 'credit.score.x'), null);
 });
 

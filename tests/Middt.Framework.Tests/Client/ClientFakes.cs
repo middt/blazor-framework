@@ -1,21 +1,37 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Client.Http;
 using Middt.Framework.Client.Security;
+using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Model.Authentication;
 using Middt.Framework.Tests.Api;
 
 namespace Middt.Framework.Tests.Client;
 
 public sealed class ItemsApiClient(HttpClient httpClient, IBaseSessionState sessionState, ITokenService tokenService, string controllerName = "items")
-    : BaseCrudApiClient<ApiItem>(httpClient, sessionState, tokenService, Options.Create(new ApiSettings { URL = "http://localhost", Version = "1" }), NullLogger.Instance)
+    : ApiClientBase(httpClient, sessionState, tokenService, NullLogger.Instance)
 {
-    protected override string ControllerName => controllerName;
+    private string Route(string action) => $"api/v1/{EscapePathSegment(controllerName, nameof(controllerName))}/{action}";
+
+    public Task<BaseResponseDataModel<List<ApiItem>>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        SendAsync<BaseResponseDataModel<List<ApiItem>>>(HttpMethod.Get, Route("getall"), null, cancellationToken);
+
+    public Task<BaseResponseDataModel<ApiItem>> GetByIdAsync(object id, CancellationToken cancellationToken = default) =>
+        SendAsync<BaseResponseDataModel<ApiItem>>(
+            HttpMethod.Get,
+            $"{Route("getbyid")}?id={Uri.EscapeDataString(Convert.ToString(id, CultureInfo.InvariantCulture) ?? string.Empty)}",
+            null,
+            cancellationToken);
+
+    public Task<BaseResponseDataModel<List<ApiItem>>> GetItemsAsync(object request, CancellationToken cancellationToken = default) =>
+        SendAsync<BaseResponseDataModel<List<ApiItem>>>(HttpMethod.Post, Route("getitems"), request, cancellationToken);
+
+    public Task<BaseResponseDataModel<ApiItem>> InsertAsync(ApiItem item, CancellationToken cancellationToken = default) =>
+        SendAsync<BaseResponseDataModel<ApiItem>>(HttpMethod.Post, Route("insert"), item, cancellationToken);
 }
 
 public sealed class FakeSessionState(string token = "", string refreshToken = "") : IBaseSessionState

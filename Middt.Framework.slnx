@@ -8,15 +8,12 @@
   </Folder>
   <Folder Name="/sdk/server/">
     <Project Path="sdk/server/Middt.Framework.Common/Middt.Framework.Common.csproj" />
-    <Project Path="sdk/server/Middt.Framework.Data/Middt.Framework.Data.csproj" />
     <Project Path="sdk/server/Middt.Framework.Api/Middt.Framework.Api.csproj" />
     <Project Path="sdk/server/Middt.Framework.Workflow/Middt.Framework.Workflow.csproj" />
     <Project Path="sdk/server/Middt.Framework.Ui.Server/Middt.Framework.Ui.Server.csproj" />
   </Folder>
   <Folder Name="/sdk/server/plugins/">
     <Project Path="sdk/server/plugins/Middt.Framework.Plugin.Rebus/Middt.Framework.Plugin.Rebus.csproj" />
-    <Project Path="sdk/server/plugins/Middt.Framework.Plugin.Redis/Middt.Framework.Plugin.Redis.csproj" />
-    <Project Path="sdk/server/plugins/Middt.Framework.Plugin.SyncfusionExport/Middt.Framework.Plugin.SyncfusionExport.csproj" />
   </Folder>
   <Folder Name="/sdk/client/">
     <Project Path="sdk/client/dotnet/Middt.Framework.Client/Middt.Framework.Client.csproj" />
@@ -26,18 +23,16 @@
   </Folder>
   <Folder Name="/sdk/client/blazor/">
     <Project Path="sdk/client/blazor/Middt.Framework.Blazor.Web/Middt.Framework.Blazor.Web.csproj" />
-    <Project Path="sdk/client/blazor/Middt.Framework.Workflow.Razor/Middt.Framework.Workflow.Razor.csproj" />
   </Folder>
   <!-- identity: the OAuth 2.0 / OpenID Connect server (one ready to run service, configured by appsettings). -->
   <Folder Name="/identity/">
     <Project Path="identity/Middt.Identity/Middt.Identity.csproj" />
   </Folder>
-  <!-- demo: the bike store sample (same layout: shared / server / client). -->
+  <!-- demo: the 100% backend-driven JSON sample (shared / server / client). -->
   <Folder Name="/demo/">
     <Project Path="demo/Middt.Sample.AppHost/Middt.Sample.AppHost.csproj" />
   </Folder>
   <Folder Name="/demo/shared/">
-    <Project Path="demo/shared/Middt.Sample.Common/Middt.Sample.Common.csproj" />
     <Project Path="demo/shared/Middt.Sample.ServiceDefaults/Middt.Sample.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/demo/server/">

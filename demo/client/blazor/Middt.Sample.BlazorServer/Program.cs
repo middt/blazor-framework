@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Middt.Framework.Blazor.Web.DependencyInjection;
 using Middt.Framework.Blazor.Web.Ui;
-using Middt.Framework.Common.DependencyInjection;
 using Middt.Framework.Client.Http;
 using Middt.Sample.BlazorServer.Service;
 using Middt.Sample.BlazorServer.SignalR;

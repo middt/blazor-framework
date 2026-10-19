@@ -53,7 +53,7 @@ public sealed class ApiClientBaseTests
         using var http = handler.CreateClient();
         var client = new ItemsApiClient(http, new FakeSessionState("t"), RefreshReturns("unused"));
 
-        await client.GetItemsAsync(new BaseSearchRequestModel<ApiItem> { SortProperty = "Name", RequestItemSize = 3 }, Ct);
+        await client.GetItemsAsync(new { SortProperty = "Name", RequestItemSize = 3 }, Ct);
 
         handler.Requests[0].Method.Should().Be(HttpMethod.Post);
         handler.Requests[0].Uri.Should().Be("/api/v1/items/getitems");

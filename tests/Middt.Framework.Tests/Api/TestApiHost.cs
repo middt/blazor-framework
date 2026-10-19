@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ using Microsoft.Extensions.Logging;
 using Middt.Framework.Api;
 using Middt.Framework.Api.DependencyInjection;
 using Middt.Framework.Api.Security;
-using Middt.Framework.Common.Database;
+using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Model.Authentication;
 
 namespace Middt.Framework.Tests.Api;
@@ -31,108 +32,61 @@ public class ApiItem
 
     public int Quantity { get; set; }
 
-    /// <summary>Unique (nullable) business key, used to provoke a DbUpdateException.</summary>
     [MaxLength(20)]
     public string? Code { get; set; }
-}
-
-public class Owner
-{
-    public long Id { get; set; }
-
-    [MaxLength(50)]
-    public string Name { get; set; } = string.Empty;
-}
-
-public class Attachment
-{
-    public int Id { get; set; }
-
-    public int DocumentId { get; set; }
-
-    [MaxLength(50)]
-    public string FileName { get; set; } = string.Empty;
-}
-
-/// <summary>Entity exercising every mass-assignment rule of BaseCrudRepository.ApplyUpdate / PrepareForInsert.</summary>
-public class Document
-{
-    public int Id { get; set; }
-
-    [Required]
-    [MaxLength(50)]
-    public string Title { get; set; } = string.Empty;
-
-    /// <summary>Ownership: may be chosen on insert, never changed afterwards.</summary>
-    [Editable(false, AllowInitialValue = true)]
-    public long OwnerId { get; set; }
-
-    public Owner? Owner { get; set; }
-
-    /// <summary>Server controlled: neither on insert nor on update.</summary>
-    [Editable(false)]
-    [MaxLength(50)]
-    public string? ApprovedBy { get; set; }
-
-    [System.ComponentModel.ReadOnly(true)]
-    [MaxLength(50)]
-    public string? AuditNote { get; set; }
-
-    /// <summary>Computed column (store generated on add and update).</summary>
-    public string? TitleUpper { get; set; }
-
-    [ConcurrencyCheck]
-    public int Version { get; set; }
-
-#pragma warning disable CA2227, CA1002
-    public List<Attachment> Attachments { get; set; } = [];
-#pragma warning restore CA2227, CA1002
 }
 
 public class ApiDbContext(DbContextOptions<ApiDbContext> options) : DbContext(options)
 {
     public DbSet<ApiItem> Items => Set<ApiItem>();
 
-    public DbSet<Owner> Owners => Set<Owner>();
-
-    public DbSet<Document> Documents => Set<Document>();
-
-    public DbSet<Attachment> Attachments => Set<Attachment>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Owner>().Property(o => o.Id).ValueGeneratedNever();
         modelBuilder.Entity<ApiItem>().HasIndex(i => i.Code).IsUnique();
-        modelBuilder.Entity<Document>().Property(d => d.TitleUpper).HasComputedColumnSql("upper(Title)");
     }
 }
 
-public class DocumentRepository(ApiDbContext context) : BaseCrudRepository<Document, ApiDbContext>(context);
-
-[ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/[controller]")]
-public sealed class DocumentsController(DocumentRepository repository) : BaseCrudControllerWithoutAuth<Document, DocumentRepository>(repository);
-
-/// <summary>Row/record level security: a user only sees and changes the documents they own.</summary>
-[ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/[controller]")]
-public sealed class OwnedDocumentsController(DocumentRepository repository) : BasePolicyCrudController<Document, DocumentRepository>(repository)
+public abstract class TestItemsControllerBase(ApiDbContext db) : BaseController
 {
-    protected override IQueryable<Document> ApplyAccessFilter(IQueryable<Document> query) => query.Where(d => d.OwnerId == UserId);
+    [HttpGet("getall")]
+    public async Task<ActionResult<BaseResponseDataModel<List<ApiItem>>>> GetAll(CancellationToken cancellationToken)
+    {
+        var items = await db.Items.AsNoTracking().ToListAsync(cancellationToken);
+        return Ok(BaseResponseDataModel<List<ApiItem>>.Success(items, items.Count));
+    }
 
-    protected override Task<bool> AuthorizeAsync(Document entity, CrudOperation operation, CancellationToken cancellationToken) =>
-        Task.FromResult(entity.OwnerId == UserId);
+    [HttpGet("getbyid")]
+    public async Task<ActionResult<BaseResponseDataModel<ApiItem>>> GetById([FromQuery] int id, CancellationToken cancellationToken)
+    {
+        var item = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        return item is null ? NotFound(new ProblemDetails { Status = 404, Title = "Kayıt bulunamadı." }) : Ok(BaseResponseDataModel<ApiItem>.Success(item, 1));
+    }
+
+    [HttpPost("getitems")]
+    public async Task<ActionResult<BaseResponseDataModel<List<ApiItem>>>> GetItems(CancellationToken cancellationToken)
+    {
+        var items = await db.Items.AsNoTracking().ToListAsync(cancellationToken);
+        return Ok(BaseResponseDataModel<List<ApiItem>>.Success(items, items.Count));
+    }
+
+    [HttpPost("insert")]
+    [ValidateModel]
+    public async Task<ActionResult<BaseResponseDataModel<ApiItem>>> Insert([FromBody] ApiItem item, CancellationToken cancellationToken)
+    {
+        db.Items.Add(item);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(BaseResponseDataModel<ApiItem>.Success(item, 1));
+    }
 }
 
-public class ItemRepository(ApiDbContext context) : BaseCrudRepository<ApiItem, ApiDbContext>(context);
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+public sealed class ItemsController(ApiDbContext db) : TestItemsControllerBase(db);
 
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public sealed class ItemsController(ItemRepository repository) : BaseCrudControllerWithoutAuth<ApiItem, ItemRepository>(repository);
-
-[ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/[controller]")]
-public sealed class SecureItemsController(ItemRepository repository) : BaseCrudControllerWithAuth<ApiItem, ItemRepository>(repository);
+[Authorize]
+public sealed class SecureItemsController(ApiDbContext db) : TestItemsControllerBase(db);
 
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
@@ -287,8 +241,6 @@ public sealed class TestApiHost : IAsyncDisposable
         });
 
         builder.Services.AddDbContext<ApiDbContext>(o => o.UseSqlite(connection));
-        builder.Services.AddScoped<ItemRepository>();
-        builder.Services.AddScoped<DocumentRepository>();
         builder.Services.AddSingleton<FakeUserStore>();
         configureBuilder?.Invoke(builder);
 
@@ -299,10 +251,6 @@ public sealed class TestApiHost : IAsyncDisposable
         {
             var db = scope.ServiceProvider.GetRequiredService<ApiDbContext>();
             await db.Database.EnsureCreatedAsync();
-            db.Owners.AddRange(
-                new Owner { Id = FakeUserStore.UserId, Name = FakeUserStore.Username },
-                new Owner { Id = FakeUserStore.OtherUserId, Name = FakeUserStore.OtherUsername });
-            await db.SaveChangesAsync();
         }
 
         await app.StartAsync();

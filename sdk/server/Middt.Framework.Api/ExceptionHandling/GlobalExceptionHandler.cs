@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -22,8 +21,8 @@ public sealed partial class GlobalExceptionHandler(
         var (status, title) = exception switch
         {
             OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested => (499, "İstek iptal edildi."),
-            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "Kayıt başka bir işlem tarafından değiştirildi."),
-            DbUpdateException => (StatusCodes.Status409Conflict, "Kayıt veritabanına yazılamadı."),
+            _ when exception.GetType().Name == "DbUpdateConcurrencyException" => (StatusCodes.Status409Conflict, "Kayıt başka bir işlem tarafından değiştirildi."),
+            _ when exception.GetType().Name == "DbUpdateException" => (StatusCodes.Status409Conflict, "Kayıt veritabanına yazılamadı."),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Kayıt bulunamadı."),
             UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Bu işlem için yetkiniz yok."),
             ArgumentException or FormatException => (StatusCodes.Status400BadRequest, "İstek geçersiz."),

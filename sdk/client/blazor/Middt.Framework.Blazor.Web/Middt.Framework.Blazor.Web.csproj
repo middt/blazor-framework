@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <Product>Middt Framework Blazor Web</Product>
-    <Description>Blazor Server frontend for Middt applications: BFF cookie authentication (Middt.Framework.Bff), generic list/detail/CRUD pages, workflow screens, modals, SignalR and file upload components. Includes the Blazor renderer and runtime editor of JSON layouts (Ui/).</Description>
+    <Description>Blazor Server frontend for Middt applications: BFF cookie authentication (Middt.Framework.Bff), workflow screens, SignalR, and the Blazor renderer and runtime editor of JSON layouts (Ui/).</Description>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 
@@ -12,8 +12,6 @@
 
   <ItemGroup>
     <PackageReference Include="Radzen.Blazor" />
-    <PackageReference Include="Syncfusion.Blazor.Inputs" />
-    <PackageReference Include="Syncfusion.Blazor.Themes" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,7 +23,6 @@
     <ProjectReference Include="..\..\dotnet\Middt.Framework.Client\Middt.Framework.Client.csproj" />
     <ProjectReference Include="..\..\..\server\Middt.Framework.Common\Middt.Framework.Common.csproj" />
     <ProjectReference Include="..\..\..\shared\Middt.Framework.Ui.Abstractions\Middt.Framework.Ui.Abstractions.csproj" />
-    <ProjectReference Include="..\Middt.Framework.Workflow.Razor\Middt.Framework.Workflow.Razor.csproj" />
   </ItemGroup>
 
 </Project>

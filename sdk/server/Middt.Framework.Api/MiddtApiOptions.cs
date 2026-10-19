@@ -28,12 +28,6 @@ public sealed class MiddtApiOptions
     /// <summary>Requests under this path may pass the JWT as <c>access_token</c> query parameter (SignalR WebSockets).</summary>
     public string HubPathPrefix { get; set; } = "/hubs";
 
-    /// <summary>Largest page a client may request from <c>getitems</c>; larger or non-positive sizes are clamped to it.</summary>
-    public int MaxPageSize { get; set; } = 500;
-
-    /// <summary>Most rows <c>getall</c> returns (lookups); use paged <c>getitems</c> for large tables.</summary>
-    public int MaxGetAllItems { get; set; } = 1000;
-
     /// <summary>
     /// Brotli/Gzip compression (fastest level) of JSON and text responses, also over HTTPS. Turn off when a reverse proxy
     /// compresses already.

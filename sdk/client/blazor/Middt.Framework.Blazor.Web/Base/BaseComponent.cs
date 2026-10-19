@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using Middt.Framework.Blazor.Web.Base.Component.Modal;
 using Middt.Framework.Blazor.Web.Base.Notification;
 using Middt.Framework.Client.Security;
 using Middt.Framework.Blazor.Web.Security;
@@ -10,7 +9,7 @@ namespace Middt.Framework.Blazor.Web.Base;
 
 /// <summary>
 /// Base for all framework components: injects common services, loads the current user's claims on first
-/// render and offers <see cref="ExecuteMethod"/> to run work behind the loading indicator with uniform error handling.
+/// render and offers <see cref="ExecuteMethod"/> to run work with uniform error handling.
 /// </summary>
 public abstract class BaseComponent : ComponentBase, IDisposable
 {
@@ -48,8 +47,6 @@ public abstract class BaseComponent : ComponentBase, IDisposable
     /// <summary>Cancelled when the component is disposed (e.g. the user navigates away).</summary>
     protected CancellationToken ComponentCancellation => disposeToken;
 
-    public BaseLoadingModal? LoadingModal { get; set; }
-
     public bool IsAuthenticated { get; protected set; }
 
     /// <summary><c>true</c> once the user's claims are loaded (already during prerendering with cookie authentication).</summary>
@@ -59,15 +56,13 @@ public abstract class BaseComponent : ComponentBase, IDisposable
     protected bool IsFirstRenderCompleted { get; private set; }
 
     /// <summary>
-    /// Runs <paramref name="action"/> while the loading indicator is shown. Exceptions are logged and
-    /// surfaced as a generic notification instead of tearing down the circuit.
+    /// Runs <paramref name="action"/>. Exceptions are logged and surfaced as a generic notification instead of tearing down the circuit.
     /// </summary>
     public virtual async Task ExecuteMethod(Func<Task> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         try
         {
-            await OpenModal();
             await action();
         }
         catch (OperationCanceledException) when (disposeCts.IsCancellationRequested)
@@ -81,14 +76,9 @@ public abstract class BaseComponent : ComponentBase, IDisposable
         }
         finally
         {
-            await CloseModal();
             await InvokeAsync(StateHasChanged);
         }
     }
-
-    protected virtual Task OpenModal() => LoadingModal is { IsModalOpen: false } modal ? modal.Open() : Task.CompletedTask;
-
-    protected virtual Task CloseModal() => LoadingModal?.Close() ?? Task.CompletedTask;
 
     /// <remarks>Derived components overriding this method must call <c>base.OnInitializedAsync()</c>.</remarks>
     protected override async Task OnInitializedAsync()

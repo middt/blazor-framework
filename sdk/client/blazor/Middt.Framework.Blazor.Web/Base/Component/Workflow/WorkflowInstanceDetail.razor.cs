@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Middt.Framework.Workflow.Razor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Middt.Framework.Client.Http;
@@ -37,7 +36,6 @@ public partial class WorkflowInstanceDetail
     private AvailableTransitionModel? stepTransition;
     private JsonObject? stepPrefill;
     private JsonSchemaForm? stepForm;
-    private ElementReference stepFormElement;
     private ElementReference stateHeading;
     private List<string> stepErrors = [];
     private bool focusAfterRender;
@@ -98,13 +96,9 @@ public partial class WorkflowInstanceDetail
     {
         try
         {
-            if (stepTransition is not null && StepViewType is null && stepForm is { HasFields: true })
+            if (stepTransition is not null && stepForm is { HasFields: true })
             {
                 await stepForm.FocusFirstAsync();
-            }
-            else if (stepTransition is not null && StepViewType is not null)
-            {
-                await stepFormElement.FocusAsync();
             }
             else
             {
@@ -212,12 +206,6 @@ public partial class WorkflowInstanceDetail
         }
     }
 
-    [Inject]
-    private IServiceProvider Services { get; set; } = default!;
-
-    /// <summary>Registered workflow views (server driven UI); optional.</summary>
-    private WorkflowViewCatalog? ViewCatalog => Services.GetService(typeof(WorkflowViewCatalog)) as WorkflowViewCatalog;
-
     /// <summary>
     /// Variables of a state's JSON layout: <c>data</c> (instance data) and <c>instance</c> (id, key, state, workflow, status).
     /// Cached while the shown values are unchanged: a new dictionary would rebuild the layout's render context and re-render
@@ -258,15 +246,6 @@ public partial class WorkflowInstanceDetail
     private readonly record struct LayoutVariablesKey(
         Guid Id, int DataVersion, string? Layout, string? Key, string State, string? StateTitle, string Workflow, WorkflowInstanceStatus Status, string? StartedBy);
 
-    private Type? StateViewType => instance?.View is { } name && ViewCatalog?.IsStateView(name) == true ? ViewCatalog.Find(name) : null;
-
-    private Type? TransitionViewType => TransitionView(pendingTransition);
-
-    private Type? StepViewType => TransitionView(stepTransition);
-
-    private Type? TransitionView(AvailableTransitionModel? transition) =>
-        transition?.View is { } name && ViewCatalog?.IsTransitionView(name) == true ? ViewCatalog.Find(name) : null;
-
     /// <summary>Whether a step form is rendered inside the screen (wizard).</summary>
     private bool ShowStepForm => stepTransition is not null && instance is not null;
 
@@ -279,40 +258,6 @@ public partial class WorkflowInstanceDetail
 
     private static bool HasInput(AvailableTransitionModel transition) =>
         transition.InputSchema?["properties"] is JsonObject { Count: > 0 };
-
-    private Dictionary<string, object?> StateViewParameters => new()
-    {
-        ["Instance"] = instance,
-        ["Interactive"] = true,
-    };
-
-    private Dictionary<string, object?> TransitionViewParameters => new()
-    {
-        ["Instance"] = instance,
-        ["Transition"] = pendingTransition,
-        ["OnSubmit"] = EventCallback.Factory.Create<JsonObject>(this, SubmitCustomFormAsync),
-        ["OnCancel"] = EventCallback.Factory.Create(this, CloseTransition),
-        ["Errors"] = (IReadOnlyList<string>)transitionErrors,
-        ["Busy"] = executing,
-    };
-
-    private Dictionary<string, object?> StepViewParameters => new()
-    {
-        ["Instance"] = instance,
-        ["Transition"] = stepTransition,
-        ["OnSubmit"] = EventCallback.Factory.Create<JsonObject>(this, SubmitCustomStepAsync),
-        ["OnCancel"] = EventCallback.Factory.Create(this, ClearStepErrors),
-        ["Errors"] = (IReadOnlyList<string>)stepErrors,
-        ["Busy"] = executing,
-    };
-
-    private Task SubmitCustomFormAsync(JsonObject body) =>
-        pendingTransition is { } transition ? ExecuteTransitionCoreAsync(transition, body, fromStep: false) : Task.CompletedTask;
-
-    private Task SubmitCustomStepAsync(JsonObject body) =>
-        stepTransition is { } transition ? ExecuteTransitionCoreAsync(transition, body, fromStep: true) : Task.CompletedTask;
-
-    private void ClearStepErrors() => stepErrors = [];
 
     private async Task SubmitStepAsync()
     {

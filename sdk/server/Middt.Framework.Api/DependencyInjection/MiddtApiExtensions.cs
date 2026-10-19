@@ -12,13 +12,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Middt.Framework.Api.Cache;
 using Middt.Framework.Api.Configuration.Model;
 using Middt.Framework.Api.ExceptionHandling;
 using Middt.Framework.Api.OpenApi;
 using Middt.Framework.Api.Security;
 using Middt.Framework.Api.Swagger;
-using Middt.Framework.Common.DependencyInjection;
 using Middt.Framework.Common.Http;
 using Middt.Framework.Common.Web;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -53,7 +51,6 @@ public static class MiddtApiExtensions
         services.AddSingleton(options);
         services.TryAddSingleton(TimeProvider.System);
         services.AddMiddtForwardedHeaders(configuration);
-        services.AddServicesFromConfiguration(configuration);
 
         // Errors → RFC 9457 ProblemDetails
         services.AddProblemDetails(o => o.CustomizeProblemDetails = ctx =>
@@ -97,9 +94,6 @@ public static class MiddtApiExtensions
         AddCors(services, configuration);
         AddJwtAuthentication(services, configuration, options, builder.Environment);
         AddRateLimiting(services, options);
-
-        services.AddHybridCache();
-        services.AddSingleton<IBaseCache, BaseHybridCache>();
 
         services.AddHealthChecks();
 

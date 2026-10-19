@@ -9,7 +9,7 @@ of the folder you work in. Task playbooks: [`docs/ai/`](docs/ai/README.md).
 
 A .NET 10 framework for line-of-business apps with **two interchangeable frontends** over one backend:
 
-- **Backend**: REST API (controllers + repositories on EF Core + dynamic `WorkflowInstanceDataQuery`), JSON-defined
+- **Backend**: REST API (controllers + dynamic `WorkflowInstanceDataQuery`), JSON-defined
   **workflow engine** (partitioned by workflow key in PostgreSQL), **100% server-driven JSON UI** (menus, list columns,
   forms, state views, and reusable nested `"widget": "layout"` blocks stored in DB and editable at runtime; see
   [`docs/ai/backend-driven-json-ui.md`](docs/ai/backend-driven-json-ui.md)).
@@ -27,16 +27,17 @@ A .NET 10 framework for line-of-business apps with **two interchangeable fronten
 ```
 sdk/                              the framework (NuGet + npm packages)
   shared/                         Model · Expressions · Ui.Abstractions        contracts, NO UI technology / ASP.NET
-  server/                         Common · Data · Api · Workflow · Ui.Server    backend, NO frontend dependencies
-    plugins/                      Plugin.Redis · Plugin.Rebus · Plugin.SyncfusionExport
+  server/                         Common · Api · Workflow · Ui.Server          backend, NO frontend dependencies
+    plugins/                      Plugin.Rebus
   client/
     dotnet/                       Middt.Framework.Client                        typed API clients (.NET)
     typescript/ui-core/           @middt/ui-core                                TS twin of the contracts + API clients
     bff/                          Middt.Framework.Bff                           cookie session, login pages, YARP proxy
-    blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
+    blazor/                       Middt.Framework.Blazor.Web                    Blazor frontend
     angular/                      @middt/angular (library workspace)            Angular frontend
 identity/Middt.Identity           OAuth2/OIDC server – ONE runnable service (not SDK), configured by appsettings (docs/identity.md)
 demo/                             100% backend-driven JSON sample (KYC, credit, order orchestration)
+  shared/                         Middt.Sample.ServiceDefaults                  Aspire OpenTelemetry & health defaults
   server/Middt.Sample.Api         API + Layouts/*.json + Workflows/*.json seeds (zero hardcoded domain views/tables)
   server/identity.json            demo settings of Middt Identity (:8083) – both demos sign in there
   client/blazor/…BlazorServer     Blazor demo (:8080)
@@ -48,7 +49,7 @@ docs/                             architecture.md, ai/ playbooks
 ```
 
 Layering is enforced by `tests/…/Architecture/LayeringTests.cs` (assembly references). Never make `sdk/shared` depend on
-ASP.NET/UI, `sdk/server` depend on any client/frontend package, or a frontend depend on Data/Api/Workflow/Ui.Server.
+ASP.NET/UI, `sdk/server` depend on any client/frontend package, or a frontend depend on Api/Workflow/Ui.Server.
 
 ## Commands
 
