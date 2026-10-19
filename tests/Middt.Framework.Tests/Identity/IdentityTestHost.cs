@@ -159,9 +159,14 @@ public sealed class IdentityTestHost : IAsyncDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         var builder = new StringBuilder();
-        foreach (var i in await db.Instances.AsNoTracking().ToListAsync(ct))
+        foreach (var i in await db.Instances.IgnoreAutoIncludes().AsNoTracking().ToListAsync(ct))
         {
-            builder.AppendLine(i.Data).AppendLine(i.PendingInput).AppendLine(i.Error);
+            builder.AppendLine(i.PendingInput).AppendLine(i.Error);
+        }
+
+        foreach (var d in await db.InstanceData.AsNoTracking().ToListAsync(ct))
+        {
+            builder.AppendLine(d.Data);
         }
 
         foreach (var h in await db.History.AsNoTracking().ToListAsync(ct))

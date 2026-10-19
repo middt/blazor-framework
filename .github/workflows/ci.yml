@@ -95,10 +95,10 @@ jobs:
         run: |
           echo "IDP_BLAZOR_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           echo "IDP_ANGULAR_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "MSSQL_SA_PASSWORD=Aa1!$(openssl rand -hex 20)" >> "$GITHUB_ENV"
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
           echo "RABBITMQ_DEFAULT_USER=ci-user" >> "$GITHUB_ENV"
           echo "RABBITMQ_DEFAULT_PASS=$(openssl rand -hex 20)" >> "$GITHUB_ENV"
-      - name: Start full stack on SQL Server
+      - name: Start full stack on PostgreSQL
         run: docker compose up -d --build
       - name: Install browser tests
         working-directory: tests/e2e
@@ -114,7 +114,7 @@ jobs:
           docker compose ps
           docker compose logs --tail=100
           exit 1
-      - name: Browser and SQL Server integration tests
+      - name: Browser and PostgreSQL integration tests
         working-directory: tests/e2e
         run: npm test
       - name: Full stack logs on failure

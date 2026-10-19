@@ -12,8 +12,8 @@ project; the demo's settings live in `demo/server/identity.json`. Full reference
   `IdentityJourneyOperationDispatcher`; keep password, code and OIDC rules in the identity service.
 - Account pages are static SSR (they set cookies) – keep `[ExcludeFromInteractiveRouting]`; admin pages are
   interactive and open a DI scope per operation. Keep the ids `Input_Username` / `Input_Password` (E2E).
-- SQL Server has no MARS in the demo: materialize OpenIddict/EF async streams before per-row queries. Tests use SQLite
-  and do not catch this – check the admin pages against the compose stack.
+- Materialize OpenIddict/EF async streams before per-row queries on the same connection. Tests use SQLite
+  and do not catch open DataReader conflicts – check the admin pages against the PostgreSQL compose stack.
 - Discovery endpoints are rebased on the configured issuer (`IssuerEndpointRebaser`): relying parties fetch it over an
   internal URL but browsers must get the public one.
 - CSP of the IdP has no `form-action` on purpose (redirect to the client after a form post); keep `frame-ancestors 'none'`.

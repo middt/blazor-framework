@@ -173,7 +173,7 @@
                     : applicationId is not null ? authorizationManager.FindByApplicationIdAsync(applicationId)
                     : authorizationManager.ListAsync(Limit, 0);
                 var authorizationRows = new List<AuthorizationRow>();
-                // Materialized first: the row details below query the database again (no MARS on SQL Server).
+                // Materialized first: the row details below query the database again on the same connection.
                 foreach (var authorization in await authorizationSource.ToListAsync())
                 {
                     var appId = await authorizationManager.GetApplicationIdAsync(authorization);

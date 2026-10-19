@@ -102,10 +102,9 @@ docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083
 - `JsonObject` lazily materialises and is **not thread-safe for reads**: parse per test/thread.
 - Number text in expressions follows ECMAScript `Number.prototype.toString`, not .NET "R".
 - Browsers don't separate cookies by port: each BFF app on the same host needs its own `CookieName`.
-- SQL Server sorts `uniqueidentifier` by bytes 10–15: use the engine's sequential id generator, not random/v7 GUIDs.
+- Workflow and job keys use UUIDv7 (`Guid.CreateVersion7()`) for chronological B-tree indexing in PostgreSQL.
 - Seeds (`demo/server/…/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
 - E2E (Playwright) suites live in `tests/e2e`; see `docs/ai/testing.md`.
-- Identity admin pages run on SQL Server without MARS: materialize an `IAsyncEnumerable` from OpenIddict/EF before
-  querying per row (SQLite in the tests does not catch "open DataReader").
+- Identity admin pages materialize an `IAsyncEnumerable` from OpenIddict/EF before querying per row on the same connection.
 - Radzen grids with `LoadData` lose the initial load across prerendering: call `grid.Reload()` in
   `OnAfterRenderAsync(firstRender)`.

@@ -15,7 +15,7 @@ public static class UiServiceCollectionExtensions
     /// Registers the layout store, validator and static renderer:
     /// <code>
     /// builder.Services.AddMiddtUi(o => o
-    ///     .UseDbContext(db => db.UseSqlServer(connectionString))
+    ///     .UseDbContext(db => db.UseNpgsql(connectionString))
     ///     .AddLayoutsFromDirectory("Layouts"));
     /// app.MapMiddtUi();
     /// </code>

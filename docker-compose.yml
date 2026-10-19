@@ -4,7 +4,7 @@
 name: middt-sample
 
 # Secrets have no defaults: copy .env.example to .env (git ignored) and set them, or export them in the shell.
-x-sql-password: &sql-password ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)}
+x-postgres-password: &postgres-password ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
 x-blazor-client-secret: &blazor-client-secret ${IDP_BLAZOR_CLIENT_SECRET:?Set IDP_BLAZOR_CLIENT_SECRET (see .env.example)}
 x-angular-client-secret: &angular-client-secret ${IDP_ANGULAR_CLIENT_SECRET:?Set IDP_ANGULAR_CLIENT_SECRET (see .env.example)}
 
@@ -70,7 +70,7 @@ services:
       dockerfile: demo/server/Middt.Sample.Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__WorkflowDb: "Server=db_server,1433;Database=MiddtWorkflow;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)};TrustServerCertificate=True"
+      ConnectionStrings__WorkflowDb: "Host=db_server;Port=5432;Database=middt_workflow;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}"
       ConnectionStrings__redis: redis:6379
       ConnectionStrings__messaging: amqp://${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}:${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS (see .env.example)}@mq:5672
       # Access tokens are issued by the identity provider (audience middt-api); keys come from its discovery document.
@@ -102,12 +102,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Identity__ConfigFile: /app/config/identity.json
-      ConnectionStrings__Identity: "Server=db_server,1433;Database=MiddtIdentity;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD (see .env.example)};TrustServerCertificate=True"
+      ConnectionStrings__Identity: "Host=db_server;Port=5432;Database=middt_identity;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}"
       ConnectionStrings__redis: redis:6379
       # The public issuer: what browsers, the BFFs (via their backchannel rewrite) and the API all agree on.
       Identity__Issuer: http://localhost:8083/
       # Client secrets of the two BFFs (seed index = order in identity.json: 0 = middt-blazor, 1 = middt-angular).
-      # An existing client keeps its secret: change it in /admin/clients or recreate the MiddtIdentity database.
+      # An existing client keeps its secret: change it in /admin/clients or recreate the middt_identity database.
       Identity__Seed__Clients__0__ClientSecret: *blazor-client-secret
       Identity__Seed__Clients__1__ClientSecret: *angular-client-secret
     volumes:
@@ -148,20 +148,21 @@ services:
       retries: 10
 
   db_server:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:17-alpine
     networks: [backend]
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: *sql-password
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: *postgres-password
+      POSTGRES_DB: postgres
     volumes:
-      - mssql-data:/var/opt/mssql
+      - postgres-data:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:1433:1433"
+      - "127.0.0.1:5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -h -1 | grep -q 1"]
-      interval: 10s
-      retries: 30
-      start_period: 15s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+      start_period: 5s
 
 
 networks:
@@ -171,5 +172,5 @@ networks:
         - subnet: 172.29.0.0/24
 
 volumes:
-  mssql-data:
+  postgres-data:
   identity-keys:

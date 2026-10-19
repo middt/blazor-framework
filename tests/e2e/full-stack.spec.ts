@@ -42,7 +42,7 @@ for (const [name, base] of [['Blazor', blazor], ['Angular', angular]] as const) 
   }
 }
 
-test('SQL Server backed identity admin loads and searches users', async ({ page }) => {
+test('PostgreSQL backed identity admin loads and searches users', async ({ page }) => {
   await page.goto(`${identity}/admin/users`);
   await signIn(page);
   await expect(page).toHaveURL(/\/admin\/users/, { timeout: 30_000 });
@@ -59,7 +59,7 @@ test('JSON-backed workflows execute end-to-end with ETag/304, task trace, SubFlo
   if (await approve.isVisible()) await approve.click();
   await expect.poll(() => new URL(page.url()).origin, { timeout: 30_000 }).toBe(angular);
 
-  // 1. Start customer-onboarding (stored in WorkflowInstances.Data JSON)
+  // 1. Start customer-onboarding (stored in WorkflowInstanceData.Data JSONB)
   const tcNo = String(10000000000 + Math.floor(Math.random() * 89999999999));
   const custStart = await page.request.post(`${angular}/api/workflows/customer-onboarding/instances`, {
     headers: { 'X-CSRF': '1' },

@@ -49,7 +49,7 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
         }
     }
 
-    /// <summary>Adds every nullable column of the model that does not exist yet (idempotent; SQL Server and PostgreSQL).</summary>
+    /// <summary>Adds every nullable column of the model that does not exist yet (idempotent; PostgreSQL).</summary>
     internal static async Task EnsureColumnsAsync(WorkflowDbContext db, CancellationToken cancellationToken)
     {
         foreach (var statement in EnsureColumnStatements(db))
@@ -63,9 +63,7 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
     internal static IEnumerable<string> EnsureColumnStatements(WorkflowDbContext db)
     {
         var provider = db.Database.ProviderName ?? string.Empty;
-        var sqlServer = provider.Contains("SqlServer", StringComparison.Ordinal);
-        var npgsql = provider.Contains("Npgsql", StringComparison.Ordinal);
-        if (!sqlServer && !npgsql)
+        if (!provider.Contains("Npgsql", StringComparison.Ordinal))
         {
             yield break;
         }
@@ -96,14 +94,12 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
                     continue;
                 }
 
-                yield return sqlServer
-                    ? $"IF COL_LENGTH(N'{Escape(qualifiedTable)}', N'{Escape(columnName)}') IS NULL ALTER TABLE {qualifiedTable} ADD {sql.DelimitIdentifier(columnName)} {columnType} NULL"
-                    : $"ALTER TABLE {qualifiedTable} ADD COLUMN IF NOT EXISTS {sql.DelimitIdentifier(columnName)} {columnType} NULL";
+                yield return $"ALTER TABLE {qualifiedTable} ADD COLUMN IF NOT EXISTS {sql.DelimitIdentifier(columnName)} {columnType} NULL";
             }
         }
     }
 
-    /// <summary>Creates every index of the model that does not exist yet (idempotent; SQL Server, PostgreSQL and SQLite).</summary>
+    /// <summary>Creates every index of the model that does not exist yet (idempotent; PostgreSQL and SQLite).</summary>
     internal static async Task EnsureIndexesAsync(WorkflowDbContext db, CancellationToken cancellationToken)
     {
         foreach (var statement in EnsureIndexStatements(db))
@@ -117,8 +113,7 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
     internal static IEnumerable<string> EnsureIndexStatements(WorkflowDbContext db)
     {
         var provider = db.Database.ProviderName ?? string.Empty;
-        var sqlServer = provider.Contains("SqlServer", StringComparison.Ordinal);
-        if (!sqlServer && !provider.Contains("Npgsql", StringComparison.Ordinal) && !provider.Contains("Sqlite", StringComparison.Ordinal))
+        if (!provider.Contains("Npgsql", StringComparison.Ordinal) && !provider.Contains("Sqlite", StringComparison.Ordinal))
         {
             yield break;
         }
@@ -146,17 +141,12 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
 
                 var columns = string.Join(", ", index.Properties.Select((p, i) =>
                     sql.DelimitIdentifier(p.GetColumnName(tableIdentifier)!) + (index.IsDescending is { Count: > 0 } desc && desc[i] ? " DESC" : string.Empty)));
-                var create = $"CREATE {(index.IsUnique ? "UNIQUE " : string.Empty)}INDEX {(sqlServer ? string.Empty : "IF NOT EXISTS ")}"
+                yield return $"CREATE {(index.IsUnique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS "
                     + $"{sql.DelimitIdentifier(name)} ON {qualifiedTable} ({columns})"
                     + (index.GetFilter() is { Length: > 0 } filter ? $" WHERE {filter}" : string.Empty);
-                yield return sqlServer
-                    ? $"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{Escape(name)}' AND object_id = OBJECT_ID(N'{Escape(qualifiedTable)}')) {create}"
-                    : create;
             }
         }
     }
-
-    private static string Escape(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -167,8 +157,8 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
             return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS \"Value\" FROM sqlite_master WHERE type = 'table' AND name = 'WorkflowInstances'").SingleAsync(cancellationToken) > 0;
         }
 
-        var schema = options.Value.Schema ?? (db.Database.ProviderName?.Contains("SqlServer", StringComparison.Ordinal) == true ? "dbo" : "public");
-        return await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM information_schema.tables WHERE table_schema = {schema} AND table_name = 'WorkflowInstances'").SingleAsync(cancellationToken) > 0;
+        var schema = options.Value.Schema ?? "public";
+        return await db.Database.SqlQuery<int>($"SELECT CAST(COUNT(*) AS int) AS \"Value\" FROM information_schema.tables WHERE table_schema = {schema} AND table_name = 'WorkflowInstances'").SingleAsync(cancellationToken) > 0;
     }
 
     private static async Task EnsureSchemaAsync(WorkflowDbContext db, string schema, CancellationToken cancellationToken)
@@ -181,11 +171,7 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
 
         var provider = db.Database.ProviderName ?? string.Empty;
 #pragma warning disable EF1002 // schema is a validated identifier
-        if (provider.Contains("SqlServer", StringComparison.Ordinal))
-        {
-            await db.Database.ExecuteSqlRawAsync($"IF SCHEMA_ID(N'{schema}') IS NULL EXEC('CREATE SCHEMA [{schema}]')", cancellationToken);
-        }
-        else if (provider.Contains("Npgsql", StringComparison.Ordinal))
+        if (provider.Contains("Npgsql", StringComparison.Ordinal))
         {
             await db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{schema}\"", cancellationToken);
         }

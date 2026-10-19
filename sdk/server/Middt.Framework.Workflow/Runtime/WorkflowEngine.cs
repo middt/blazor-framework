@@ -73,21 +73,32 @@ public sealed partial class WorkflowEngine(
         var startPending = (definition.Start.Input?.Persistable(startBody)
             ?? (parentInstanceId is not null ? startBody : null))?.ToJsonString();
 
+        var now = Now;
+        var instanceId = db.NewId();
         var instance = new WorkflowInstance
         {
-            Id = db.NewId(),
+            Id = instanceId,
             WorkflowKey = definition.Key,
             WorkflowVersion = definition.Version,
             BusinessKey = string.IsNullOrEmpty(request.Key) ? null : request.Key,
             Status = WorkflowInstanceStatus.Busy,
-            BusySince = Now,
+            BusySince = now,
             PendingTransition = definition.Start.Key,
             PendingInput = startPending,
             ParentInstanceId = parentInstanceId,
             StartedBy = user.AuditName,
             LastExecutedBy = user.AuditName,
-            CreatedAt = Now,
-            UpdatedAt = Now,
+            CreatedAt = now,
+            UpdatedAt = now,
+            InstanceData = new WorkflowInstanceData
+            {
+                InstanceId = instanceId,
+                Data = "{}",
+                DataVersion = 0,
+                DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
+                ETag = WorkflowInstanceData.NewETag(instanceId, 0),
+                UpdatedAt = now,
+            },
         };
 
         // Insert first: claims the business key and makes the instance visible (Busy) while tasks run.
@@ -301,7 +312,7 @@ public sealed partial class WorkflowEngine(
                     return JobOutcome.Done;
 
                 case WorkflowJobKind.ResumeParent:
-                    return await ResumeParentAsync(instance.Id, Guid.Parse(job.Payload!), cancellationToken) ? JobOutcome.Done : JobOutcome.RetrySoon;
+                    return await ResumeParentAsync(instance.Id, Guid.Parse(job.Payload!.AsSpan().Trim(" \"".AsSpan())), cancellationToken) ? JobOutcome.Done : JobOutcome.RetrySoon;
 
                 case WorkflowJobKind.CancelChild:
                     return await CancelChildAsync(instance.Id, cancellationToken) ? JobOutcome.Done : JobOutcome.RetrySoon;
@@ -534,7 +545,7 @@ public sealed partial class WorkflowEngine(
 
         if (claimed == 0)
         {
-            var current = await db.Instances.AsNoTracking().FirstOrDefaultAsync(i => i.Id == instanceId, cancellationToken)
+            var current = await db.Instances.IgnoreAutoIncludes().AsNoTracking().FirstOrDefaultAsync(i => i.Id == instanceId, cancellationToken)
                 ?? throw new WorkflowNotFoundException($"Instance '{instanceId}' does not exist.");
             throw new WorkflowConflictException(current.Status switch
             {
@@ -557,12 +568,41 @@ public sealed partial class WorkflowEngine(
                 snapshot.PendingTransition = pendingKeyForClaim;
                 snapshot.PendingInput = pendingInputForClaim;
             }
+
+            var attachNewData = snapshot.InstanceData is null;
+            snapshot.InstanceData ??= new WorkflowInstanceData
+            {
+                InstanceId = snapshot.Id,
+                Data = "{}",
+                DataVersion = 0,
+                DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
+                ETag = WorkflowInstanceData.NewETag(snapshot.Id, 0),
+                UpdatedAt = now,
+            };
             db.Instances.Attach(snapshot);
+            if (attachNewData)
+            {
+                db.Entry(snapshot.InstanceData).State = EntityState.Added;
+            }
+
             instance = snapshot;
         }
         else
         {
             instance = await db.Instances.FirstAsync(i => i.Id == instanceId, cancellationToken);
+            if (instance.InstanceData is null)
+            {
+                instance.InstanceData = new WorkflowInstanceData
+                {
+                    InstanceId = instance.Id,
+                    Data = "{}",
+                    DataVersion = 0,
+                    DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
+                    ETag = WorkflowInstanceData.NewETag(instance.Id, 0),
+                    UpdatedAt = now,
+                };
+                db.InstanceData.Add(instance.InstanceData);
+            }
         }
 
         var run = new Run(registry.Get(instance.WorkflowKey, instance.WorkflowVersion), instance, JsonPath.ParseObject(instance.Data), user);
@@ -1229,7 +1269,7 @@ public sealed partial class WorkflowEngine(
 
         if (run.NotifyParent && instance.ParentInstanceId is { } parentId)
         {
-            run.NewJobs.Add(NewJob(new WorkflowInstance { Id = parentId }, WorkflowJobKind.ResumeParent, null, null, Now, instance.Id.ToString()));
+            run.NewJobs.Add(NewJob(new WorkflowInstance { Id = parentId }, WorkflowJobKind.ResumeParent, null, null, Now, JsonSerializer.Serialize(instance.Id)));
         }
 
         if (EventHandlers.Length > 0)

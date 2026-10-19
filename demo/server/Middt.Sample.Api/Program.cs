@@ -45,10 +45,10 @@ builder.Services.AddHostedService<RabbitMqQueueInitializer>();
 var dbConnectionString = builder.Configuration.GetConnectionString("WorkflowDb")
     ?? builder.Configuration.GetConnectionString("BikeStores");
 
-// Workflow engine: JSON definitions from ./Workflows, all domain data stored in WorkflowInstances.Data JSON ("wf" schema).
+// Workflow engine: JSON definitions from ./Workflows, all domain data stored in WorkflowInstanceData.Data JSONB ("wf" schema).
 builder.Services.AddMiddtWorkflow(workflow =>
 {
-    workflow.UseDbContext(db => db.UseSqlServer(dbConnectionString));
+    workflow.UseDbContext(db => db.UseNpgsql(dbConnectionString));
     workflow.AutoCreateSchema = true;
     workflow.ExposeErrorDetails = builder.Environment.IsDevelopment();
     workflow.AddDefinitionsFromDirectory("Workflows");
@@ -61,7 +61,7 @@ builder.Services.AddHostedService<DemoWorkflowSeeder>();
 // Server driven UI: JSON layouts (pages and workflow state views) in the "ui" schema, seeded from ./Layouts and editable at runtime.
 builder.Services.AddMiddtUi(ui =>
 {
-    ui.UseDbContext(db => db.UseSqlServer(dbConnectionString));
+    ui.UseDbContext(db => db.UseNpgsql(dbConnectionString));
     ui.AutoCreateSchema = true;
     ui.AddLayoutsFromDirectory("Layouts");
 });

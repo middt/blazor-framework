@@ -314,19 +314,27 @@ public sealed class IdentityProtocolTests
         var callback = await SignInThroughJourneyAsync(host, browser, Oidc.AuthorizeUrl(challenge), "alice", IdentityTestHost.AlicePassword);
         (await RedeemAsync(browser, Oidc.Query(callback)["code"], verifier)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var (tables, workflowKeys) = await host.WorkflowDbAsync(async db =>
+        var (tables, instanceColumns, dataCount, workflowKeys) = await host.WorkflowDbAsync(async db =>
         {
             var ct = TestContext.Current.CancellationToken;
             var tableNames = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
                 Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.SqlQuery<string>(
                     db.Database, $"SELECT name AS \"Value\" FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"),
                 ct);
+            var columns = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.SqlQuery<string>(
+                    db.Database, $"SELECT name AS \"Value\" FROM pragma_table_info('WorkflowInstances') ORDER BY name"),
+                ct);
+            var instanceDataCount = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(
+                db.InstanceData, ct);
             var keys = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
                 db.Instances.Select(i => i.WorkflowKey).Distinct(), ct);
-            return (tableNames, keys);
+            return (tableNames, columns, instanceDataCount, keys);
         });
 
-        tables.Should().BeEquivalentTo(["WorkflowHistory", "WorkflowIncidents", "WorkflowInstances", "WorkflowJobs"]);
+        tables.Should().BeEquivalentTo(["WorkflowHistory", "WorkflowIncidents", "WorkflowInstanceData", "WorkflowInstances", "WorkflowJobs"]);
+        instanceColumns.Should().NotContain(["Data", "DataVersion"]);
+        dataCount.Should().BeGreaterThan(0);
         workflowKeys.Should().Contain(["idp-user", "idp-role", "oauth-application", "oauth-scope", "oauth-authorization", "oauth-token"]);
     }
 }

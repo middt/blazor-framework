@@ -40,7 +40,7 @@
   <ItemGroup>
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EfCoreVersion)" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EfCoreVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
     <PackageVersion Include="System.Linq.Dynamic.Core" Version="1.7.4" />
@@ -75,7 +75,7 @@
   <!-- Aspire / Observability -->
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="$(AspireVersion)" />
-    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="$(AspireVersion)" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
@@ -86,8 +86,9 @@
   </ItemGroup>
 
   <!-- Security pins for vulnerable transitive dependencies (NuGet audit: GHSA-846f-f764-76mx, GHSA-2fmv-rv2c-59x7,
-       GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83). Remove once the direct dependencies ship fixed versions. -->
+       GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83, GHSA-qhrr-8q5h-9q3h). Remove once the direct dependencies ship fixed versions. -->
   <ItemGroup>
+    <PackageVersion Include="MessagePack" Version="2.5.303" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="$(AspNetCoreVersion)" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="$(AspNetCoreVersion)" />
   </ItemGroup>

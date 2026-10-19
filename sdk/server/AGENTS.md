@@ -30,8 +30,7 @@ Common · Data · Api · Workflow · Ui.Server · plugins (Redis, Rebus). **Must
 - Errors shown to callers are hidden unless `ExposeErrorDetails`; the `http` task never follows redirects and honours
   `AllowedHttpHosts` – keep both.
 - Static view HTML: `IWorkflowViewRenderer` implementations (Razor components via `UseViews`, layouts via the host).
-- Persistence: `WorkflowDbContext` (schema `wf`), indexes created at startup with `AutoCreateSchema`; ids on SQL Server
-  come from the sequential generator.
+- Persistence: `WorkflowDbContext` (schema `wf`, PostgreSQL `jsonb` columns), indexes created at startup with `AutoCreateSchema`; ids use UUIDv7 (`Guid.CreateVersion7()`).
 
 ## Ui.Server
 - `UiLayoutStore` (EF, schema `ui`, revisions, optimistic version, cached snapshot with a reload lock), seeding from

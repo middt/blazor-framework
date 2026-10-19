@@ -50,7 +50,9 @@ public sealed class UiDbContext(DbContextOptions<UiDbContext> options, IOptions<
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var schema = Database.ProviderName?.Contains("Sqlite", StringComparison.Ordinal) == true ? null : uiOptions.Value.Schema;
+        var provider = Database.ProviderName ?? string.Empty;
+        var schema = provider.Contains("Sqlite", StringComparison.Ordinal) ? null : uiOptions.Value.Schema;
+        var isPostgres = provider.Contains("Npgsql", StringComparison.Ordinal);
 
         modelBuilder.Entity<UiLayoutEntity>(e =>
         {
@@ -60,6 +62,11 @@ public sealed class UiDbContext(DbContextOptions<UiDbContext> options, IOptions<
             e.Property(x => x.Kind).HasMaxLength(16).IsRequired();
             e.Property(x => x.Title).HasMaxLength(256);
             e.Property(x => x.Content).IsRequired();
+            if (isPostgres)
+            {
+                e.Property(x => x.Content).HasColumnType("jsonb");
+            }
+
             e.Property(x => x.Version).IsConcurrencyToken();
             e.Property(x => x.Source).HasMaxLength(16);
             e.Property(x => x.UpdatedBy).HasMaxLength(256);
@@ -71,6 +78,11 @@ public sealed class UiDbContext(DbContextOptions<UiDbContext> options, IOptions<
             e.HasKey(x => x.Id);
             e.Property(x => x.Key).HasMaxLength(100).IsRequired();
             e.Property(x => x.Content).IsRequired();
+            if (isPostgres)
+            {
+                e.Property(x => x.Content).HasColumnType("jsonb");
+            }
+
             e.Property(x => x.CreatedBy).HasMaxLength(256);
             e.HasIndex(x => new { x.Key, x.Version });
         });

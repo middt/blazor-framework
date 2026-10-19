@@ -11,7 +11,7 @@
 | E2E | Playwright scripts (see below) | both frontends, same scenarios |
 
 ## E2E
-The versioned Playwright smoke suite lives in `tests/e2e` and runs against both demo frontends and the SQL Server backed
+The versioned Playwright smoke suite lives in `tests/e2e` and runs against both demo frontends and the PostgreSQL backed
 identity service in CI. Run `npm ci && npx playwright install chromium && npm test` in that folder while the Compose stack
 is running. It covers authentication, anonymous API behavior, workflow start dialogs, the layout editor, and identity
 admin user queries. Extend this suite with full workflow wizard transitions using the stable ids/classes/aria labels

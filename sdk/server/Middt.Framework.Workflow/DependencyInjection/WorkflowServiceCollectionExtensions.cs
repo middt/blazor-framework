@@ -14,7 +14,7 @@ public static class WorkflowServiceCollectionExtensions
     /// Registers the workflow engine:
     /// <code>
     /// builder.Services.AddMiddtWorkflow(o => o
-    ///     .UseDbContext(db => db.UseSqlServer(connectionString))
+    ///     .UseDbContext(db => db.UseNpgsql(connectionString))
     ///     .AddDefinitionsFromDirectory("Workflows")
     ///     .AddTask&lt;NotifyCustomerTask&gt;("notify-customer"));
     /// app.MapMiddtWorkflows();

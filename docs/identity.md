@@ -27,7 +27,7 @@ secrets there). The demo uses `demo/server/identity.json`.
 
 | Key | |
 |---|---|
-| `ConnectionStrings:Identity` | SQL Server database (users, clients, tokens, journeys) – required |
+| `ConnectionStrings:Identity` | PostgreSQL database (users, clients, tokens, journeys) – required |
 | `ConnectionStrings:redis` | optional: shared Data Protection keys (several instances, restarts) |
 | `Identity:Issuer` | public URL, e.g. `https://id.example.com/` |
 | `Identity:SigningCertificate:{Path,Password,Thumbprint,Encryption*}` | required outside Development (Development uses development certificates) |
@@ -39,7 +39,7 @@ secrets there). The demo uses `demo/server/identity.json`.
 | Option (`Identity:*`) | Default | |
 |---|---|---|
 | `Issuer` | request host | public URL (`iss`); discovery then advertises every endpoint under it, also when a relying party fetches discovery over an internal address (container network) |
-| `WorkflowSchema` | `wf_idp` | workflow tables (`WorkflowInstances`, `WorkflowHistory`, `WorkflowJobs`, `WorkflowIncidents`) storing journeys, users (`idp-user`), roles (`idp-role`), and OAuth2 entities (`oauth-application`, `oauth-scope`, `oauth-authorization`, `oauth-token`); ignored by SQLite |
+| `WorkflowSchema` | `wf_idp` | workflow tables (`WorkflowInstances`, `WorkflowInstanceData`, `WorkflowHistory`, `WorkflowJobs`, `WorkflowIncidents`) storing journeys, users (`idp-user`), roles (`idp-role`), and OAuth2 entities (`oauth-application`, `oauth-scope`, `oauth-authorization`, `oauth-token`); ignored by SQLite |
 | `AutoCreateSchema` | `false` | creates database, schemas and tables at startup (use migrations in production) |
 | `RequireHttps` | on outside Development | OpenIddict transport security |
 | `AccessTokenLifetime` / `IdentityTokenLifetime` / `RefreshTokenLifetime` / `AuthorizationCodeLifetime` | 15 min / 15 min / 14 days / 5 min | |
@@ -221,7 +221,7 @@ production – a warning is logged when the development mailbox is active outsid
   default `idp-admin`; signed-in users without it are sent to `/account/denied`): users (search, create, roles,
   lock/unlock, reset MFA, set password), clients (OpenIddict applications: type, secret shown once, redirect URIs,
   permissions, consent type), scopes, sessions (authorizations/tokens, revoke), journeys (instances + history). Every
-  operation uses its own DI scope; queries are materialized before per-row lookups (SQL Server without MARS).
+  operation uses its own DI scope; queries are materialized before per-row lookups on the same connection.
 - `/dev/mailbox` in Development: messages of the development `IIdentityMessageSender`.
 - Security headers – `frame-ancestors 'none'` + `X-Frame-Options: DENY` (login
   and consent cannot be framed), same-origin scripts. `form-action` is deliberately not set: browsers apply it to the
@@ -247,7 +247,7 @@ Demo clients: `middt-blazor` (confidential, `http://localhost:8080/signin-oidc`)
 ## Demo (:8083)
 
 The demo runs the service with `demo/server/identity.json`: issuer `http://localhost:8083/`, database
-`MiddtIdentity` (created at startup), relaxed password policy (demo password `test`), roles, scope `api` →
+`middt_identity` (created at startup), relaxed password policy (demo password `test`), roles, scope `api` →
 `middt-api`, clients `middt-blazor` / `middt-angular` and the demo users. Both demos sign in here; the API validates
 its access tokens.
 
@@ -258,7 +258,7 @@ its access tokens.
 
 - The `middt-angular` client uses explicit consent (the consent page appears once per user), `middt-blazor` implicit.
 - A client secret is stored on the first start; changing it in `.env` later also requires changing it in
-  `/admin/clients` (or dropping the `MiddtIdentity` database).
+  `/admin/clients` (or dropping the `middt_identity` database).
 - Users are identified by the IdP's `sub` (a GUID): workflow instances started with the old demo token belong to the
   old user id and are not listed for the new one (`instanceAccess` owner mode).
 - Development certificates are only acceptable for the demo; production configures `Identity:SigningCertificate`,

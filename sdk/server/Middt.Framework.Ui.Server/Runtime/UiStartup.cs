@@ -105,8 +105,8 @@ internal sealed partial class UiStartup(IServiceScopeFactory scopeFactory, IHost
         }
         else
         {
-            var schema = options.Value.Schema ?? (provider.Contains("SqlServer", StringComparison.Ordinal) ? "dbo" : "public");
-            exists = await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM information_schema.tables WHERE table_schema = {schema} AND table_name = 'UiLayouts'").SingleAsync(cancellationToken) > 0;
+            var schema = options.Value.Schema ?? "public";
+            exists = await db.Database.SqlQuery<int>($"SELECT CAST(COUNT(*) AS int) AS \"Value\" FROM information_schema.tables WHERE table_schema = {schema} AND table_name = 'UiLayouts'").SingleAsync(cancellationToken) > 0;
         }
 
         if (exists)
@@ -123,11 +123,7 @@ internal sealed partial class UiStartup(IServiceScopeFactory scopeFactory, IHost
             }
 
 #pragma warning disable EF1002 // name is a validated identifier
-            if (provider.Contains("SqlServer", StringComparison.Ordinal))
-            {
-                await db.Database.ExecuteSqlRawAsync($"IF SCHEMA_ID(N'{name}') IS NULL EXEC('CREATE SCHEMA [{name}]')", cancellationToken);
-            }
-            else if (provider.Contains("Npgsql", StringComparison.Ordinal))
+            if (provider.Contains("Npgsql", StringComparison.Ordinal))
             {
                 await db.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{name}\"", cancellationToken);
             }

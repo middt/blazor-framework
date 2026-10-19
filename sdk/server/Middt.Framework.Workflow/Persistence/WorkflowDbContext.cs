@@ -1,14 +1,15 @@
-using System.Buffers.Binary;
-using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Options;
 
 namespace Middt.Framework.Workflow.Persistence;
 
-/// <summary>Workflow tables (instances, history, jobs, incidents). The provider is chosen by the application.</summary>
+/// <summary>Workflow tables (instances, instance data, history, jobs, incidents). The provider is chosen by the application.</summary>
 public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> options, IOptions<MiddtWorkflowOptions> workflowOptions) : DbContext(options)
 {
     public DbSet<WorkflowInstance> Instances => Set<WorkflowInstance>();
+
+    public DbSet<WorkflowInstanceData> InstanceData => Set<WorkflowInstanceData>();
 
     public DbSet<WorkflowHistory> History => Set<WorkflowHistory>();
 
@@ -16,29 +17,11 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
 
     public DbSet<WorkflowIncident> Incidents => Set<WorkflowIncident>();
 
-    private bool? isSqlServer;
-
     /// <summary>
-    /// New key for instances and jobs, ordered by creation time in the provider's own GUID sort order. SQL Server compares
-    /// <c>uniqueidentifier</c> starting with the last six bytes, so a UUIDv7 (time in the first bytes) would be random there
-    /// and fragment the clustered primary key; it gets the timestamp in those bytes instead. Other providers use UUIDv7.
+    /// New time-ordered UUIDv7 key for workflow instances and jobs.
     /// </summary>
-    public Guid NewId()
-    {
-        isSqlServer ??= Database.ProviderName?.Contains("SqlServer", StringComparison.Ordinal) == true;
-        return isSqlServer.Value ? NewSqlServerSequentialId(DateTimeOffset.UtcNow) : Guid.CreateVersion7();
-    }
-
-    /// <summary>48-bit Unix milliseconds big-endian in bytes 10-15 (SQL Server's most significant), random elsewhere.</summary>
-    internal static Guid NewSqlServerSequentialId(DateTimeOffset now)
-    {
-        Span<byte> bytes = stackalloc byte[16];
-        RandomNumberGenerator.Fill(bytes[..10]);
-        Span<byte> time = stackalloc byte[8];
-        BinaryPrimitives.WriteInt64BigEndian(time, now.ToUnixTimeMilliseconds());
-        time[2..].CopyTo(bytes[10..]);
-        return new Guid(bytes);
-    }
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Called through the DbContext instance.")]
+    public Guid NewId() => Guid.CreateVersion7();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,13 +41,15 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.PendingTransition).HasMaxLength(128);
             e.Property(x => x.StartedBy).HasMaxLength(256);
             e.Property(x => x.LastExecutedBy).HasMaxLength(256);
-            if (isPostgres)
-            {
-                e.Property(x => x.Data).HasColumnType("jsonb");
-            }
-
             e.Property(x => x.Revision).IsConcurrencyToken();
             e.Ignore(x => x.IsTerminal);
+            e.Ignore(x => x.Data);
+            e.Ignore(x => x.DataVersion);
+            e.HasOne(x => x.InstanceData)
+                .WithOne()
+                .HasForeignKey<WorkflowInstanceData>(x => x.InstanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(x => x.InstanceData).AutoInclude();
             e.HasIndex(x => new { x.WorkflowKey, x.BusinessKey }).IsUnique();
             e.HasIndex(x => new { x.WorkflowKey, x.Status, x.State });
             e.HasIndex(x => x.ParentInstanceId);
@@ -75,6 +60,21 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
 
             // Busy recovery scan: WHERE Status = 'Busy' AND BusySince < @threshold.
             e.HasIndex(x => new { x.Status, x.BusySince }, "IX_WorkflowInstances_Status_BusySince");
+        });
+
+        modelBuilder.Entity<WorkflowInstanceData>(e =>
+        {
+            e.ToTable("WorkflowInstanceData", schema);
+            e.HasKey(x => x.InstanceId);
+            e.Property(x => x.Data).IsRequired();
+            if (isPostgres)
+            {
+                e.Property(x => x.Data).HasColumnType("jsonb");
+            }
+
+            e.Property(x => x.DataHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.ETag).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => x.DataHash, "IX_WorkflowInstanceData_DataHash");
         });
 
         modelBuilder.Entity<WorkflowHistory>(e =>
@@ -122,5 +122,30 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Property(x => x.TaskKey).HasMaxLength(128);
             e.HasIndex(x => x.InstanceId);
         });
+
+        if (isPostgres)
+        {
+            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+                v => v.Kind == DateTimeKind.Utc ? v : DateTime.SpecifyKind(v, DateTimeKind.Utc),
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+            var nullableDateTimeConverter = new ValueConverter<DateTime?, DateTime?>(
+                v => v.HasValue ? (v.Value.Kind == DateTimeKind.Utc ? v.Value : DateTime.SpecifyKind(v.Value, DateTimeKind.Utc)) : v,
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime))
+                    {
+                        property.SetValueConverter(dateTimeConverter);
+                    }
+                    else if (property.ClrType == typeof(DateTime?))
+                    {
+                        property.SetValueConverter(nullableDateTimeConverter);
+                    }
+                }
+            }
+        }
     }
 }

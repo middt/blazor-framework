@@ -161,13 +161,20 @@ internal sealed partial class AuthJourneyService(
         var updated = await db.Instances
             .Where(i => i.Id == id && i.Revision == revision && i.Status == WorkflowInstanceStatus.Completed)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(i => i.Data, json)
                 .SetProperty(i => i.Revision, revision + 1)
                 .SetProperty(i => i.UpdatedAt, now), cancellationToken);
         if (updated != 1)
         {
             return null;
         }
+
+        var dataHash = WorkflowInstanceData.ComputeHash(json);
+        await db.InstanceData
+            .Where(d => d.InstanceId == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.Data, json)
+                .SetProperty(d => d.DataHash, dataHash)
+                .SetProperty(d => d.UpdatedAt, now), cancellationToken);
 
         var consentOnly = JourneyTask.Flag(data, JourneyData.ConsentOnly);
         var returnUrl = JourneyTask.Text(data, JourneyData.ReturnUrl);

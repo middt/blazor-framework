@@ -101,7 +101,7 @@ Design choices:
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddMiddtApi(o => o.Title = "My API");
-builder.Services.AddDbContextPool<ShopContext>(o => o.UseSqlServer(builder.Configuration.GetConnectionString("Shop")));
+builder.Services.AddDbContextPool<ShopContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Shop")));
 builder.Services.AddScoped<ProductRepository>();
 
 var app = builder.Build();
@@ -191,9 +191,9 @@ without Dapr): one process, your database, a background job processor.
 ```csharp
 builder.Services.AddMiddtWorkflow(o =>
 {
-    o.UseDbContext(db => db.UseSqlServer(connectionString)); // any EF Core relational provider
-    o.AutoCreateSchema = true;                               // creates the "wf" tables (use migrations in production)
-    o.AddDefinitionsFromDirectory("Workflows");              // *.json, validated at startup
+    o.UseDbContext(db => db.UseNpgsql(connectionString)); // PostgreSQL (jsonb) or SQLite
+    o.AutoCreateSchema = true;                            // creates the "wf" tables (use migrations in production)
+    o.AddDefinitionsFromDirectory("Workflows");           // *.json, validated at startup
 });
 app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
 ```
@@ -482,7 +482,7 @@ token reuse; personal data is kept out of logs; vulnerable transitive packages a
 
 ## Running the sample
 
-The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Rebus), the OAuth 2.0 / OpenID Connect identity provider, the API, the Blazor UI and the Angular UI. Both UIs sign in at the identity provider (authorization code + PKCE through their BFF) and the API accepts its access tokens. Creating a category (category-request workflow) publishes a `CategoryCreated` event that the API's own handler consumes.
+The demo (`demo/`) runs on PostgreSQL (`middt_workflow` + `middt_identity`), Redis, RabbitMQ (Rebus), the OAuth 2.0 / OpenID Connect identity provider, the API, the Blazor UI and the Angular UI. Both UIs sign in at the identity provider (authorization code + PKCE through their BFF) and the API accepts its access tokens.
 
 **With .NET Aspire (recommended)** – requires Docker or Podman:
 
@@ -490,14 +490,14 @@ The demo (`demo/`) is a bike store: SQL Server (BikeStores), Redis, RabbitMQ (Re
 dotnet run --project demo/Middt.Sample.AppHost
 ```
 
-The Aspire dashboard shows all resources, logs, traces and metrics. Set the SQL password once with
-`dotnet user-secrets set Parameters:sql-password "<password>" --project demo/Middt.Sample.AppHost`
+The Aspire dashboard shows all resources, logs, traces and metrics. Set the PostgreSQL password once with
+`dotnet user-secrets set Parameters:postgres-password "<password>" --project demo/Middt.Sample.AppHost`
 (Aspire prompts for missing parameters otherwise).
 
 **With Docker Compose:**
 
 ```bash
-cp .env.example .env    # then set IDP_BLAZOR_CLIENT_SECRET, IDP_ANGULAR_CLIENT_SECRET, MSSQL_SA_PASSWORD, RABBITMQ_DEFAULT_USER / _PASS
+cp .env.example .env    # then set IDP_BLAZOR_CLIENT_SECRET, IDP_ANGULAR_CLIENT_SECRET, POSTGRES_PASSWORD, RABBITMQ_DEFAULT_USER / _PASS
 docker compose up --build
 ```
 
@@ -506,50 +506,6 @@ identity provider: <http://localhost:8083> (login, registration, password reset,
 `/dev/mailbox` for verification codes) · demo users `test@test.com` / `test` (roles `manager`, `ui-admin`, `idp-admin`)
 and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference: <http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
-
-**Linked workflows of the sample.** Every "new record" of the bike store goes through a workflow that writes the
-real BikeStores tables with the framework's general `entity-*`, `db-*`, `set` and messaging tasks. In logical order:
-
-| # | Workflow | Steps | Writes / links |
-|---|---|---|---|
-| 1 | `store-opening` v2 Mağaza açılışı | details → manager approval → lifecycle | `stores`; starts `staff-onboarding` with the new store pre-selected |
-| 2 | `staff-onboarding` v2 Personel alımı | store → person (+ manager) → manager approval → lifecycle | `staffs` |
-| 3 | `category-request` v2 Kategori talebi | name + justification → manager approval → lifecycle | `categories` (+ `CategoryCreated` event) |
-| 4 | `product-launch` v2 Ürün lansmanı | category, brand, price, optional initial stock → price approval above 5.000 TL → lifecycle | `products`; starts `stock-replenishment` for the initial stock |
-| 5 | `stock-replenishment` Stok ikmali | store, product, quantity → manager approval (automatic after 1 minute, immediate for orders) | `stocks` (+quantity) |
-| 6 | `customer-onboarding` v2 Müşteri kaydı | Bireysel/Kurumsal → TCKN or tax number → contact → verification → lifecycle | `customers` |
-| 7 | `order-approval` v3 Sipariş onayı | registered customer → store, product, quantity → credit check → finance/manager/express review | `orders` + `order_items` (status 1); starts `order-fulfillment` |
-| 8 | `order-fulfillment` Sipariş karşılama | stock check (missing stock → `stock-replenishment` subflow) → reserve → picking → shipping → delivered | `stocks` (−quantity), order status 2 → 4, shipped date; cancel returns the stock (status 3) |
-
-The “Test Akışları” menu contains small framework examples for core, entity, HTTP, messaging and subflow tasks.
-`test-retry-tasks` uses a deliberately failing read to demonstrate two attempts and the `Continue` error policy.
-
-Rule violations a user can fix (duplicate e-mail, store without staff, not enough stock) do not fault the instance:
-general tasks write a Turkish message to `data.error` and the workflow moves to a "Düzeltme gerekli" step
-(layout `bike-task-error`) that leads back to the form.
-
-**One lifecycle per record.** Stores, staff, categories, products and customers change only through their workflow
-(1–4, 6): their API `insert` / `update` / `delete` answer 403 ("Bu kayıt iş akışı üzerinden değiştirilir."), orders
-(`ViewOrder`) and stocks are read-only too. After the record is created the instance does not finish: `setKey` gives it
-the business key `store-12`, `staff-3`, `category-8`, `product-41` or `customer-1501` and it waits in **Aktif**
-(`active`, current values in `data.store` / `data.staff` / …):
-
-- `request-change` "Değişiklik talebi" (inline form prefilled with the current values) → `change-approval` (manager:
-  `approve-change` → `entity-update` → back to `active` with the new values; `reject-change` / `withdraw-change` → `active`
-  unchanged; a rule violation → `change-fix` "Düzeltme gerekli" → `back-to-record`).
-- `request-close` "Kapatma talebi" (reason) → `close-approval` (manager `approve-close` / `reject-close`) →
-  `entity-update` sets `active` false → final state `closed` "Kapatıldı". Closing is a **soft delete** (`active = 0`): existing
-  orders keep the record, lookups (`getall`, the selects of forms and filters) offer active records only, lists
-  (`getitems`) show all with a "Durum" column and filter; new orders, staff of a closed store and products of a closed
-  category are refused with a "… pasif durumda." message. A category with active products cannot be closed.
-- Existing records (the seed has no instances) are **adopted**: the lists' row action "Değişiklik / kapatma" opens
-  `/workflow/<key>?start=1&key=<entity>-<id>&<idField>=<id>`; the start input carries the id (`storeId`, `staffId`,
-  `categoryId`, `productId`, `customerId`), the record is loaded and the instance goes straight to `active` – or to
-  `inactive` "Pasif" for a passive record (`request-reactivate` → `reactivate-approval` → active). Starting again with
-  the same key returns the existing instance.
-
-The stores/categories/products/customers `active` columns are added at API startup (`BikeStoresSchemaUpgrade`,
-idempotent, SQL Server).
 
 ## Development
 
@@ -566,7 +522,7 @@ dotnet pack Middt.Framework.slnx -c Release -o artifacts
 (cd sdk/client/typescript/ui-core && npm ci && npm run build)            # @middt/ui-core package
 (cd sdk/client/angular && npm ci && npx ng build middt-angular)           # @middt/angular package
 (cd demo/client/angular/app && npm ci && npx ng build sample)             # Angular demo app (consumes both packages)
-(cd tests/e2e && npm ci && npx playwright install chromium && npm test)    # full-stack browser + SQL Server smoke tests (Compose running)
+(cd tests/e2e && npm ci && npx playwright install chromium && npm test)    # full-stack browser + PostgreSQL smoke tests (Compose running)
 ```
 
 `spec/ui-layout.schema.json` is generated from the widget catalog; after changing widget specs regenerate it with
@@ -582,8 +538,8 @@ Package versions are managed centrally in `Directory.Packages.props`; shared bui
 - Blazor host pages should keep `<persist-component-state />` and `~/` asset URLs (fingerprinted static assets).
 - Custom layout widgets skip updates whose `Node` and `Context` are unchanged; override `SkipUnchangedParameters` if a
   widget renders state from elsewhere. Pass the same `Variables` dictionary to `UiLayoutHost` while nothing changed.
-- Workflow commands answer 409 when the instance changed between validation and claim; workflow ids on SQL Server are
-  SQL-Server-sequential GUIDs; new indexes are created at startup with `AutoCreateSchema`, otherwise via migration.
+- Workflow commands answer 409 when the instance changed between validation and claim; workflow ids are time-ordered
+  UUIDv7 (`Guid.CreateVersion7()`); new indexes are created at startup with `AutoCreateSchema`, otherwise via migration.
 - `LocalUrl` and `UiUrl` reject control characters, non-ASCII (LocalUrl) and leading/trailing whitespace – percent-encode.
 - Signing in again ends the previous server session; the .NET client no longer retries POST/PUT/PATCH/DELETE or 429.
 - Workflow owner checks compare `StartedBy` with the user name – user names must be unique.

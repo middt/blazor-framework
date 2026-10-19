@@ -1,10 +1,25 @@
+using System.Security.Cryptography;
+using System.Text;
 using Middt.Framework.Model.Workflow;
 
 namespace Middt.Framework.Workflow.Persistence;
 
 public sealed class WorkflowInstance
 {
-    public Guid Id { get; set; }
+    private Guid id;
+
+    public Guid Id
+    {
+        get => id;
+        set
+        {
+            id = value;
+            if (InstanceData is not null)
+            {
+                InstanceData.InstanceId = value;
+            }
+        }
+    }
 
     public string WorkflowKey { get; set; } = string.Empty;
 
@@ -18,10 +33,46 @@ public sealed class WorkflowInstance
 
     public WorkflowInstanceStatus Status { get; set; }
 
-    /// <summary>Latest instance data (JSON).</summary>
-    public string Data { get; set; } = "{}";
+    /// <summary>Navigation to the instance's JSON data row in the <c>WorkflowInstanceData</c> table.</summary>
+    public WorkflowInstanceData? InstanceData { get; set; }
 
-    public int DataVersion { get; set; }
+    /// <summary>Latest instance data (JSON), stored in <see cref="WorkflowInstanceData"/> (not a column on <c>WorkflowInstances</c>).</summary>
+    public string Data
+    {
+        get => InstanceData?.Data ?? "{}";
+        set
+        {
+            var now = UpdatedAt != default ? UpdatedAt : DateTime.UtcNow;
+            InstanceData ??= new WorkflowInstanceData
+            {
+                InstanceId = id,
+                DataVersion = 1,
+                UpdatedAt = now,
+            };
+            InstanceData.Data = value;
+            InstanceData.DataHash = WorkflowInstanceData.ComputeHash(value);
+            InstanceData.ETag = WorkflowInstanceData.NewETag(id, InstanceData.DataVersion);
+            InstanceData.UpdatedAt = now;
+        }
+    }
+
+    /// <summary>Data version counter, stored in <see cref="WorkflowInstanceData"/> (not a column on <c>WorkflowInstances</c>).</summary>
+    public int DataVersion
+    {
+        get => InstanceData?.DataVersion ?? 0;
+        set
+        {
+            var now = UpdatedAt != default ? UpdatedAt : DateTime.UtcNow;
+            InstanceData ??= new WorkflowInstanceData
+            {
+                InstanceId = id,
+                UpdatedAt = now,
+            };
+            InstanceData.DataVersion = value;
+            InstanceData.ETag = WorkflowInstanceData.NewETag(id, value);
+            InstanceData.UpdatedAt = now;
+        }
+    }
 
     /// <summary>Optimistic concurrency token, incremented on every change.</summary>
     public int Revision { get; set; }
@@ -53,6 +104,40 @@ public sealed class WorkflowInstance
     public DateTime? CompletedAt { get; set; }
 
     public bool IsTerminal => Status is WorkflowInstanceStatus.Completed or WorkflowInstanceStatus.Cancelled;
+}
+
+/// <summary>
+/// Latest JSON data payload and version metadata of a <see cref="WorkflowInstance"/>, stored in the dedicated
+/// <c>WorkflowInstanceData</c> table so lightweight state/status operations on <c>WorkflowInstances</c> stay separated from JSON payloads.
+/// </summary>
+public sealed class WorkflowInstanceData
+{
+    /// <summary>SHA-256 hex digest of <c>{}</c>.</summary>
+    public const string EmptyJsonObjectHash = "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a";
+
+    public Guid InstanceId { get; set; }
+
+    /// <summary>Latest instance data (JSON).</summary>
+    public string Data { get; set; } = "{}";
+
+    public int DataVersion { get; set; }
+
+    /// <summary>Lowercase hex SHA-256 of <see cref="Data"/> for fast change detection.</summary>
+    public string DataHash { get; set; } = EmptyJsonObjectHash;
+
+    /// <summary>Entity tag for the data payload version.</summary>
+    public string ETag { get; set; } = string.Empty;
+
+    public DateTime UpdatedAt { get; set; }
+
+    public static string ComputeHash(string? json)
+    {
+        var normalized = string.IsNullOrWhiteSpace(json) ? "{}" : json;
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
+    }
+
+    public static string NewETag(Guid instanceId, int dataVersion) =>
+        $"{instanceId:N}-v{dataVersion}";
 }
 
 /// <summary>Audit trail: one row per executed transition with the resulting data snapshot.</summary>

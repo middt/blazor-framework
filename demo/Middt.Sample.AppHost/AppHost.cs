@@ -1,19 +1,19 @@
-// Local orchestration for the sample: SQL Server (MiddtWorkflow + MiddtIdentity), Redis, RabbitMQ, identity provider (:8083), API,
+// Local orchestration for the sample: PostgreSQL (middt_workflow + middt_identity), Redis, RabbitMQ, identity provider (:8083), API,
 // Blazor UI and the Angular UI.
 // Run with: dotnet run --project demo/Middt.Sample.AppHost  (requires Docker or Podman)
 var builder = DistributedApplication.CreateBuilder(args);
 
-var sqlPassword = builder.AddParameter("sql-password", secret: true);
-var sql = builder.AddSqlServer("sql", sqlPassword)
+var pgPassword = builder.AddParameter("postgres-password", secret: true);
+var postgres = builder.AddPostgres("postgres", password: pgPassword)
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 
-var workflowDb = sql.AddDatabase("WorkflowDb", "MiddtWorkflow");
+var workflowDb = postgres.AddDatabase("WorkflowDb", "middt_workflow");
 
 var redis = builder.AddRedis("redis");
 var messaging = builder.AddRabbitMQ("messaging").WithManagementPlugin();
 
-var identityDb = sql.AddDatabase("Identity", "MiddtIdentity");
+var identityDb = postgres.AddDatabase("Identity", "middt_identity");
 var identity = builder.AddProject<Projects.Middt_Identity>("middt-identity")
     .WithExternalHttpEndpoints()
     .WithEnvironment("Identity__ConfigFile", Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "server", "identity.json")))

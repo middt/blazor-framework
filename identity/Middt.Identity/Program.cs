@@ -6,7 +6,7 @@ using Middt.Identity.Ui;
 
 // Middt Identity: OAuth 2.0 / OpenID Connect server. Everything deployment specific comes from configuration
 // (appsettings, environment variables, or an extra JSON file named by Identity:ConfigFile):
-//   ConnectionStrings:Identity        SQL Server database (users, clients, tokens, journeys)
+//   ConnectionStrings:Identity        PostgreSQL database (users, clients, tokens, journeys)
 //   ConnectionStrings:redis           optional: shared Data Protection keys
 //   Identity:Issuer                   public URL, e.g. https://id.example.com/
 //   Identity:SigningCertificate:*     required outside Development
@@ -21,7 +21,7 @@ builder.AddMiddtIdentityServer(o =>
 {
     var section = builder.Configuration.GetSection("Identity");
     section.Bind(o);
-    o.UseDbContext(db => db.UseSqlServer(
+    o.UseDbContext(db => db.UseNpgsql(
         builder.Configuration.GetConnectionString("Identity")
         ?? throw new InvalidOperationException("ConnectionStrings:Identity is not configured.")));
     // Bind may already have filled the get-only Seed: start empty and read it exactly once.

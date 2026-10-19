@@ -64,7 +64,7 @@
                 var manager = sp.GetRequiredService<IOpenIddictApplicationManager>();
                 var total = (int)await manager.CountAsync();
                 var page = new List<ClientRow>();
-                // Materialized first: the row details below may query the database again (no MARS on SQL Server).
+                // Materialized first: the row details below may query the database again on the same connection.
                 foreach (var application in await manager.ListAsync(args.Top ?? 20, args.Skip ?? 0).ToListAsync())
                 {
                     page.Add(new ClientRow(

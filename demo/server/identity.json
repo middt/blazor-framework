@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "Identity": "Server=localhost,1433;Database=MiddtIdentity;User Id=sa;Password=yourStrong(!)Password;TrustServerCertificate=True"
+    "Identity": "Host=localhost;Port=5433;Database=middt_identity;Username=postgres;Password=postgres"
   },
   "Identity": {
     "Issuer": "http://localhost:8083/",

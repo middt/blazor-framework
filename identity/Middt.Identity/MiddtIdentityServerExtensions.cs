@@ -33,7 +33,7 @@ public static class MiddtIdentityServerExtensions
     /// journeys) and <see cref="IAuthJourneyService"/>, a development mailbox and the startup seeding.
     /// <code>
     /// builder.AddMiddtIdentityServer(o => o
-    ///     .UseDbContext(db => db.UseSqlServer(connectionString))
+    ///     .UseDbContext(db => db.UseNpgsql(connectionString))
     ///     .AddSeedFromConfiguration(builder.Configuration.GetSection("Identity:Seed")));
     /// …
     /// app.UseAuthentication();

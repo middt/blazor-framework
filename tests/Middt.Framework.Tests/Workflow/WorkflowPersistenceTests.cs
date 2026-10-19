@@ -46,7 +46,7 @@ public sealed class WorkflowPersistenceTests
         using var response = await host.Client.SendAsync(request, Ct);
 
         response.EnsureSuccessStatusCode();
-        // Engine: read + claim + delete left-state jobs + save (SQLite runs the update/inserts as separate commands; SQL Server
+        // Engine: read + claim + delete left-state jobs + save (SQLite runs the update/inserts as separate commands; PostgreSQL
         // batches them). No second read of the instance and no job query for the response (formerly 11 commands here).
         // The test host's RecordingEventHandler adds one SELECT of its own. Durable event delivery adds one job insert
         // in the state transaction and one delete after successful delivery.
@@ -136,13 +136,17 @@ public sealed class WorkflowPersistenceTests
     }
 
     [Fact]
-    public void Sql_server_keys_are_ordered_by_time_in_sql_server_guid_order()
+    public async Task Generated_keys_are_ordered_by_time_in_uuid_v7_order()
     {
-        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var ids = Enumerable.Range(0, 50).Select(i => WorkflowDbContext.NewSqlServerSequentialId(start.AddMilliseconds(i * 7))).ToList();
+        var ids = new List<Guid>(20);
+        for (var i = 0; i < 20; i++)
+        {
+            ids.Add(Guid.CreateVersion7());
+            await Task.Delay(2, Ct);
+        }
 
-        // System.Data.SqlTypes.SqlGuid compares exactly like SQL Server's uniqueidentifier.
-        var sorted = ids.OrderBy(g => new System.Data.SqlTypes.SqlGuid(g)).ToList();
+        // Standard big-endian byte order (used by PostgreSQL uuid B-tree indexes) orders UUIDv7 chronologically.
+        var sorted = ids.OrderBy(g => Convert.ToHexString(g.ToByteArray(bigEndian: true)), StringComparer.Ordinal).ToList();
         sorted.Should().Equal(ids);
         ids.Should().OnlyHaveUniqueItems();
     }
@@ -165,6 +169,32 @@ public sealed class WorkflowPersistenceTests
 
         await host.RunJobsAsync(TimeSpan.FromMinutes(6));
         (await host.RowAsync(instance.Id)).Status.Should().Be(WorkflowInstanceStatus.Faulted);
+    }
+
+    [Fact]
+    public async Task Instance_data_is_persisted_in_dedicated_WorkflowInstanceData_table()
+    {
+        await using var host = await WorkflowTestHost.StartAsync([TestWorkflows.Pipeline]);
+        var started = await host.StartInstanceAsync("pipeline", new { name = "bike", amount = 100 }, user: WorkflowTestHost.User("alice"));
+
+        var (instanceCols, dataCols, dataRow) = await host.WithDbAsync(async db =>
+        {
+            var instCols = await db.Database
+                .SqlQueryRaw<string>("SELECT name AS \"Value\" FROM pragma_table_info('WorkflowInstances') ORDER BY name")
+                .ToListAsync(Ct);
+            var dtCols = await db.Database
+                .SqlQueryRaw<string>("SELECT name AS \"Value\" FROM pragma_table_info('WorkflowInstanceData') ORDER BY name")
+                .ToListAsync(Ct);
+            var row = await db.InstanceData.AsNoTracking().SingleAsync(d => d.InstanceId == started.Id, Ct);
+            return (instCols, dtCols, row);
+        });
+
+        instanceCols.Should().NotContain(["Data", "DataVersion"]);
+        dataCols.Should().BeEquivalentTo(["Data", "DataHash", "DataVersion", "ETag", "InstanceId", "UpdatedAt"]);
+        dataRow.DataVersion.Should().Be(1);
+        dataRow.Data.Should().Contain("\"bike\"");
+        dataRow.DataHash.Should().Be(WorkflowInstanceData.ComputeHash(dataRow.Data));
+        dataRow.ETag.Should().Be(WorkflowInstanceData.NewETag(started.Id, 1));
     }
 
     /// <summary>Simulates a concurrent writer: increments the revision right before the next claim UPDATE runs.</summary>
