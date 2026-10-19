@@ -57,13 +57,13 @@ internal sealed class WorkflowStartup(
         }
         else
         {
-            // CreateTables only runs for a new database: add nullable columns and indexes introduced by later framework versions.
+            // CreateTables only runs for a new database: add nullable columns introduced by later framework versions.
             await EnsureWorkflowKeyMigrationAsync(db, options.Value.Schema, cancellationToken);
             await EnsureColumnsAsync(db, cancellationToken);
-            await EnsureIndexesAsync(db, cancellationToken);
         }
 
         await WorkflowPartitionManager.EnsurePartitionsAndIndexesAsync(db, registry, options.Value.Schema, logger, cancellationToken);
+        await EnsureIndexesAsync(db, cancellationToken);
     }
 
     private static async Task EnsureWorkflowKeyMigrationAsync(WorkflowDbContext db, string? schemaName, CancellationToken cancellationToken)
@@ -173,7 +173,8 @@ internal sealed class WorkflowStartup(
     internal static IEnumerable<string> EnsureIndexStatements(WorkflowDbContext db)
     {
         var provider = db.Database.ProviderName ?? string.Empty;
-        if (!provider.Contains("Npgsql", StringComparison.Ordinal) && !provider.Contains("Sqlite", StringComparison.Ordinal))
+        var isPostgres = provider.Contains("Npgsql", StringComparison.Ordinal);
+        if (!isPostgres && !provider.Contains("Sqlite", StringComparison.Ordinal))
         {
             yield break;
         }
@@ -199,9 +200,11 @@ internal sealed class WorkflowStartup(
                     continue;
                 }
 
+                // PostgreSQL partitioned tables require all partition key columns ("WorkflowKey") in any UNIQUE index.
+                var isUnique = index.IsUnique && (!isPostgres || index.Properties.Any(p => p.Name == "WorkflowKey"));
                 var columns = string.Join(", ", index.Properties.Select((p, i) =>
                     sql.DelimitIdentifier(p.GetColumnName(tableIdentifier)!) + (index.IsDescending is { Count: > 0 } desc && desc[i] ? " DESC" : string.Empty)));
-                yield return $"CREATE {(index.IsUnique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS "
+                yield return $"CREATE {(isUnique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS "
                     + $"{sql.DelimitIdentifier(name)} ON {qualifiedTable} ({columns})"
                     + (index.GetFilter() is { Length: > 0 } filter ? $" WHERE {filter}" : string.Empty);
             }

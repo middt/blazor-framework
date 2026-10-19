@@ -352,7 +352,8 @@ public sealed partial class WorkflowEngine(
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var readable = registry.GetVersions(workflow)
+        var versions = registry.GetVersions(workflow);
+        var readable = versions
             .Where(d => d.Roles.Count == 0 || d.Roles.Any(user.IsInRole))
             .ToArray();
         if (readable.Length == 0)
@@ -364,8 +365,20 @@ public sealed partial class WorkflowEngine(
         var ownerVersions = readable.Where(d => !CanSeeAllInstances(d, user)).Select(d => d.Version).ToArray();
         var owner = user.AuditName;
 
-        var query = db.Instances.AsNoTracking().Where(i => i.WorkflowKey == workflow
-            && (allVersions.Contains(i.WorkflowVersion) || (ownerVersions.Contains(i.WorkflowVersion) && i.StartedBy == owner)));
+        IQueryable<WorkflowInstance> query = db.Instances.AsNoTracking();
+        if (ownerVersions.Length == 0 && allVersions.Length == versions.Count)
+        {
+            query = query.Where(i => i.WorkflowKey == workflow);
+        }
+        else if (allVersions.Length == 0 && ownerVersions.Length == versions.Count)
+        {
+            query = query.Where(i => i.WorkflowKey == workflow && i.StartedBy == owner);
+        }
+        else
+        {
+            query = query.Where(i => i.WorkflowKey == workflow
+                && (allVersions.Contains(i.WorkflowVersion) || (ownerVersions.Contains(i.WorkflowVersion) && i.StartedBy == owner)));
+        }
 
         if (!string.IsNullOrEmpty(state))
         {
@@ -382,7 +395,7 @@ public sealed partial class WorkflowEngine(
             query = query.Where(i => i.BusinessKey == key);
         }
 
-        var count = await query.CountAsync(cancellationToken);
+        var count = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
         pageSize = Math.Clamp(pageSize, 1, 200);
         var items = await query.OrderByDescending(i => i.CreatedAt)
             .Skip((Math.Max(page, 1) - 1) * pageSize).Take(pageSize)

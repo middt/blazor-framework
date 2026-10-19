@@ -7,6 +7,7 @@ using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Expressions;
 using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Persistence;
 using Middt.Framework.Workflow.Schema;
 
@@ -19,32 +20,29 @@ namespace Middt.Framework.Workflow.Runtime;
 /// </summary>
 public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegistry registry)
 {
-    private static readonly Dictionary<string, string> EntityAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["CustomerOnboarding"] = "customer-onboarding",
-        ["Customer"] = "customer-onboarding",
-        ["CreditAllocation"] = "credit-allocation",
-        ["Credit"] = "credit-allocation",
-        ["OrderPaymentOrchestration"] = "order-payment-orchestration",
-        ["OrderPayment"] = "order-payment-orchestration",
-        ["Order"] = "order-payment-orchestration",
-        ["SlaEscalation"] = "sla-escalation",
-        ["Sla"] = "sla-escalation",
-        ["RiskLimitEval"] = "risk-limit-eval",
-        ["RiskLimit"] = "risk-limit-eval",
-    };
-
-    /// <summary>Returns all accessible instances of <paramref name="entity"/> with <c>dataSchema</c> role/mask projection applied.</summary>
+    /// <summary>Returns accessible instances of <paramref name="entity"/> (clamped to 200 for unpaged lookups/KPIs) with <c>dataSchema</c> role/mask projection applied.</summary>
     public async Task<BaseResponseDataModel<List<JsonObject>>> GetAllAsync(
         string entity,
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        var items = await LoadProjectedInstancesAsync(entity, user, cancellationToken);
+        var query = BuildAccessibleQuery(entity, user);
+        if (query is null)
+        {
+            return new BaseResponseDataModel<List<JsonObject>> { Result = ResultEnum.Success, Count = 0, Data = [] };
+        }
+
+        var total = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
+        var rows = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Take(200)
+            .ToListAsync(cancellationToken);
+
+        var items = ProjectRows(rows, user);
         return new BaseResponseDataModel<List<JsonObject>>
         {
             Result = ResultEnum.Success,
-            Count = items.Count,
+            Count = total,
             Data = items,
         };
     }
@@ -56,15 +54,72 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        var items = await LoadProjectedInstancesAsync(entity, user, cancellationToken);
+        var query = BuildAccessibleQuery(entity, user);
+        if (query is null)
+        {
+            return new BaseResponseDataModel<List<JsonObject>> { Result = ResultEnum.Success, Count = 0, Data = [] };
+        }
 
-        if (searchRequest?["requestModel"] is JsonObject filter)
+        var page = Math.Max(1, searchRequest?["currentPage"]?.GetValue<int>() ?? 1);
+        var pageSize = Math.Clamp(searchRequest?["requestItemSize"]?.GetValue<int>() ?? 20, 1, 100);
+        var filter = searchRequest?["requestModel"] as JsonObject;
+        var hasActiveFilter = HasNonEmptyFilter(filter);
+        var sortProperty = searchRequest?["sortProperty"]?.GetValue<string>();
+        var ascending = searchRequest?["sortReverse"]?.GetValue<bool>() ?? false;
+
+        if (!hasActiveFilter && (string.IsNullOrWhiteSpace(sortProperty) || string.Equals(sortProperty, "createdAt", StringComparison.OrdinalIgnoreCase)))
+        {
+            var total = await query.IgnoreAutoIncludes().CountAsync(cancellationToken);
+            var ordered = ascending ? query.OrderBy(i => i.CreatedAt) : query.OrderByDescending(i => i.CreatedAt);
+            var rows = await ordered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return new BaseResponseDataModel<List<JsonObject>>
+            {
+                Result = ResultEnum.Success,
+                Count = total,
+                Data = ProjectRows(rows, user),
+            };
+        }
+
+        if (filter is not null)
+        {
+            foreach (var (k, v) in filter)
+            {
+                var text = v?.ToString().Trim();
+                if (string.IsNullOrEmpty(text))
+                {
+                    continue;
+                }
+
+                if (string.Equals(k, "key", StringComparison.OrdinalIgnoreCase) || string.Equals(k, "businessKey", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(i => i.BusinessKey != null && i.BusinessKey.Contains(text));
+                }
+                else if (string.Equals(k, "state", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(i => i.State.Contains(text));
+                }
+                else
+                {
+                    query = query.Where(i => i.InstanceData != null && i.InstanceData.Data.Contains(text));
+                }
+            }
+        }
+
+        var candidateRows = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Take(1000)
+            .ToListAsync(cancellationToken);
+
+        var items = ProjectRows(candidateRows, user);
+        if (filter is not null)
         {
             items = [.. items.Where(item => MatchesFilter(item, filter))];
         }
 
-        var sortProperty = searchRequest?["sortProperty"]?.GetValue<string>();
-        var ascending = searchRequest?["sortReverse"]?.GetValue<bool>() ?? false;
         if (!string.IsNullOrWhiteSpace(sortProperty))
         {
             items = ascending
@@ -72,15 +127,13 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
                 : [.. items.OrderByDescending(i => SortKey(i, sortProperty), StringComparer.OrdinalIgnoreCase)];
         }
 
-        var page = Math.Max(1, searchRequest?["currentPage"]?.GetValue<int>() ?? 1);
-        var pageSize = Math.Clamp(searchRequest?["requestItemSize"]?.GetValue<int>() ?? 20, 1, 100);
-        var total = items.Count;
+        var filteredTotal = items.Count;
         var paged = items.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
         return new BaseResponseDataModel<List<JsonObject>>
         {
             Result = ResultEnum.Success,
-            Count = total,
+            Count = filteredTotal,
             Data = paged,
         };
     }
@@ -92,38 +145,89 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        var items = await LoadProjectedInstancesAsync(entity, user, cancellationToken);
-        var match = items.FirstOrDefault(i =>
-            string.Equals(i["id"]?.GetValue<string>(), id, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(i["key"]?.GetValue<string>(), id, StringComparison.OrdinalIgnoreCase));
+        var query = BuildAccessibleQuery(entity, user);
+        if (query is null)
+        {
+            return new BaseResponseDataModel<JsonObject> { Result = ResultEnum.Error, Count = 0, Data = null };
+        }
+
+        if (Guid.TryParse(id, out var guid))
+        {
+            query = query.Where(i => i.Id == guid || i.BusinessKey == id);
+        }
+        else
+        {
+            query = query.Where(i => i.BusinessKey == id);
+        }
+
+        var row = await query.FirstOrDefaultAsync(cancellationToken);
+        if (row is null)
+        {
+            return new BaseResponseDataModel<JsonObject> { Result = ResultEnum.Error, Count = 0, Data = null };
+        }
+
+        var definition = TryGetDefinition(row.WorkflowKey, row.WorkflowVersion);
+        var match = FlattenInstance(row, definition, user);
 
         return new BaseResponseDataModel<JsonObject>
         {
-            Result = match is not null ? ResultEnum.Success : ResultEnum.Error,
-            Count = match is not null ? 1 : 0,
+            Result = ResultEnum.Success,
+            Count = 1,
             Data = match,
         };
     }
 
-    private async Task<List<JsonObject>> LoadProjectedInstancesAsync(string entity, ClaimsPrincipal user, CancellationToken cancellationToken)
+    private IQueryable<WorkflowInstance>? BuildAccessibleQuery(string entity, ClaimsPrincipal principal)
     {
         var workflowKey = ResolveWorkflowKey(entity);
+        var wfUser = WorkflowUser.From(principal);
         IQueryable<WorkflowInstance> query = db.Instances.AsNoTracking();
+
         if (workflowKey is not null)
         {
-            query = query.Where(i => i.WorkflowKey == workflowKey);
+            var versions = TryGetVersions(workflowKey);
+            if (versions.Count > 0)
+            {
+                var readable = versions
+                    .Where(d => d.Roles.Count == 0 || d.Roles.Any(wfUser.IsInRole))
+                    .ToArray();
+                if (readable.Length == 0)
+                {
+                    return null;
+                }
+
+                var allVersions = readable.Where(d => CanSeeAllInstances(d, wfUser)).Select(d => d.Version).ToArray();
+                var ownerVersions = readable.Where(d => !CanSeeAllInstances(d, wfUser)).Select(d => d.Version).ToArray();
+                var owner = wfUser.AuditName;
+
+                if (ownerVersions.Length == 0 && allVersions.Length == versions.Count)
+                {
+                    return query.Where(i => i.WorkflowKey == workflowKey);
+                }
+
+                if (allVersions.Length == 0 && ownerVersions.Length == versions.Count)
+                {
+                    return query.Where(i => i.WorkflowKey == workflowKey && i.StartedBy == owner);
+                }
+
+                return query.Where(i => i.WorkflowKey == workflowKey
+                    && (allVersions.Contains(i.WorkflowVersion) || (ownerVersions.Contains(i.WorkflowVersion) && i.StartedBy == owner)));
+            }
+
+            return query.Where(i => i.WorkflowKey == workflowKey);
         }
 
-        var rows = await query
-            .OrderByDescending(i => i.CreatedAt)
-            .Take(200)
-            .ToListAsync(cancellationToken);
+        return query;
+    }
 
+    private List<JsonObject> ProjectRows(List<WorkflowInstance> rows, ClaimsPrincipal user)
+    {
+        var wfUser = WorkflowUser.From(user);
         var result = new List<JsonObject>(rows.Count);
         foreach (var row in rows)
         {
             var definition = TryGetDefinition(row.WorkflowKey, row.WorkflowVersion);
-            if (definition is not null && !CanReadInstance(definition, row, user))
+            if (definition is not null && !CanReadInstance(definition, row, wfUser))
             {
                 continue;
             }
@@ -134,38 +238,62 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         return result;
     }
 
+    private static bool HasNonEmptyFilter(JsonObject? filter)
+    {
+        if (filter is null)
+        {
+            return false;
+        }
+
+        foreach (var (_, v) in filter)
+        {
+            if (!string.IsNullOrWhiteSpace(v?.ToString()))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IReadOnlyList<WorkflowDefinition> TryGetVersions(string key)
+    {
+        try
+        {
+            return registry.GetVersions(key);
+        }
+        catch (WorkflowNotFoundException)
+        {
+            return [];
+        }
+    }
+
     private WorkflowDefinition? TryGetDefinition(string key, int version)
     {
         try
         {
             return registry.Get(key, version);
         }
-        catch (KeyNotFoundException)
+        catch (WorkflowNotFoundException)
         {
             return null;
         }
     }
 
-    private static bool CanReadInstance(WorkflowDefinition definition, WorkflowInstance instance, ClaimsPrincipal user)
+    private static bool CanSeeAllInstances(WorkflowDefinition definition, WorkflowUser user) =>
+        user.IsSystem
+        || definition.InstanceAccess is not { IsOwnerOnly: true } access
+        || access.SupervisorRoles.Any(user.IsInRole);
+
+    private static bool CanReadInstance(WorkflowDefinition definition, WorkflowInstance instance, WorkflowUser user)
     {
         if (definition.Roles.Count > 0 && !definition.Roles.Any(user.IsInRole))
         {
             return false;
         }
 
-        var access = definition.InstanceAccess;
-        if (access is null || !access.IsOwnerOnly)
-        {
-            return true;
-        }
-
-        if (access.SupervisorRoles.Any(user.IsInRole))
-        {
-            return true;
-        }
-
-        var userName = user.Identity?.Name;
-        return !string.IsNullOrEmpty(userName) && string.Equals(instance.StartedBy, userName, StringComparison.Ordinal);
+        return CanSeeAllInstances(definition, user)
+            || (!string.IsNullOrEmpty(instance.StartedBy) && string.Equals(instance.StartedBy, user.AuditName, StringComparison.Ordinal));
     }
 
     private static JsonObject FlattenInstance(WorkflowInstance instance, WorkflowDefinition? definition, ClaimsPrincipal user)
@@ -228,28 +356,82 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
             null => string.Empty,
         };
 
-    private static string? ResolveWorkflowKey(string entity)
+    private string? ResolveWorkflowKey(string entity)
     {
-        if (string.Equals(entity, "WorkflowInstance", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(entity) || string.Equals(entity, "WorkflowInstance", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        if (EntityAliases.TryGetValue(entity, out var mapped))
+        if (TryGetVersions(entity) is { Count: > 0 } direct)
         {
-            return mapped;
+            return direct[0].Key;
         }
 
-        var sb = new StringBuilder(entity.Length + 4);
-        for (var i = 0; i < entity.Length; i++)
+        var kebab = ToKebabCase(entity);
+        if (TryGetVersions(kebab) is { Count: > 0 } kebabMatch)
         {
-            var c = entity[i];
-            if (char.IsUpper(c) && i > 0 && char.IsLower(entity[i - 1]))
+            return kebabMatch[0].Key;
+        }
+
+        var normalized = NormalizeKey(entity);
+        foreach (var def in registry.Latest)
+        {
+            if (string.Equals(NormalizeKey(def.Key), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return def.Key;
+            }
+        }
+
+        var prefixMatches = registry.Latest
+            .Where(d => d.Key.StartsWith(kebab + "-", StringComparison.OrdinalIgnoreCase))
+            .Select(d => d.Key)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (prefixMatches.Count == 1)
+        {
+            return prefixMatches[0];
+        }
+
+        return kebab;
+    }
+
+    private static string ToKebabCase(string text)
+    {
+        var sb = new StringBuilder(text.Length + 4);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (c is '_' or ' ')
+            {
+                if (sb.Length > 0 && sb[^1] != '-')
+                {
+                    sb.Append('-');
+                }
+
+                continue;
+            }
+
+            if (char.IsUpper(c) && i > 0 && (char.IsLower(text[i - 1]) || char.IsDigit(text[i - 1])))
             {
                 sb.Append('-');
             }
 
             sb.Append(char.ToLowerInvariant(c));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string NormalizeKey(string text)
+    {
+        var sb = new StringBuilder(text.Length);
+        foreach (var c in text)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(char.ToLowerInvariant(c));
+            }
         }
 
         return sb.ToString();

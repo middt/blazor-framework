@@ -15,7 +15,7 @@ namespace Middt.Sample.Api.Controllers;
 [ApiController]
 [Authorize]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/{entity:regex(^(?i)(customeronboarding|customer-onboarding|creditallocation|credit-allocation|orderpaymentorchestration|order-payment-orchestration|slaescalation|sla-escalation|risklimiteval|risk-limit-eval|workflowinstance)$)}")]
+[Route("api/v{version:apiVersion}/{entity}")]
 public sealed class WorkflowDataController(WorkflowInstanceDataQuery query) : ControllerBase
 {
     [HttpGet("getall")]
