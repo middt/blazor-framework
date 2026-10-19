@@ -93,6 +93,7 @@ public sealed partial class WorkflowEngine(
             InstanceData = new WorkflowInstanceData
             {
                 InstanceId = instanceId,
+                WorkflowKey = definition.Key,
                 Data = "{}",
                 DataVersion = 0,
                 DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
@@ -147,6 +148,7 @@ public sealed partial class WorkflowEngine(
             db.Incidents.Add(new WorkflowIncident
             {
                 InstanceId = instance.Id,
+                WorkflowKey = definition.Key,
                 State = instance.State,
                 TransitionKey = definition.Start.Key,
                 Error = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message,
@@ -573,6 +575,7 @@ public sealed partial class WorkflowEngine(
             snapshot.InstanceData ??= new WorkflowInstanceData
             {
                 InstanceId = snapshot.Id,
+                WorkflowKey = snapshot.WorkflowKey,
                 Data = "{}",
                 DataVersion = 0,
                 DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
@@ -595,6 +598,7 @@ public sealed partial class WorkflowEngine(
                 instance.InstanceData = new WorkflowInstanceData
                 {
                     InstanceId = instance.Id,
+                    WorkflowKey = instance.WorkflowKey,
                     Data = "{}",
                     DataVersion = 0,
                     DataHash = WorkflowInstanceData.EmptyJsonObjectHash,
@@ -635,6 +639,7 @@ public sealed partial class WorkflowEngine(
                 db.Incidents.Add(new WorkflowIncident
                 {
                     InstanceId = instanceId,
+                    WorkflowKey = run.Definition.Key,
                     State = instance.State,
                     TransitionKey = pending?.Key,
                     Error = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message,
@@ -1398,6 +1403,7 @@ public sealed partial class WorkflowEngine(
         db.Incidents.Add(new WorkflowIncident
         {
             InstanceId = run.Instance.Id,
+            WorkflowKey = run.Definition.Key,
             State = run.Instance.State,
             TransitionKey = transitionKey,
             TaskKey = taskKey,
@@ -1418,6 +1424,7 @@ public sealed partial class WorkflowEngine(
         db.History.Add(new WorkflowHistory
         {
             InstanceId = run.Instance.Id,
+            WorkflowKey = run.Definition.Key,
             TransitionKey = transitionKey,
             FromState = string.IsNullOrEmpty(from) ? null : from,
             ToState = run.Instance.State,
@@ -1437,6 +1444,7 @@ public sealed partial class WorkflowEngine(
     {
         Id = db.NewId(),
         InstanceId = instance.Id,
+        WorkflowKey = instance.WorkflowKey ?? string.Empty,
         Kind = kind,
         TransitionKey = transition,
         State = state,

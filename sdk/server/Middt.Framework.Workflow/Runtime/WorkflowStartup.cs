@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Workflow.Definitions;
 using Middt.Framework.Workflow.Persistence;
@@ -11,7 +12,11 @@ using Middt.Framework.Workflow.Persistence;
 namespace Middt.Framework.Workflow.Runtime;
 
 /// <summary>Validates all definitions at startup (fail fast) and optionally creates the workflow tables.</summary>
-internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, WorkflowRegistry registry, IOptions<MiddtWorkflowOptions> options) : IHostedService
+internal sealed class WorkflowStartup(
+    IServiceScopeFactory scopeFactory,
+    WorkflowRegistry registry,
+    IOptions<MiddtWorkflowOptions> options,
+    ILogger<WorkflowStartup>? logger = null) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -31,6 +36,8 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
             await creator.CreateAsync(cancellationToken);
         }
 
+        var isPostgres = db.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true;
+
         if (!await TablesExistAsync(db, cancellationToken))
         {
             // Tables of this context only (the database may contain other application tables).
@@ -39,13 +46,66 @@ internal sealed class WorkflowStartup(IServiceScopeFactory scopeFactory, Workflo
                 await EnsureSchemaAsync(db, schema, cancellationToken);
             }
 
-            await creator.CreateTablesAsync(cancellationToken);
+            if (isPostgres)
+            {
+                await WorkflowPartitionManager.CreatePartitionedTablesAsync(db, options.Value.Schema, cancellationToken);
+            }
+            else
+            {
+                await creator.CreateTablesAsync(cancellationToken);
+            }
         }
         else
         {
             // CreateTables only runs for a new database: add nullable columns and indexes introduced by later framework versions.
+            await EnsureWorkflowKeyMigrationAsync(db, options.Value.Schema, cancellationToken);
             await EnsureColumnsAsync(db, cancellationToken);
             await EnsureIndexesAsync(db, cancellationToken);
+        }
+
+        await WorkflowPartitionManager.EnsurePartitionsAndIndexesAsync(db, registry, options.Value.Schema, logger, cancellationToken);
+    }
+
+    private static async Task EnsureWorkflowKeyMigrationAsync(WorkflowDbContext db, string? schemaName, CancellationToken cancellationToken)
+    {
+        var provider = db.Database.ProviderName ?? string.Empty;
+        if (!provider.Contains("Npgsql", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var schema = string.IsNullOrWhiteSpace(schemaName) ? "public" : schemaName;
+        var statements = new[]
+        {
+            $"ALTER TABLE \"{schema}\".\"WorkflowInstanceData\" ADD COLUMN IF NOT EXISTS \"WorkflowKey\" varchar(128) NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowInstanceData\" d SET \"WorkflowKey\" = COALESCE(i.\"WorkflowKey\", 'Default') FROM \"{schema}\".\"WorkflowInstances\" i WHERE d.\"InstanceId\" = i.\"Id\" AND d.\"WorkflowKey\" IS NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowInstanceData\" SET \"WorkflowKey\" = 'Default' WHERE \"WorkflowKey\" IS NULL;",
+
+            $"ALTER TABLE \"{schema}\".\"WorkflowJobs\" ADD COLUMN IF NOT EXISTS \"WorkflowKey\" varchar(128) NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowJobs\" j SET \"WorkflowKey\" = COALESCE(i.\"WorkflowKey\", 'Default') FROM \"{schema}\".\"WorkflowInstances\" i WHERE j.\"InstanceId\" = i.\"Id\" AND j.\"WorkflowKey\" IS NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowJobs\" SET \"WorkflowKey\" = 'Default' WHERE \"WorkflowKey\" IS NULL;",
+
+            $"ALTER TABLE \"{schema}\".\"WorkflowHistory\" ADD COLUMN IF NOT EXISTS \"WorkflowKey\" varchar(128) NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowHistory\" h SET \"WorkflowKey\" = COALESCE(i.\"WorkflowKey\", 'Default') FROM \"{schema}\".\"WorkflowInstances\" i WHERE h.\"InstanceId\" = i.\"Id\" AND h.\"WorkflowKey\" IS NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowHistory\" SET \"WorkflowKey\" = 'Default' WHERE \"WorkflowKey\" IS NULL;",
+
+            $"ALTER TABLE \"{schema}\".\"WorkflowIncidents\" ADD COLUMN IF NOT EXISTS \"WorkflowKey\" varchar(128) NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowIncidents\" inc SET \"WorkflowKey\" = COALESCE(i.\"WorkflowKey\", 'Default') FROM \"{schema}\".\"WorkflowInstances\" i WHERE inc.\"InstanceId\" = i.\"Id\" AND inc.\"WorkflowKey\" IS NULL;",
+            $"UPDATE \"{schema}\".\"WorkflowIncidents\" SET \"WorkflowKey\" = 'Default' WHERE \"WorkflowKey\" IS NULL;",
+        };
+
+        foreach (var sql in statements)
+        {
+            try
+            {
+#pragma warning disable EF1002
+                await db.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+#pragma warning restore EF1002
+            }
+            catch
+            {
+                // Ignored if table does not exist
+            }
         }
     }
 

@@ -20,3 +20,4 @@
 | `docker compose up` fails with "Set IDP_BLAZOR_CLIENT_SECRET" (or another variable) | secrets have no defaults | `cp .env.example .env` and fill it |
 | Demo login fails with `invalid_client` after changing a client secret in `.env` | the IdP keeps the secret stored on first start | change it in `http://localhost:8083/admin/clients` too, or drop the `middt_identity` database |
 | E2E logout test hangs | typed `/Account/Logout` needs confirmation (logout CSRF protection) | navigate from the app (same-origin) or click the button |
+| Existing PostgreSQL database with unpartitioned workflow tables | PostgreSQL does not allow in-place `ALTER TABLE ... PARTITION BY` | `WorkflowPartitionManager.MigrateExistingTablesToPartitionedAsync` automatically renames old tables, creates declarative partitioned tables, routes rows into matching partitions, and syncs sequences |

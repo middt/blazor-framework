@@ -77,7 +77,7 @@ public sealed class WorkflowTimerTests
         {
             db.Jobs.Add(new WorkflowJob
             {
-                Id = Guid.NewGuid(), InstanceId = id, Kind = WorkflowJobKind.Scheduled, TransitionKey = "escalate", State = "waiting",
+                Id = Guid.NewGuid(), InstanceId = id, WorkflowKey = "timers", Kind = WorkflowJobKind.Scheduled, TransitionKey = "escalate", State = "waiting",
                 DueAt = T0, CreatedAt = T0,
             });
             return await db.SaveChangesAsync(TestContext.Current.CancellationToken);

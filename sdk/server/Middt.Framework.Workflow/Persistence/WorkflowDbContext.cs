@@ -33,7 +33,7 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
         modelBuilder.Entity<WorkflowInstance>(e =>
         {
             e.ToTable("WorkflowInstances", schema);
-            e.HasKey(x => x.Id);
+            e.HasKey(x => new { x.Id, x.WorkflowKey });
             e.Property(x => x.WorkflowKey).HasMaxLength(128).IsRequired();
             e.Property(x => x.BusinessKey).HasMaxLength(256);
             e.Property(x => x.State).HasMaxLength(128).IsRequired();
@@ -47,11 +47,13 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             e.Ignore(x => x.DataVersion);
             e.HasOne(x => x.InstanceData)
                 .WithOne()
-                .HasForeignKey<WorkflowInstanceData>(x => x.InstanceId)
+                .HasForeignKey<WorkflowInstanceData>(x => new { x.InstanceId, x.WorkflowKey })
                 .OnDelete(DeleteBehavior.Cascade);
             e.Navigation(x => x.InstanceData).AutoInclude();
+            e.HasIndex(x => x.Id).IsUnique();
             e.HasIndex(x => new { x.WorkflowKey, x.BusinessKey }).IsUnique();
             e.HasIndex(x => new { x.WorkflowKey, x.Status, x.State });
+            e.HasIndex(x => new { x.WorkflowKey, x.ParentInstanceId });
             e.HasIndex(x => x.ParentInstanceId);
 
             // Instance list: WHERE WorkflowKey = @k [AND StartedBy = @owner] ORDER BY CreatedAt DESC.
@@ -65,7 +67,8 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
         modelBuilder.Entity<WorkflowInstanceData>(e =>
         {
             e.ToTable("WorkflowInstanceData", schema);
-            e.HasKey(x => x.InstanceId);
+            e.HasKey(x => new { x.InstanceId, x.WorkflowKey });
+            e.Property(x => x.WorkflowKey).HasMaxLength(128).IsRequired();
             e.Property(x => x.Data).IsRequired();
             if (isPostgres)
             {
@@ -74,13 +77,17 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
 
             e.Property(x => x.DataHash).HasMaxLength(64).IsRequired();
             e.Property(x => x.ETag).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => x.InstanceId).IsUnique();
             e.HasIndex(x => x.DataHash, "IX_WorkflowInstanceData_DataHash");
+            e.HasIndex(x => new { x.WorkflowKey, x.UpdatedAt }, "IX_WorkflowInstanceData_WorkflowKey_UpdatedAt");
         });
 
         modelBuilder.Entity<WorkflowHistory>(e =>
         {
             e.ToTable("WorkflowHistory", schema);
             e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.Property(x => x.WorkflowKey).HasMaxLength(128).IsRequired();
             e.Property(x => x.TransitionKey).HasMaxLength(128);
             e.Property(x => x.FromState).HasMaxLength(128);
             e.Property(x => x.ToState).HasMaxLength(128);
@@ -93,13 +100,15 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
                 e.Property(x => x.Tasks).HasColumnType("jsonb");
             }
 
+            e.HasIndex(x => new { x.WorkflowKey, x.InstanceId });
             e.HasIndex(x => x.InstanceId);
         });
 
         modelBuilder.Entity<WorkflowJob>(e =>
         {
             e.ToTable("WorkflowJobs", schema);
-            e.HasKey(x => x.Id);
+            e.HasKey(x => new { x.Id, x.WorkflowKey });
+            e.Property(x => x.WorkflowKey).HasMaxLength(128).IsRequired();
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.TransitionKey).HasMaxLength(128);
             e.Property(x => x.State).HasMaxLength(128);
@@ -109,6 +118,8 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
                 e.Property(x => x.Payload).HasColumnType("jsonb");
             }
 
+            e.HasIndex(x => x.Id).IsUnique();
+            e.HasIndex(x => new { x.WorkflowKey, x.DueAt });
             e.HasIndex(x => x.DueAt);
             e.HasIndex(x => x.InstanceId);
         });
@@ -117,9 +128,12 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
         {
             e.ToTable("WorkflowIncidents", schema);
             e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.Property(x => x.WorkflowKey).HasMaxLength(128).IsRequired();
             e.Property(x => x.State).HasMaxLength(128);
             e.Property(x => x.TransitionKey).HasMaxLength(128);
             e.Property(x => x.TaskKey).HasMaxLength(128);
+            e.HasIndex(x => new { x.WorkflowKey, x.InstanceId });
             e.HasIndex(x => x.InstanceId);
         });
 

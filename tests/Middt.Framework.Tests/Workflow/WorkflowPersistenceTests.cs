@@ -190,11 +190,33 @@ public sealed class WorkflowPersistenceTests
         });
 
         instanceCols.Should().NotContain(["Data", "DataVersion"]);
-        dataCols.Should().BeEquivalentTo(["Data", "DataHash", "DataVersion", "ETag", "InstanceId", "UpdatedAt"]);
+        dataCols.Should().BeEquivalentTo(["Data", "DataHash", "DataVersion", "ETag", "InstanceId", "UpdatedAt", "WorkflowKey"]);
+        dataRow.WorkflowKey.Should().Be("pipeline");
         dataRow.DataVersion.Should().Be(1);
         dataRow.Data.Should().Contain("\"bike\"");
         dataRow.DataHash.Should().Be(WorkflowInstanceData.ComputeHash(dataRow.Data));
         dataRow.ETag.Should().Be(WorkflowInstanceData.NewETag(started.Id, 1));
+    }
+
+    [Fact]
+    public async Task Flow_specific_indexes_and_workflow_keys_are_created_for_registered_workflows()
+    {
+        await using var host = await WorkflowTestHost.StartAsync([TestWorkflows.Pipeline]);
+        var started = await host.StartInstanceAsync("pipeline", new { name = "road-bike", amount = 250 }, user: WorkflowTestHost.User("alice"));
+
+        var (indexes, hist) = await host.WithDbAsync(async db =>
+        {
+            var idxs = await db.Database
+                .SqlQueryRaw<string>("SELECT name AS \"Value\" FROM sqlite_master WHERE type = 'index'")
+                .ToListAsync(Ct);
+
+            var h = await db.History.AsNoTracking().Where(item => item.InstanceId == started.Id).ToListAsync(Ct);
+            return (idxs, h);
+        });
+
+        indexes.Should().Contain(name => name.Contains("IX_Part_Pipeline"));
+        hist.Should().NotBeEmpty();
+        hist.Should().AllSatisfy(h => h.WorkflowKey.Should().Be("pipeline"));
     }
 
     /// <summary>Simulates a concurrent writer: increments the revision right before the next claim UPDATE runs.</summary>

@@ -46,9 +46,11 @@ public sealed class WorkflowInstance
             InstanceData ??= new WorkflowInstanceData
             {
                 InstanceId = id,
+                WorkflowKey = WorkflowKey,
                 DataVersion = 1,
                 UpdatedAt = now,
             };
+            InstanceData.WorkflowKey = WorkflowKey;
             InstanceData.Data = value;
             InstanceData.DataHash = WorkflowInstanceData.ComputeHash(value);
             InstanceData.ETag = WorkflowInstanceData.NewETag(id, InstanceData.DataVersion);
@@ -66,8 +68,10 @@ public sealed class WorkflowInstance
             InstanceData ??= new WorkflowInstanceData
             {
                 InstanceId = id,
+                WorkflowKey = WorkflowKey,
                 UpdatedAt = now,
             };
+            InstanceData.WorkflowKey = WorkflowKey;
             InstanceData.DataVersion = value;
             InstanceData.ETag = WorkflowInstanceData.NewETag(id, value);
             InstanceData.UpdatedAt = now;
@@ -117,6 +121,9 @@ public sealed class WorkflowInstanceData
 
     public Guid InstanceId { get; set; }
 
+    /// <summary>Workflow definition key for partition routing and index isolation.</summary>
+    public string WorkflowKey { get; set; } = string.Empty;
+
     /// <summary>Latest instance data (JSON).</summary>
     public string Data { get; set; } = "{}";
 
@@ -145,6 +152,7 @@ public sealed class WorkflowHistory
 {
     public long Id { get; set; }
     public Guid InstanceId { get; set; }
+    public string WorkflowKey { get; set; } = string.Empty;
     public string TransitionKey { get; set; } = string.Empty;
     public string? FromState { get; set; }
     public string ToState { get; set; } = string.Empty;
@@ -187,6 +195,7 @@ public sealed class WorkflowJob
 {
     public Guid Id { get; set; }
     public Guid InstanceId { get; set; }
+    public string WorkflowKey { get; set; } = string.Empty;
     public WorkflowJobKind Kind { get; set; }
     public string? TransitionKey { get; set; }
 
@@ -206,6 +215,7 @@ public sealed class WorkflowIncident
 {
     public long Id { get; set; }
     public Guid InstanceId { get; set; }
+    public string WorkflowKey { get; set; } = string.Empty;
     public string? State { get; set; }
     public string? TransitionKey { get; set; }
     public string? TaskKey { get; set; }

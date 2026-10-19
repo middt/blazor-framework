@@ -9,6 +9,7 @@ place that must change and verifies the result.
 | New CRUD entity (API + both frontends) | [add-crud-entity.md](add-crud-entity.md) |
 | New layout widget (spec → .NET → Blazor → Angular → static HTML) | [add-layout-widget.md](add-layout-widget.md) |
 | New or changed workflow (definition, views, layouts) | [add-workflow.md](add-workflow.md) |
+| Workflow partitioning & flow-specific JSON indexing | [workflow-partitioning-and-indexing.md](workflow-partitioning-and-indexing.md) |
 | Change the portable expression language | [change-expression-language.md](change-expression-language.md) |
 | Security review checklist for every change | [security-checklist.md](security-checklist.md) |
 | Row-level security & branch authorization best practices | [../row-level-security-best-practices.md](../row-level-security-best-practices.md) |

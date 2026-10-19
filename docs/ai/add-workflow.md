@@ -37,6 +37,12 @@ example: wizard steps, inline transitions, rules, subflow, roles, timers, layout
    `/workflow/order-approval`). Cover task retry isolation, fault/retry behavior, and any new subflow or event
    delivery path. `test-retry-tasks.json` is a runnable demo of retry followed by `Continue`; `WorkflowReliabilityTests`
    has examples for recovery, versioned access and durable follow-up jobs.
+6. **Partitioning & indexing**: Declare searchable/filterable fields in `dataSchema.properties` (with explicit types:
+   `integer`, `number`, `boolean`, `string`). The engine automatically creates dedicated PostgreSQL partition tables
+   (`WorkflowInstances_{Suffix}`, `WorkflowInstanceData_{Suffix}`, `WorkflowJobs_{Suffix}`, `WorkflowHistory_{Suffix}`,
+   `WorkflowIncidents_{Suffix}`) and typed functional B-Tree indexes at startup. See
+   [`workflow-partitioning-and-indexing.md`](workflow-partitioning-and-indexing.md) for architecture, partition-wise
+   joins, and custom indexing patterns.
 
 For a transition that accepts secrets, declare each top-level secret property in `input.sensitive`. The engine strips
 those values from persisted history and pending input, and rejects asynchronous execution of such transitions. A
