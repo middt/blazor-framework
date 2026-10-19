@@ -9,10 +9,13 @@ of the folder you work in. Task playbooks: [`docs/ai/`](docs/ai/README.md).
 
 A .NET 10 framework for line-of-business apps with **two interchangeable frontends** over one backend:
 
-- **Backend**: REST API (controllers + repositories on EF Core), JSON-defined **workflow engine**, **server driven UI**
-  (JSON layouts stored in the DB, editable at runtime).
+- **Backend**: REST API (controllers + repositories on EF Core + dynamic `WorkflowInstanceDataQuery`), JSON-defined
+  **workflow engine** (partitioned by workflow key in PostgreSQL), **100% server-driven JSON UI** (menus, list columns,
+  forms, state views, and reusable nested `"widget": "layout"` blocks stored in DB and editable at runtime; see
+  [`docs/ai/backend-driven-json-ui.md`](docs/ai/backend-driven-json-ui.md)).
 - **Frontends**: **Blazor Server** (Radzen) and **Angular 22** (Material). Both sit behind a **BFF** (cookie session,
-  server side tokens, `/api` + `/hubs` proxy). The browser never holds an API token.
+  server side tokens, `/api` + `/hubs` proxy). The browser never holds an API token. Neither demo frontend contains
+  hardcoded domain views.
 - **Identity** (`identity/`, a service, not part of the SDK): OAuth 2.0 / OIDC server (OpenIddict) whose
   sign-in/registration/reset/MFA flows are workflow journeys, with a Blazor UI + admin console. The demos' BFFs sign in
   there; the API validates its tokens.
@@ -33,8 +36,8 @@ sdk/                              the framework (NuGet + npm packages)
     blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
     angular/                      @middt/angular (library workspace)            Angular frontend
 identity/Middt.Identity           OAuth2/OIDC server – ONE runnable service (not SDK), configured by appsettings (docs/identity.md)
-demo/                             bike store sample (same shape: shared / server / client)
-  server/Middt.Sample.Api         API + Layouts/*.json + Workflows/*.json seeds
+demo/                             100% backend-driven JSON sample (KYC, credit, order orchestration)
+  server/Middt.Sample.Api         API + Layouts/*.json + Workflows/*.json seeds (zero hardcoded domain views/tables)
   server/identity.json            demo settings of Middt Identity (:8083) – both demos sign in there
   client/blazor/…BlazorServer     Blazor demo (:8080)
   client/angular/                 Middt.Sample.Angular (BFF host, :8081) + app/ (Angular demo app)

@@ -8,16 +8,18 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import {
+  formatWorkflowDataCell,
   formatWorkflowDate,
   isSuccess,
   errorText,
   schemaHasInput,
   schemaValuesFromQuery,
+  workflowDataColumns,
   WORKFLOW_STATUS_OPTIONS,
   workflowStatusBadge,
   workflowStatusText,
 } from '@middt/ui-core';
-import type { WorkflowData, WorkflowDefinitionModel, WorkflowInstanceModel, WorkflowInstanceStatusName } from '@middt/ui-core';
+import type { WorkflowData, WorkflowDataColumn, WorkflowDefinitionModel, WorkflowInstanceModel, WorkflowInstanceStatusName } from '@middt/ui-core';
 import { NotifyService } from '@middt/angular/core';
 import { MiddtJsonSchemaFormComponent } from './json-schema-form.component';
 import { WORKFLOW_API_CLIENT } from './workflow-client';
@@ -79,6 +81,12 @@ export interface WorkflowStartOpened {
               <th mat-header-cell *matHeaderCellDef>Anahtar</th>
               <td mat-cell *matCellDef="let item">{{ item.key ?? item.id.slice(0, 8) }}</td>
             </ng-container>
+            @for (col of dataColumns(); track col.key) {
+              <ng-container [matColumnDef]="'data:' + col.key">
+                <th mat-header-cell *matHeaderCellDef>{{ col.title }}</th>
+                <td mat-cell *matCellDef="let item">{{ dataCell(item.data, col) }}</td>
+              </ng-container>
+            }
             <ng-container matColumnDef="state">
               <th mat-header-cell *matHeaderCellDef>Adım</th>
               <td mat-cell *matCellDef="let item">{{ stateTitle(item) }}</td>
@@ -95,12 +103,12 @@ export interface WorkflowStartOpened {
               <th mat-header-cell *matHeaderCellDef>Güncelleme</th>
               <td mat-cell *matCellDef="let item">{{ date(item.updatedAt) }}</td>
             </ng-container>
-            <tr mat-header-row *matHeaderRowDef="columns"></tr>
-            <tr mat-row *matRowDef="let item; columns: columns" class="middt-wf-row" [class.middt-wf-row-selected]="item.id === selectedRowId()"
+            <tr mat-header-row *matHeaderRowDef="columns()"></tr>
+            <tr mat-row *matRowDef="let item; columns: columns()" class="middt-wf-row" [class.middt-wf-row-selected]="item.id === selectedRowId()"
                 [attr.aria-selected]="item.id === selectedRowId()" tabindex="0" [attr.data-id]="item.id"
                 (click)="select(item)" (keydown.enter)="select(item)" (keydown.space)="$event.preventDefault(); select(item)"></tr>
             <tr class="mat-mdc-row" *matNoDataRow>
-              <td class="mat-mdc-cell middt-wf-empty" [attr.colspan]="columns.length">{{ loading() ? 'Yükleniyor...' : 'Kayıt bulunamadı.' }}</td>
+              <td class="mat-mdc-cell middt-wf-empty" [attr.colspan]="columns().length">{{ loading() ? 'Yükleniyor...' : 'Kayıt bulunamadı.' }}</td>
             </tr>
           </table>
         </div>
@@ -193,10 +201,14 @@ export class MiddtWorkflowInstanceListComponent {
   /** Raised when the current definition of the workflow is loaded (e.g. to show its title as the browser title). */
   readonly definitionLoaded = output<WorkflowDefinitionModel>();
 
-  protected readonly columns = ['key', 'state', 'status', 'createdAt', 'updatedAt'];
   protected readonly statusOptions = WORKFLOW_STATUS_OPTIONS;
 
   protected readonly definition = signal<WorkflowDefinitionModel | null>(null);
+  protected readonly dataColumns = computed<WorkflowDataColumn[]>(() => workflowDataColumns(this.definition()));
+  protected readonly columns = computed<string[]>(() => {
+    const cols = this.dataColumns();
+    return ['key', ...cols.map(c => 'data:' + c.key), 'state', 'status', ...(cols.length === 0 ? ['createdAt'] : []), 'updatedAt'];
+  });
   readonly #definitions = signal<ReadonlyMap<number, WorkflowDefinitionModel>>(new Map());
   protected readonly items = signal<WorkflowInstanceModel[]>([]);
   protected readonly count = signal(0);
@@ -278,6 +290,7 @@ export class MiddtWorkflowInstanceListComponent {
   protected statusText = workflowStatusText;
   protected badge = workflowStatusBadge;
   protected date = formatWorkflowDate;
+  protected dataCell = formatWorkflowDataCell;
 
   async #loadAll(workflow: string): Promise<void> {
     this.#abort.abort();

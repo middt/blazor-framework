@@ -1,10 +1,11 @@
 ---
-description: Add or change a workflow definition with its screens in both frontends
+description: Add or change a workflow definition with its JSON-driven screens in both frontends
 argument-hint: <workflow description>
 ---
 
 Implement this workflow change: $ARGUMENTS
 
-Follow `docs/ai/add-workflow.md`: JSON definition in `demo/server/Middt.Sample.Api/Workflows/` (new `version` for
-breaking changes), prefer `view.layout` JSON layouts for state screens (both frontends for free), otherwise add the Razor
-view **and** the Angular view; engine tests with `WorkflowTestHost` for new rules/validation. Then run `/verify`.
+Follow `docs/ai/add-workflow.md` and `docs/ai/backend-driven-json-ui.md`:
+1. JSON definition in `demo/server/Middt.Sample.Api/Workflows/` (include `icon`, `dataSchema` with `"x-list": false` where needed, and bump `version` when updating a seeded workflow).
+2. State screens in `demo/server/Middt.Sample.Api/Layouts/` (`kind: "view"`) referenced via `"view": { "layout": "<layout-key>" }` (rendered automatically by both Blazor and Angular; embed reusable partial layouts via `{ "widget": "layout", "key": "..." }`).
+3. Add or update engine/layout tests (`WorkflowDefinitionTests`, `UiSampleLayoutTests`, `SampleJsonWorkflowTests`). Then run `/verify`.

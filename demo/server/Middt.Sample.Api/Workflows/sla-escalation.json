@@ -2,9 +2,20 @@
   "key": "sla-escalation",
   "version": 1,
   "title": "SLA & Eskalasyon Yönetimi",
+  "icon": "timer",
   "timeout": {
     "after": "PT24H",
     "target": "expired"
+  },
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "ticketTitle": { "type": "string", "title": "Talep / Çağrı Başlığı" },
+      "customerName": { "type": "string", "title": "Müşteri / Kurum" },
+      "severity": { "type": "string", "title": "Öncelik Seviyesi" },
+      "assignedQueue": { "type": "string", "title": "Atanan Ekip" },
+      "amount": { "type": "number", "title": "Etkilenen Tutar (₺)" }
+    }
   },
   "start": {
     "key": "start",
@@ -105,6 +116,7 @@
       "title": "Uzman Yanıtı Bekleniyor (Dinamik SLA Timer)",
       "step": 2,
       "subType": "Human",
+      "view": { "layout": "order-escalated" },
       "onEntry": [
         {
           "task": "log",
@@ -226,14 +238,16 @@
       "title": "Çözümlendi",
       "step": 4,
       "type": "Finish",
-      "subType": "Success"
+      "subType": "Success",
+      "view": { "layout": "order-escalated" }
     },
     {
       "key": "expired",
       "title": "Zaman Aşımı (Timeout)",
       "step": 4,
       "type": "Finish",
-      "subType": "Timeout"
+      "subType": "Timeout",
+      "view": { "layout": "order-escalated" }
     }
   ]
 }

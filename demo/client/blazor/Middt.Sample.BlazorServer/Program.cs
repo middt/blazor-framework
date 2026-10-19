@@ -1,4 +1,3 @@
-using Middt.Framework.Workflow.Razor;
 using Microsoft.AspNetCore.DataProtection;
 using Middt.Framework.Blazor.Web.DependencyInjection;
 using Middt.Framework.Blazor.Web.Ui;
@@ -23,7 +22,6 @@ if (builder.Configuration.GetConnectionString("redis") is { Length: > 0 } redis)
 
 // Typed API clients (IHttpClientFactory + standard resilience pipeline).
 builder.Services.AddMiddtApiClient<WorkflowApiClient>();
-builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>());
 builder.Services.AddMiddtUi(); // server driven UI: JSON layouts (/ui/{key}, workflow state layouts, /ui-admin editor)
 
 builder.Services.AddScoped<MenuService>();

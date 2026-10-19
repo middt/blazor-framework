@@ -2,10 +2,19 @@
   "key": "order-payment-orchestration",
   "version": 1,
   "title": "Sipariş & Ödeme Orkestrasyonu",
+  "icon": "shopping_cart",
   "onError": {
     "maxAttempts": 2,
     "delay": "00:00:00",
     "action": "Fault"
+  },
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "customerName": { "type": "string", "title": "Müşteri Adı" },
+      "amount": { "type": "number", "title": "Sipariş Tutarı (₺)" },
+      "paymentMethod": { "type": "string", "title": "Ödeme Yöntemi" }
+    }
   },
   "start": {
     "key": "start",
@@ -172,7 +181,7 @@
       "title": "Finans Operasyon Onayı",
       "step": 3,
       "subType": "Human",
-      "view": { "component": "order-review" },
+      "view": { "layout": "order-review" },
       "transitions": [
         {
           "key": "confirm-order",
@@ -199,7 +208,6 @@
           "title": "Siparişi İptal Et",
           "target": "cancelled",
           "roles": [ "manager" ],
-          "view": { "component": "reject-reason" },
           "input": {
             "schema": {
               "type": "object",
@@ -219,7 +227,7 @@
       "step": 4,
       "type": "Finish",
       "subType": "Success",
-      "view": { "component": "order-result" }
+      "view": { "layout": "order-result" }
     },
     {
       "key": "cancelled",
@@ -227,7 +235,7 @@
       "step": 4,
       "type": "Finish",
       "subType": "Cancelled",
-      "view": { "component": "order-result" }
+      "view": { "layout": "order-result" }
     }
   ]
 }

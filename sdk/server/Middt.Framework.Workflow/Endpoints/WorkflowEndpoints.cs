@@ -47,7 +47,7 @@ public static class WorkflowEndpoints
             var user = WorkflowUser.From(principal);
             var items = registry.Latest
                 .Where(d => d.Roles.Count == 0 || d.Roles.Any(user.IsInRole))
-                .Select(d => new WorkflowSummaryModel { Key = d.Key, Version = d.Version, Title = d.Title })
+                .Select(d => new WorkflowSummaryModel { Key = d.Key, Version = d.Version, Title = d.Title, Icon = d.Icon })
                 .OrderBy(d => d.Key, StringComparer.Ordinal)
                 .ToList();
             return BaseResponseDataModel<List<WorkflowSummaryModel>>.Success(items, items.Count);
@@ -62,7 +62,7 @@ public static class WorkflowEndpoints
                 throw new WorkflowForbiddenException($"You are not allowed to access workflow '{workflow}'.");
             }
 
-            return BaseResponseDataModel<WorkflowDefinitionModel>.Success(ToModel(definition), 1);
+            return BaseResponseDataModel<WorkflowDefinitionModel>.Success(ToModel(definition, user), 1);
         }).WithName("GetWorkflow");
 
         group.MapPost("{workflow}/instances", async (string workflow, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] StartWorkflowRequest? request, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
@@ -155,13 +155,15 @@ public static class WorkflowEndpoints
         }
     }
 
-    private static WorkflowDefinitionModel ToModel(WorkflowDefinition definition) => new()
+    private static WorkflowDefinitionModel ToModel(WorkflowDefinition definition, Middt.Framework.Expressions.ExpressionUser user) => new()
     {
         Key = definition.Key,
         Version = definition.Version,
         Title = definition.Title,
+        Icon = definition.Icon,
         StartState = definition.Start.Target,
         StartInputSchema = (JsonObject?)definition.Start.Input?.Schema?.DeepClone(),
+        DataSchema = Schema.JsonSchemaValidator.ProjectSchema(definition.DataSchema, user),
         States = definition.States.Select(s => new WorkflowStateModel
         {
             Key = s.Key,

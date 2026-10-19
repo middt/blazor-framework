@@ -3,8 +3,7 @@
   "key": "credit-pipeline",
   "title": "Kredi Tahsis Portföyü (Workflow JSON)",
   "kind": "page",
-  "version": 1,
-  "menu": { "title": "Kredi Portföyü", "icon": "account_balance", "order": 20 },
+  "version": 2,
   "body": [
     { "widget": "heading", "text": "Kredi Tahsis Portföyü (Workflow JSON Verisi)" },
     { "widget": "link", "text": "Yeni Kredi Tahsis Talebi", "href": "/workflow/credit-allocation?start=1", "style": "button" },

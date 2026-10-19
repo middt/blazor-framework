@@ -7,9 +7,10 @@ NOT here (`demo/client/angular/app`). Depends on `@middt/ui-core` as a `file:` p
 (cd ../typescript/ui-core && npm run build) && npx ng build middt-angular
 ```
 
-- Structure: `lib/core` (config/`provideMiddt`, `bffFetch` with `X-CSRF`, `AuthService` via `/bff/user`, guards,
-  notifications, SignalR), `lib/ui` (layout renderer, widgets, grid, field editor, dialogs, page/host, editor, caches),
-  `lib/workflow` (API client token, list/detail/wizard, JSON Schema form, view registry `provideWorkflowViews`).
+- Structure: `core/src` (config/`provideMiddt`, `bffFetch` with `X-CSRF`, `AuthService` via `/bff/user`, guards,
+  notifications), `ui/src` (layout renderer, display widgets, `UiGridWidget`, `UiRecordWidget`, `UiLayoutWidget` for
+  nested `"widget": "layout"`, field editor, dialogs, layout editor), `workflow/src` (API client token,
+  list/detail/wizard, JSON Schema form, optional view registry `provideWorkflowViews`), `signalr/src`.
 - Components: standalone, **OnPush**, signals/`computed` (zoneless app – plain field mutation after `await` won't
   re-render). No template function calls that allocate per change detection (use `computed`).
 - Contract logic (expressions, formats, URL safety, field validation, API clients) belongs in **ui-core**, not here.

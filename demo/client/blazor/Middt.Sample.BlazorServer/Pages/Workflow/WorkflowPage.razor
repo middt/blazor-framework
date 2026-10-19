@@ -8,7 +8,7 @@
    ?key=… prefills its business key and parameters named like start input properties prefill those fields. *@
 @* Keyed once on the container (sibling keys must be unique): another workflow recreates both components. *@
 <div class="middt-wf-layout" @key="Key">
-    <WorkflowInstanceList @ref="list" Workflow="@Key" Title="@ListTitle(Key)" SelectedId="@selectedId" OnSelected="OnSelected"
+    <WorkflowInstanceList @ref="list" Workflow="@Key" SelectedId="@selectedId" OnSelected="OnSelected"
                           OpenStart="@OpenStart" StartKey="@StartKey" StartValues="@startValues"
                           OnStartOpened="RemoveStartQuery" OnDefinitionLoaded="OnDefinitionLoaded" />
     <WorkflowInstanceDetail Workflow="@Key" InstanceId="@selectedId" OnChanged="OnChanged" />
@@ -27,7 +27,7 @@
     [Inject]
     private IJSRuntime JsRuntime { get; set; } = default!;
 
-    /// <summary>Workflow key (e.g. <c>order-approval</c>).</summary>
+    /// <summary>Workflow key (e.g. <c>customer-onboarding</c>).</summary>
     [Parameter]
     public string Key { get; set; } = string.Empty;
 
@@ -40,11 +40,6 @@
     public string? StartKey { get; set; }
 
     private bool OpenStart => Start is "1" || string.Equals(Start, "true", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// List heading: the workflow definition title (the list's default); order approval keeps its historic heading.
-    /// </summary>
-    public static string? ListTitle(string key) => key == "order-approval" ? "Sipariş onayları" : null;
 
     protected override void OnParametersSet()
     {

@@ -33,6 +33,9 @@ public static partial class JsonSchemaValidator
     /// <summary>Schema keyword masking string field values unless exempted by role.</summary>
     public const string MaskKeyword = "x-mask";
 
+    /// <summary>Schema keyword controlling whether a property is shown as a column in the workflow instance list (<c>true</c> by default).</summary>
+    public const string ListKeyword = "x-list";
+
     private static readonly HashSet<string> SupportedKeywords =
     [
         "$schema", "title", "description", "type", "properties", "required", "additionalProperties", "enum", "const",
@@ -63,6 +66,13 @@ public static partial class JsonSchemaValidator
                 foreach (var error in CheckMask(value, $"{path}.{MaskKeyword}"))
                 {
                     yield return error;
+                }
+            }
+            else if (keyword == ListKeyword)
+            {
+                if (value is not JsonValue lv || lv.GetValueKind() is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    yield return $"{path}.{ListKeyword}: must be a boolean.";
                 }
             }
             else if (!SupportedKeywords.Contains(keyword))
@@ -152,6 +162,41 @@ public static partial class JsonSchemaValidator
 
         var projected = (JsonObject)data.DeepClone();
         ApplyProjection(projected, schema, user);
+        return projected;
+    }
+
+    /// <summary>
+    /// Clones <paramref name="schema"/> and removes properties whose <c>x-roles</c> exclude <paramref name="user"/>.
+    /// </summary>
+    public static JsonObject? ProjectSchema(JsonObject? schema, ExpressionUser user)
+    {
+        if (schema is null)
+        {
+            return null;
+        }
+
+        var projected = (JsonObject)schema.DeepClone();
+        if (user.IsSystem || projected["properties"] is not JsonObject properties)
+        {
+            return projected;
+        }
+
+        var disallowed = properties
+            .Where(kv => kv.Value is JsonObject propSchema &&
+                         propSchema[RolesKeyword] is JsonArray rolesArr &&
+                         rolesArr.Count > 0 &&
+                         !rolesArr
+                             .Select(r => r is JsonValue rv && rv.TryGetValue<string>(out var s) ? s : null)
+                             .OfType<string>()
+                             .Any(user.IsInRole))
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var name in disallowed)
+        {
+            properties.Remove(name);
+        }
+
         return projected;
     }
 

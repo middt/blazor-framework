@@ -1,28 +1,38 @@
-# Playbook: add a CRUD entity end to end
+# Playbook: add a CRUD / directory screen end to end
 
-Example: a `Brand` screen for the bike store, in both frontends, without writing UI code.
+Middt Framework supports two backend patterns for server-paged `grid` screens (`/ui/{key}` in both Blazor and Angular) without writing any frontend UI code:
 
-## 1. API (demo/server/Middt.Sample.Api)
-1. Entity in `Model/Database` (EF scaffolded partial + `…Extend.cs` with `[NotMapped]`/`[Query*]` search properties;
-   search-only properties need `[QueryIsNoFilter]` or a `Query*` attribute). Register in the `BikeStoresContext`.
-2. Repository `Repository/Bike/BrandRepository : BaseCrudRepository<Brand, BikeStoresContext>`; register in `Program.cs`.
-   Views/keyless entities: override `DefaultSortProperty`.
-3. Controller `BrandController(BrandRepository repository) : SampleCrudController<Brand, BrandRepository>(repository)`. For production tenant/owner data, derive from `BasePolicyCrudController<TModel, TRepository>` and implement both `ApplyAccessFilter` and `AuthorizeAsync` explicitly.
-   with `[Route("api/v{version:apiVersion}/[controller]")]` and `[ApiVersion("1.0")]`. Add `AuthorizeAsync` /
-   `ApplyAccessFilter` overrides if rows belong to users/tenants.
-4. Tests (framework behaviour is covered; add tests only for custom logic).
+---
 
-## 2. Screen = JSON layout (no frontend code)
-1. Copy `demo/server/Middt.Sample.Api/Layouts/bike-category.json` to `bike-brand.json`; keep `"$schema"` for completion.
-2. Set `key`, `title`, `menu` (title, Material icon, order), the `grid` `entity: "Brand"`, `columns`, `search`, `form`
-   (field types: text, textarea, number, integer, date, datetime, checkbox, select (options/lookup), picker).
-3. Restart the API (seeds are validated on start) or create it at runtime in the editor (`/ui-admin`).
-4. It appears in **both** menus (Blazor :8080, Angular :8081) at `/ui/bike-brand`.
+## Option A (Recommended – Zero C# Code): Workflow JSON-Backed Screen
 
-## 3. Optional typed .NET client
-Only if .NET code calls the API directly: `BrandService : BaseCrudApiClient<Brand>` in `demo/shared/Middt.Sample.Common`
-and `builder.Services.AddMiddtApiClient<BrandService>()`.
+In `demo/server/Middt.Sample.Api`, domain records live as JSON documents inside PostgreSQL-partitioned workflow instances (`WorkflowInstances` + `WorkflowInstanceData`). `WorkflowInstanceDataQuery` dynamically exposes `/api/{workflowKey}/GetListWithModel`, `/api/{workflowKey}/CountWithModel`, and `/api/{workflowKey}/GetById` for every registered workflow definition—no C# entity, repository, or controller is needed.
 
-## 4. Verify
-`/verify` (or the commands in AGENTS.md), then open both frontends: list, search, create (validation messages), edit,
-delete (needs role `manager`).
+### 1. Workflow definition (`Workflows/<key>.json`)
+1. Define or reuse a workflow in `demo/server/Middt.Sample.Api/Workflows/` (e.g., `customer-onboarding.json`, `credit-allocation.json`, `order-payment-orchestration.json`).
+2. Declare searchable/sortable fields in `dataSchema.properties` with explicit JSON types (`string`, `integer`, `number`, `boolean`). `WorkflowPartitionInitializer` automatically creates PostgreSQL partitions and typed B-Tree expression indexes on `WorkflowInstanceData.Data` at startup.
+
+### 2. Screen = JSON layout (`Layouts/<screen-key>.json`)
+1. Copy `demo/server/Middt.Sample.Api/Layouts/customer-directory.json` (or `credit-pipeline.json` / `order-monitor.json`).
+2. Set `key`, `version`, `title`, `kind: "crud"`, `icon` (Material icon shown in the sidebar menu), and configure the `grid` widget:
+   - `endpoint`: the workflow key (e.g., `"customer-onboarding"` or `"CustomerOnboarding"` — `WorkflowInstanceDataQuery` resolves both dynamically).
+   - `columns`: `{ "field": "CustomerNo", "header": "Müşteri No", "sortable": true, ... }`.
+   - `fields`: search/filter and form field definitions (`text`, `number`, `select`, `date`, `boolean`).
+3. Restart the API (or create/edit the layout at runtime in `/admin/layouts`).
+4. The screen appears automatically in **both** menus (Blazor `:8080`, Angular `:8081`) at `/ui/<screen-key>`.
+
+---
+
+## Option B: EF Core Relational Entity (`BaseCrudRepository` + `BasePolicyCrudController`)
+
+When building a line-of-business service backed by a dedicated relational EF Core table:
+
+1. **Entity & Search Model**: Create the EF Core entity inheriting `BaseModel` and add `[NotMapped]` / `[Query*]` filter properties (search-only properties use `[QueryIsNoFilter]` or a `[Query*]` attribute from `Middt.Framework.Model`). Register the `DbSet<T>` in your `DbContext`.
+2. **Repository**: Create `MyEntityRepository : BaseCrudRepository<MyEntity, MyDbContext>` and register it in DI. Override `DefaultSortProperty` for keyless views.
+3. **Controller**: Derive from `BasePolicyCrudController<MyEntity, MyEntityRepository>` (which enforces row-level security via `ApplyAccessFilter` and `AuthorizeAsync`).
+4. **Screen = JSON layout**: Create `Layouts/<key>.json` (`kind: "crud"`) with `"widget": "grid"` and `"endpoint": "MyEntity"`, matching the controller route.
+
+---
+
+## Verify
+Run `/verify` (or `dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*UiSampleLayoutTests"`), then open both frontends (`/ui/<key>`) to test paging, sorting, and filtering.

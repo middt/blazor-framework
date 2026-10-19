@@ -108,6 +108,7 @@ export const UiWidgetNames = {
   link: 'link',
   grid: 'grid',
   record: 'record',
+  layout: 'layout',
 } as const;
 
 /** Form/search field types. */

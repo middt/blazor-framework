@@ -60,9 +60,92 @@ public sealed partial class UiLayoutValidator(UiWidgetCatalog catalog)
             errors.Add("roles: must not contain empty values.");
         }
 
-        var state = new State(errors);
+        var state = new State(layout.Key, errors);
         ValidateNodes(layout.Body, "body", 1, state);
         return new UiValidationResult { Errors = errors };
+    }
+
+    /// <summary>
+    /// Validates cross-layout <c>"widget": "layout"</c> references across a set of layouts: target existence,
+    /// target <c>kind == "view"</c>, and absence of circular reference chains (<c>A -&gt; B -&gt; A</c>).
+    /// </summary>
+    public static IReadOnlyList<string> ValidateGraph(IReadOnlyDictionary<string, UiLayoutDocument> layouts)
+    {
+        ArgumentNullException.ThrowIfNull(layouts);
+        var errors = new List<string>();
+        var edges = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+        static void CollectTargets(IEnumerable<UiNode>? nodes, List<string> targets)
+        {
+            foreach (var node in nodes ?? [])
+            {
+                if (string.Equals(node.Widget, "layout", StringComparison.Ordinal) && node.StringProp("key") is { Length: > 0 } key)
+                {
+                    targets.Add(key);
+                }
+
+                if (node.Children is { Count: > 0 })
+                {
+                    CollectTargets(node.Children, targets);
+                }
+            }
+        }
+
+        foreach (var (key, layout) in layouts)
+        {
+            var targets = new List<string>();
+            CollectTargets(layout.Body, targets);
+            edges[key] = targets;
+
+            foreach (var target in targets.Distinct(StringComparer.Ordinal))
+            {
+                if (!layouts.TryGetValue(target, out var targetLayout))
+                {
+                    errors.Add($"layout '{key}': embedded layout '{target}' does not exist.");
+                }
+                else if (targetLayout.Kind != UiLayoutKind.View)
+                {
+                    errors.Add($"layout '{key}': embedded layout '{target}' must have kind '{UiLayoutKind.View}'.");
+                }
+            }
+        }
+
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var stack = new List<string>();
+
+        void Visit(string current)
+        {
+            var cycleIndex = stack.IndexOf(current);
+            if (cycleIndex >= 0)
+            {
+                var chain = string.Join(" -> ", stack.Skip(cycleIndex).Append(current));
+                errors.Add($"Circular layout reference detected: {chain}.");
+                return;
+            }
+
+            if (!visited.Add(current) || !edges.TryGetValue(current, out var nextList))
+            {
+                return;
+            }
+
+            stack.Add(current);
+            foreach (var next in nextList.Distinct(StringComparer.Ordinal))
+            {
+                if (layouts.ContainsKey(next))
+                {
+                    Visit(next);
+                }
+            }
+
+            stack.RemoveAt(stack.Count - 1);
+        }
+
+        foreach (var key in layouts.Keys.Order(StringComparer.Ordinal))
+        {
+            Visit(key);
+        }
+
+        return errors;
     }
 
     public static bool IsValidKey(string? key) => key is not null && KeyRegex().IsMatch(key);
@@ -127,6 +210,12 @@ public sealed partial class UiLayoutValidator(UiWidgetCatalog catalog)
         path = $"{path}({node.Widget})";
         ValidateProps(node.Props, spec.Props, path, errors);
         spec.Validate?.Invoke(node, path, errors);
+        if (string.Equals(node.Widget, "layout", StringComparison.Ordinal)
+            && !string.IsNullOrEmpty(state.LayoutKey)
+            && string.Equals(node.StringProp("key"), state.LayoutKey, StringComparison.Ordinal))
+        {
+            errors.Add($"{path}.key: layout '{state.LayoutKey}' cannot embed itself.");
+        }
 
         switch (spec.Children)
         {
@@ -271,8 +360,10 @@ public sealed partial class UiLayoutValidator(UiWidgetCatalog catalog)
     [GeneratedRegex("^[a-z0-9][a-z0-9._-]{0,99}$", RegexOptions.CultureInvariant)]
     private static partial Regex KeyRegex();
 
-    private sealed class State(List<string> errors)
+    private sealed class State(string layoutKey, List<string> errors)
     {
+        public string LayoutKey { get; } = layoutKey;
+
         public List<string> Errors { get; } = errors;
 
         public HashSet<string> Ids { get; } = new(StringComparer.Ordinal);

@@ -4,33 +4,23 @@ using Middt.Sample.BlazorServer.Model;
 namespace Middt.Sample.BlazorServer.Service;
 
 /// <summary>
-/// Side menu: home, the "İş Akışları" group (one generic <c>/workflow/{key}</c> page per demo workflow), every JSON layout
-/// page with a <c>menu</c> entry (loaded from the API) and the layout editor.
+/// Side menu: home, the "İş Akışları" group (loaded dynamically from <c>GET /api/workflows</c>, one generic
+/// <c>/workflow/{key}</c> page per workflow JSON definition), every JSON layout page with a <c>menu</c> entry and the layout editor.
 /// </summary>
-public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logger)
+public sealed class MenuService(UiApiClient uiClient, WorkflowApiClient workflowClient, ILogger<MenuService> logger)
 {
     private static readonly MenuItem Home = new() { Name = "Home", Path = "/", Icon = "home", Title = "Middt Sample" };
 
-    /// <summary>Demo workflows showcasing JSON document persistence and all workflow engine capabilities.</summary>
-    public static readonly IReadOnlyList<(string Key, string Name, string Icon)> Workflows =
-    [
-        ("customer-onboarding", "Müşteri Kaydı & KYC", "person_add"),
-        ("credit-allocation", "Kredi Tahsis & 4-Göz Onay", "account_balance"),
-        ("order-payment-orchestration", "Sipariş & Ödeme Orkestrasyonu", "shopping_cart"),
-        ("sla-escalation", "SLA & Eskalasyon Yönetimi", "timer"),
-        ("risk-limit-eval", "Risk & Limit Servisi (SubFlow)", "verified_user"),
-    ];
-
     private static readonly MenuItem Designer = new() { Name = "Ekran Tasarımı", Path = "/ui-admin", Icon = "dashboard_customize", Title = "Ekran Tasarımı" };
 
-    // Per circuit (scoped service): the group's Expanded state is mutable.
+    // Per circuit (scoped service): the group's Expanded state and Children (loaded from GET /api/workflows) are mutable.
     private readonly MenuItem workflowGroup = new()
     {
         Name = "İş Akışları",
         Path = "/workflow",
         Icon = "account_tree",
         Expanded = true,
-        Children = [.. Workflows.Select(w => new MenuItem { Name = w.Name, Path = WorkflowPath(w.Key), Icon = w.Icon, Title = w.Name })],
+        Children = [],
     };
 
     private IReadOnlyList<MenuItem> layoutItems = [];
@@ -48,18 +38,42 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
     /// <summary>Route of the generic workflow page.</summary>
     public static string WorkflowPath(string key) => $"/workflow/{key}";
 
-    /// <summary>The entries loaded from the API (persisted from prerendering into the circuit).</summary>
+    /// <summary>The workflow menu entries loaded from <c>GET /api/workflows</c>.</summary>
+    public IReadOnlyList<MenuItem> WorkflowItems => workflowGroup.Children ?? [];
+
+    /// <summary>The layout page entries loaded from <c>GET /api/ui/layouts?kind=page</c>.</summary>
     public IReadOnlyList<MenuItem> LayoutItems => layoutItems;
 
     /// <summary>Uses entries loaded earlier (e.g. while prerendering) instead of calling the API again; does not raise <see cref="Changed"/>.</summary>
-    public void Restore(IReadOnlyList<MenuItem> items) => layoutItems = items;
+    public void Restore(IReadOnlyList<MenuItem> workflows, IReadOnlyList<MenuItem> layouts)
+    {
+        workflowGroup.Children = [.. workflows];
+        layoutItems = layouts;
+    }
 
     public async Task RefreshAsync()
     {
-        var response = await uiClient.ListAsync("page");
+        var wfTask = workflowClient.ListWorkflowsAsync();
+        var uiTask = uiClient.ListAsync("page");
+        await Task.WhenAll(wfTask, uiTask);
+
+        var wfResponse = await wfTask;
+        if (wfResponse.IsSuccess && wfResponse.Data is { Count: > 0 } workflows)
+        {
+            workflowGroup.Children = [.. workflows.Select(w => new MenuItem
+            {
+                Name = w.Title ?? w.Key,
+                Path = WorkflowPath(w.Key),
+                Icon = w.Icon ?? "account_tree",
+                Title = w.Title ?? w.Key,
+            })];
+        }
+
+        var response = await uiTask;
         if (!response.IsSuccess)
         {
             logger.LogWarning("Layout menu could not be loaded: {Error}", response.ErrorText);
+            Changed?.Invoke();
             return;
         }
 
@@ -75,3 +89,4 @@ public sealed class MenuService(UiApiClient uiClient, ILogger<MenuService> logge
 
     public static string TitleFor(MenuItem? item) => item?.Title ?? "Middt Sample";
 }
+

@@ -3,7 +3,7 @@
   "key": "order-escalated",
   "title": "Eskale edilen sipariş",
   "kind": "view",
-  "version": 4,
+  "version": 5,
   "body": [
     { "widget": "alert", "severity": "warning", "text": "{{ data.customerName }} siparişi süresi içinde karara bağlanmadığı için eskale edildi." },
     {
@@ -17,12 +17,17 @@
             {
               "widget": "fields",
               "items": [
+                { "label": "Çağrı Başlığı", "value": "{{ data.ticketTitle }}", "visibleWhen": "data.ticketTitle != null" },
+                { "label": "Öncelik", "value": "{{ data.severity }}", "visibleWhen": "data.severity != null" },
+                { "label": "Atanan Ekip", "value": "{{ data.assignedQueue }}", "visibleWhen": "data.assignedQueue != null" },
                 { "label": "Tutar", "value": "{{ data.amount }}", "format": "N2" },
                 { "label": "Ürün", "value": "{{ data.product }}", "visibleWhen": "data.product != null" },
                 { "label": "Teslimat", "value": "{{ data.deliveryType }}" },
                 { "label": "Müşteri tipi", "value": "{{ data.customerType }}" },
                 { "label": "Talep eden", "value": "{{ data.requestedBy }}" },
-                { "label": "Talep zamanı", "value": "{{ data.requestedAt }}", "format": "g" }
+                { "label": "Talep zamanı", "value": "{{ data.requestedAt }}", "format": "g" },
+                { "label": "Eskalasyon Nedeni", "value": "{{ data.escalatedReason }}", "visibleWhen": "data.escalatedReason != null" },
+                { "label": "Çözüm Notu", "value": "{{ data.resolutionNote }}", "visibleWhen": "data.resolutionNote != null" }
               ]
             },
             { "widget": "text", "style": "muted", "text": "Not: {{ data.note }}", "visibleWhen": "data.note != null && data.note != \"\"" }

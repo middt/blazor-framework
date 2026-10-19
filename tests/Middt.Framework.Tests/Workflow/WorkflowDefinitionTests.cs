@@ -122,7 +122,6 @@ public sealed class WorkflowDefinitionTests
             o.EnableJobProcessor = false;
             o.AddDefinitionsFromDirectory(Path.Combine(RepositoryRoot(), "demo", "server", "Middt.Sample.Api", "Workflows"));
             o.AddRebusTasks();
-            o.UseViews(Middt.Framework.Workflow.Razor.WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>().Views);
         });
 
         var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();

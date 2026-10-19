@@ -252,4 +252,78 @@ public static class WorkflowUi
     }
 
     public static string FormatJson(JsonNode? node) => node is null ? "{}" : node.ToJsonString(IndentedJson);
+
+    private static readonly CultureInfo TrCulture = CultureInfo.GetCultureInfo("tr-TR");
+
+    /// <summary>
+    /// Extracts columns/fields from <see cref="WorkflowDefinitionModel.DataSchema"/> (falling back to
+    /// <see cref="WorkflowDefinitionModel.StartInputSchema"/>), excluding complex object/array properties or (when
+    /// <paramref name="includeAll"/> is <c>false</c>) properties with <c>"x-list": false</c>.
+    /// </summary>
+    public static IReadOnlyList<WorkflowDataColumn> DataColumns(WorkflowDefinitionModel? definition, bool includeAll = false)
+    {
+        var schema = definition?.DataSchema ?? definition?.StartInputSchema;
+        if (schema?["properties"] is not JsonObject properties || properties.Count == 0)
+        {
+            return [];
+        }
+
+        var columns = new List<WorkflowDataColumn>(properties.Count);
+        foreach (var (name, node) in properties)
+        {
+            if (node is not JsonObject prop)
+            {
+                continue;
+            }
+
+            if (!includeAll && prop["x-list"] is JsonValue listFlag && listFlag.TryGetValue<bool>(out var show) && !show)
+            {
+                continue;
+            }
+
+            var type = SchemaType(prop);
+            if (type is "object" or "array")
+            {
+                continue;
+            }
+
+            var title = prop["title"] is JsonValue titleNode && titleNode.GetValueKind() == JsonValueKind.String
+                ? titleNode.GetValue<string>()
+                : name;
+            columns.Add(new WorkflowDataColumn(name, string.IsNullOrWhiteSpace(title) ? name : title, type));
+        }
+
+        return columns;
+    }
+
+    /// <summary>Formats a projected workflow data property value for display in the instance grid.</summary>
+    public static string FormatDataCell(JsonObject? data, WorkflowDataColumn column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+        if (data is null || !data.TryGetPropertyValue(column.Key, out var node) || node is null)
+        {
+            return "-";
+        }
+
+        if (node is JsonValue val)
+        {
+            return val.GetValueKind() switch
+            {
+                JsonValueKind.String => val.GetValue<string>() is { Length: > 0 } s ? s : "-",
+                JsonValueKind.True => "Evet",
+                JsonValueKind.False => "Hayır",
+                JsonValueKind.Number when column.Type == "number" && val.TryGetValue<decimal>(out var dec) =>
+                    dec.ToString(dec == decimal.Truncate(dec) ? "N0" : "N2", TrCulture),
+                JsonValueKind.Number when val.TryGetValue<long>(out var l) =>
+                    l.ToString("N0", TrCulture),
+                _ => val.ToJsonString(),
+            };
+        }
+
+        return node.ToJsonString();
+    }
 }
+
+/// <summary>Column definition extracted from a workflow's JSON data schema for instance list grids.</summary>
+public sealed record WorkflowDataColumn(string Key, string Title, string Type);
+

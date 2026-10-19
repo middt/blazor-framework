@@ -39,7 +39,6 @@
   <Folder Name="/demo/shared/">
     <Project Path="demo/shared/Middt.Sample.Common/Middt.Sample.Common.csproj" />
     <Project Path="demo/shared/Middt.Sample.ServiceDefaults/Middt.Sample.ServiceDefaults.csproj" />
-    <Project Path="demo/shared/Middt.Sample.Views/Middt.Sample.Views.csproj" />
   </Folder>
   <Folder Name="/demo/server/">
     <Project Path="demo/server/Middt.Sample.Api/Middt.Sample.Api.csproj" />

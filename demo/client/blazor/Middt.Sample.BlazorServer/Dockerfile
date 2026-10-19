@@ -16,7 +16,6 @@ COPY sdk/client/bff/Middt.Framework.Bff/*.csproj sdk/client/bff/Middt.Framework.
 COPY sdk/client/blazor/Middt.Framework.Workflow.Razor/*.csproj sdk/client/blazor/Middt.Framework.Workflow.Razor/
 COPY sdk/client/blazor/Middt.Framework.Blazor.Web/*.csproj sdk/client/blazor/Middt.Framework.Blazor.Web/
 COPY demo/shared/Middt.Sample.Common/*.csproj demo/shared/Middt.Sample.Common/
-COPY demo/shared/Middt.Sample.Views/*.csproj demo/shared/Middt.Sample.Views/
 COPY demo/shared/Middt.Sample.ServiceDefaults/*.csproj demo/shared/Middt.Sample.ServiceDefaults/
 COPY demo/client/blazor/Middt.Sample.BlazorServer/*.csproj demo/client/blazor/Middt.Sample.BlazorServer/
 RUN dotnet restore demo/client/blazor/Middt.Sample.BlazorServer/Middt.Sample.BlazorServer.csproj

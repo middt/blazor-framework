@@ -899,3 +899,67 @@ export function schemaValuesFromQuery(schema: WorkflowData | null | undefined, v
 
   return { data, names };
 }
+
+// ------------------------------------------------------------------------------------------- data schema list columns
+
+/** Column definition extracted from a workflow's JSON data schema for instance list grids. */
+export interface WorkflowDataColumn {
+  key: string;
+  title: string;
+  type: string;
+}
+
+const trNumberFormat0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const trNumberFormat2 = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Extracts columns/fields from `definition.dataSchema` (falling back to `definition.startInputSchema`),
+ * excluding complex object/array properties or (when `includeAll` is `false`) properties with `"x-list": false`.
+ */
+export function workflowDataColumns(definition: WorkflowDefinitionModel | null | undefined, includeAll = false): WorkflowDataColumn[] {
+  const schema = definition?.dataSchema ?? definition?.startInputSchema;
+  const properties = schema?.['properties'];
+  if (!isObject(properties)) {
+    return [];
+  }
+
+  const columns: WorkflowDataColumn[] = [];
+  for (const [key, node] of Object.entries(properties)) {
+    if (!isObject(node) || (!includeAll && node['x-list'] === false)) {
+      continue;
+    }
+
+    const type = schemaType(node);
+    if (type === 'object' || type === 'array') {
+      continue;
+    }
+
+    const title = getString(node, 'title');
+    columns.push({ key, title: title && title.trim() !== '' ? title : key, type });
+  }
+
+  return columns;
+}
+
+/** Formats a projected workflow data property value for display in the instance grid. */
+export function formatWorkflowDataCell(data: WorkflowData | null | undefined, column: WorkflowDataColumn): string {
+  const value = data?.[column.key];
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Evet' : 'Hayır';
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (column.type === 'number' && !Number.isInteger(value)) {
+      return trNumberFormat2.format(value);
+    }
+
+    return trNumberFormat0.format(value);
+  }
+
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+

@@ -178,18 +178,36 @@
                     <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
                 </details>
             }
-            else if (ShowStepForm)
-            {
-                @* Wizard step: the form is the focus, the collected data stays available but collapsed. *@
-                <details class="middt-wf-raw">
-                    <summary>Girilen veriler</summary>
-                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
-                </details>
-            }
             else
             {
-                <h3 class="middt-wf-subheading">Veri</h3>
-                <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                var dataFields = WorkflowUi.DataColumns(definition, includeAll: true);
+                if (dataFields.Count > 0)
+                {
+                    <h3 class="middt-wf-subheading">Veri Özeti</h3>
+                    <dl class="middt-wf-props">
+                        @foreach (var field in dataFields)
+                        {
+                            <dt>@field.Title</dt>
+                            <dd>@WorkflowUi.FormatDataCell(instance.Data, field)</dd>
+                        }
+                    </dl>
+                    <details class="middt-wf-raw">
+                        <summary>@(ShowStepForm ? "Girilen veriler (JSON)" : "Ham veri")</summary>
+                        <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                    </details>
+                }
+                else if (ShowStepForm)
+                {
+                    <details class="middt-wf-raw">
+                        <summary>Girilen veriler</summary>
+                        <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                    </details>
+                }
+                else
+                {
+                    <h3 class="middt-wf-subheading">Veri</h3>
+                    <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">@WorkflowUi.FormatJson(instance.Data)</pre>
+                }
             }
         </RadzenCard>
 

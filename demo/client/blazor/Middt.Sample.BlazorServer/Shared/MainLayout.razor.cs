@@ -39,6 +39,7 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
     private IOptions<SecuritySettings> SecuritySettings { get; set; } = default!;
 
     private const string MenuStateKey = "middt-sample-menu";
+    private const string WorkflowMenuStateKey = "middt-sample-workflows";
 
     /// <summary>Radzen theme of the host page (<c>_Host.cshtml</c> renders <c>RadzenTheme</c> statically with it).</summary>
     public const string DefaultTheme = "material";
@@ -62,8 +63,9 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
         await BaseTokenHelper.LoadAsync();
         persisting = ApplicationState.RegisterOnPersisting(() =>
         {
-            if (MenuService.LayoutItems.Count > 0) // nothing loaded (anonymous, API error): the circuit loads it itself
+            if (MenuService.WorkflowItems.Count > 0 || MenuService.LayoutItems.Count > 0) // nothing loaded (anonymous, API error): the circuit loads it itself
             {
+                ApplicationState.PersistAsJson(WorkflowMenuStateKey, MenuService.WorkflowItems);
                 ApplicationState.PersistAsJson(MenuStateKey, MenuService.LayoutItems);
             }
 
@@ -74,9 +76,11 @@ public sealed partial class MainLayout : LayoutComponentBase, IDisposable
         MenuService.SetCanDesign(authState.User.IsInRole("ui-admin"));
 
         // The menu loaded while prerendering is handed over to the circuit, so it is not requested twice per page load.
-        if (ApplicationState.TryTakeFromJson<List<MenuItem>>(MenuStateKey, out var items) && items is not null)
+        var hasWorkflows = ApplicationState.TryTakeFromJson<List<MenuItem>>(WorkflowMenuStateKey, out var workflows);
+        var hasLayouts = ApplicationState.TryTakeFromJson<List<MenuItem>>(MenuStateKey, out var items);
+        if ((hasWorkflows || hasLayouts) && (workflows is not null || items is not null))
         {
-            MenuService.Restore(items);
+            MenuService.Restore(workflows ?? [], items ?? []);
         }
         else if (authState.User.Identity?.IsAuthenticated == true)
         {

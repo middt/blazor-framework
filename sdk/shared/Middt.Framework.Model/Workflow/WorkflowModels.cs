@@ -34,6 +34,7 @@ public sealed class WorkflowSummaryModel
     public string Key { get; set; } = string.Empty;
     public int Version { get; set; }
     public string? Title { get; set; }
+    public string? Icon { get; set; }
 }
 
 public sealed class WorkflowStateModel
@@ -68,8 +69,10 @@ public sealed class WorkflowDefinitionModel
     public string Key { get; set; } = string.Empty;
     public int Version { get; set; }
     public string? Title { get; set; }
+    public string? Icon { get; set; }
     public string StartState { get; set; } = string.Empty;
     public JsonObject? StartInputSchema { get; set; }
+    public JsonObject? DataSchema { get; set; }
     public List<WorkflowStateModel> States { get; set; } = [];
     public List<WorkflowTransitionModel> Transitions { get; set; } = [];
 }

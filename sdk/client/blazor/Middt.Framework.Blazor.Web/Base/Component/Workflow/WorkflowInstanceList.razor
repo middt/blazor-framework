@@ -30,6 +30,13 @@
             <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="Key" Title="Anahtar" Sortable="false" MinWidth="160px">
                 <Template Context="item">@(item.Key ?? item.Id.ToString()[..8])</Template>
             </RadzenDataGridColumn>
+            @foreach (var col in dataColumns)
+            {
+                var currentCol = col;
+                <RadzenDataGridColumn @key="currentCol.Key" TItem="WorkflowInstanceModel" Title="@currentCol.Title" Sortable="false" MinWidth="130px">
+                    <Template Context="item">@WorkflowUi.FormatDataCell(item.Data, currentCol)</Template>
+                </RadzenDataGridColumn>
+            }
             <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="StateTitle" Title="Adım" Sortable="false" MinWidth="140px">
                 <Template Context="item">@(item.StateTitle ?? item.State)</Template>
             </RadzenDataGridColumn>
@@ -38,9 +45,12 @@
                     <RadzenBadge BadgeStyle="@WorkflowUi.StatusBadge(item.Status)" Text="@WorkflowUi.StatusText(item.Status)" IsPill="true" />
                 </Template>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="CreatedAt" Title="Oluşturma" Sortable="false" Width="165px">
-                <Template Context="item">@WorkflowUi.FormatDate(item.CreatedAt, timeZone)</Template>
-            </RadzenDataGridColumn>
+            @if (dataColumns.Count == 0)
+            {
+                <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="CreatedAt" Title="Oluşturma" Sortable="false" Width="165px">
+                    <Template Context="item">@WorkflowUi.FormatDate(item.CreatedAt, timeZone)</Template>
+                </RadzenDataGridColumn>
+            }
             <RadzenDataGridColumn TItem="WorkflowInstanceModel" Property="UpdatedAt" Title="Güncelleme" Sortable="false" Width="165px">
                 <Template Context="item">@WorkflowUi.FormatDate(item.UpdatedAt, timeZone)</Template>
             </RadzenDataGridColumn>

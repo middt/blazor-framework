@@ -85,6 +85,12 @@ internal sealed partial class UiStartup(IServiceScopeFactory scopeFactory, IHost
             }
         }
 
+        var graphErrors = Validation.UiLayoutValidator.ValidateGraph(seeds.ToDictionary(s => s.Item2.Key, s => s.Item2, StringComparer.Ordinal));
+        if (graphErrors.Count > 0)
+        {
+            throw new InvalidOperationException($"Layout seed graph is invalid:{Environment.NewLine}{string.Join(Environment.NewLine, graphErrors)}");
+        }
+
         return seeds;
     }
 

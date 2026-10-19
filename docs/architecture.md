@@ -56,41 +56,45 @@ backend-for-frontend blocks (`sdk/client/bff`), so no frontend ever holds an API
 
 | Renderer | Where | Widgets |
 |---|---|---|
-| Blazor (interactive) | `Middt.Framework.Blazor.Web` (`Ui/`) | display widgets + `grid`/`record` (Radzen) |
+| Blazor (interactive) | `Middt.Framework.Blazor.Web` (`Ui/`) | display widgets + `grid`/`record`/`layout` (Radzen) |
 | Static HTML | `Middt.Framework.Ui.Server` (`UiHtmlRenderer`, plain C#) | display widgets; interactive ones render a placeholder |
 | Angular | `@middt/angular` on top of `@middt/ui-core` | same names, Angular components (Material) |
 
 Custom widgets are registered in each place: the **spec** in the API (`MiddtUiOptions.AddWidget(spec, html?)`) and
-in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a component map in Angular).
+in every frontend (`AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, a component map in Angular). Reusable composite
+widgets can also be defined in pure JSON (`kind: "view"`) and embedded via `{ "widget": "layout", "key": "<layout-key>", "data": "<optional-expr>" }` without writing any C# or TypeScript code (see [`docs/ai/backend-driven-json-ui.md`](ai/backend-driven-json-ui.md)).
 
 ## How the Angular frontend was added (and how to add another)
 
 1. **Workspace**: `sdk/client/angular` (Angular 22 + Material) with the library `@middt/angular` (demo app in `demo/client/angular/app`); it
-   compiles `@middt/ui-core` from source through a `tsconfig` path.
+   consumes `@middt/ui-core` as a `file:` package.
 2. **Authentication**: the SPA is served by a BFF host (`demo/client/angular/Middt.Sample.Angular`: `AddMiddtSpaBff()` +
    `UseMiddtSpaBff()`). It owns the cookie session and the tokens, serves the server rendered login/logout pages,
    `GET /bff/user`, and proxies `/api/**` and `/hubs/**` (YARP, WebSockets included) to the API with the session's
    access token, refreshing it before it expires. CSRF: API calls carry an `X-CSRF` header, WebSocket upgrades must be
    same-origin. The API is unchanged.
-3. **Layouts**: `MiddtLayoutPageComponent` / `MiddtLayoutHostComponent` load layouts and map widget names to Angular
-   components (`MIDDT_UI_WIDGETS`); `UiRenderContext` from `@middt/ui-core` evaluates `visibleWhen`, templates and
+3. **Layouts**: `UiLayoutRendererComponent` loads layouts and maps widget names to Angular
+   components (`MIDDT_UI_WIDGETS`); `@middt/ui-core` evaluates `visibleWhen`, templates and
    formats exactly like .NET; the same CSS classes (`middt-ui-*`) and E2E selectors work in both frontends.
    The Angular package has focused `core`, `ui`, `workflow`, and `signalr` entry points; the root entry point remains
-   an aggregate for compatibility. The demo registers workflow views in its lazy workflow route.
-4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; Razor views (`view.component`) have
-   Angular counterparts registered with `provideWorkflowViews()`; states with `view.layout` use the layout host;
+   an aggregate for compatibility.
+4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; all demo workflow states use `view.layout`
+   JSON layouts (`kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`) rendered by
+   the layout host in both frontends (the SDK also supports optional `view.component` registrations via `provideWorkflowViews()`);
    unregistered views fall back to the server rendered HTML.
-   Transition input schemas are rendered as forms; a property with `x-lookup` (`entity`, `valueField`, `textField`)
-   becomes a select loaded from the entity's CRUD `getall` endpoint (cached per circuit/page for a minute, capped at 1000 rows) – the engine only checks the hint's shape.
-5. **Editor**: the layout API is frontend independent; both frontends ship an editor.
+   Transition input schemas are rendered as forms; a property with `x-lookup` (`endpoint`, `valueField`, `displayField`)
+   becomes a select loaded dynamically from the endpoint – the engine only checks the hint's shape.
+5. **Editor**: the layout API is frontend independent; both frontends ship an editor (`/admin/layouts`).
 
 For a third frontend (e.g. React) repeat 1–4: reuse `@middt/ui-core` and a BFF host built with `AddMiddtSpaBff()`.
 
 ## Workflow execution and recovery
 
-Workflow JSON uses the framework's general task types. The `operation` task delegates named domain actions to an
+Workflow JSON uses the framework's general task types (`set`, `setKey`, `log`, `http`, `publish`, `startWorkflow`,
+`loadWorkflow`, `fanOut`, `cache`). The `operation` task delegates named domain actions to an
 explicitly registered `IWorkflowOperationDispatcher`; identity allowlists its password, MFA and OIDC operations there.
-The demo's data flows use `entity-*`, `db-*` and `set` tasks directly. Task definitions remain independent of
+The demo's flows store and query all domain data as JSON inside PostgreSQL-partitioned workflow tables (`WorkflowInstances` +
+`WorkflowInstanceData`) and expose dynamic CRUD query endpoints via `WorkflowInstanceDataQuery`. Task definitions remain independent of
 application-specific `IWorkflowTask` implementations.
 
 The engine claims an instance with a conditional `Active`/`Faulted` → `Busy` update and, for transition commands, stores

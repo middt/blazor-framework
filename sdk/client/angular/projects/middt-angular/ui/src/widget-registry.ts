@@ -13,6 +13,7 @@ import {
   UiTextWidget,
 } from './display-widgets';
 import { UiGridWidget } from './grid-widget.component';
+import { UiLayoutWidget } from './layout-widget.component';
 import { UiRecordWidget } from './record-widget.component';
 
 /**
@@ -29,7 +30,7 @@ export interface UiWidgetDefinition {
   description?: string;
 }
 
-/** Built-in widgets: display components and the interactive `grid` and `record`. */
+/** Built-in widgets: display components and the interactive `grid`, `record` and `layout`. */
 export function defaultUiWidgets(): UiWidgetDefinition[] {
   return [
     { name: UiWidgetNames.heading, component: UiHeadingWidget, description: 'Title text.' },
@@ -49,6 +50,7 @@ export function defaultUiWidgets(): UiWidgetDefinition[] {
       description: 'Server paged data grid of an entity with search, row actions and optional create/edit/delete.',
     },
     { name: UiWidgetNames.record, component: UiRecordWidget, interactive: true, description: "Loads one entity by id and shows its children with it as 'record'." },
+    { name: UiWidgetNames.layout, component: UiLayoutWidget, interactive: true, description: "Embeds a reusable view layout by key (optionally scoping 'data' to a sub-expression)." },
   ];
 }
 

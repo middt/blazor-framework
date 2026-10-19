@@ -6,13 +6,11 @@ using Middt.Framework.Ui.Server.DependencyInjection;
 using Middt.Framework.Ui.Server.Endpoints;
 using Middt.Framework.Workflow.DependencyInjection;
 using Middt.Framework.Workflow.Endpoints;
-using Middt.Framework.Workflow.Razor;
 using Middt.Framework.Workflow.Runtime;
 using Middt.Framework.Workflow.Tasks;
 using Middt.Sample.Api;
 using Middt.Sample.Api.Handlers;
 using Middt.Sample.Common.Messages;
-using Middt.Sample.Views;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,7 +51,6 @@ builder.Services.AddMiddtWorkflow(workflow =>
     workflow.ExposeErrorDetails = builder.Environment.IsDevelopment();
     workflow.AddDefinitionsFromDirectory("Workflows");
     workflow.AddRebusTasks();
-    workflow.UseViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>().Views);
 });
 builder.Services.AddSingleton<IWorkflowMessagePublisher, RebusWorkflowMessagePublisher>();
 builder.Services.AddHostedService<DemoWorkflowSeeder>();

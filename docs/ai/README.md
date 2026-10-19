@@ -6,9 +6,10 @@ place that must change and verifies the result.
 
 | Task | Playbook |
 |---|---|
-| New CRUD entity (API + both frontends) | [add-crud-entity.md](add-crud-entity.md) |
+| 100% Backend-driven JSON screens, workflows & reusable `"widget": "layout"` | [backend-driven-json-ui.md](backend-driven-json-ui.md) |
+| New CRUD / directory screen or entity (JSON-backed or EF Core) | [add-crud-entity.md](add-crud-entity.md) |
 | New layout widget (spec → .NET → Blazor → Angular → static HTML) | [add-layout-widget.md](add-layout-widget.md) |
-| New or changed workflow (definition, views, layouts) | [add-workflow.md](add-workflow.md) |
+| New or changed workflow (definition, `dataSchema`, `view.layout`) | [add-workflow.md](add-workflow.md) |
 | Workflow partitioning & flow-specific JSON indexing | [workflow-partitioning-and-indexing.md](workflow-partitioning-and-indexing.md) |
 | Change the portable expression language | [change-expression-language.md](change-expression-language.md) |
 | Security review checklist for every change | [security-checklist.md](security-checklist.md) |
@@ -18,10 +19,10 @@ place that must change and verifies the result.
 
 ## How to work with an assistant on this repo
 
-1. **Describe the outcome and the scope** ("add a Brand screen to both frontends", "make the grid sortable by …").
+1. **Describe the outcome and the scope** ("add a Customer Risk screen to both frontends", "add a new workflow with a KYC review layout").
    Mention whether contracts may change.
-2. Let it **read before writing**: the nested `AGENTS.md`, the closest existing example (e.g. `CategoryController`,
-   `bike-category.json`, an existing widget) and the matching tests.
+2. Let it **read before writing**: the nested `AGENTS.md`, the closest existing example (e.g. `customer-onboarding.json`,
+   `kyc-review.json`, `customer-directory.json`, `workflow-footer.json`, or an existing widget) and the matching tests.
 3. Prefer **small vertical slices** that end green (build + tests) over big bang changes.
 4. For changes spanning .NET and TypeScript, split by folder ownership (server / bff+client / blazor / angular+ui-core);
    the layering tests and the shared `spec/` keep the halves consistent.

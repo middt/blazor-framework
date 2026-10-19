@@ -2,6 +2,17 @@
   "key": "risk-limit-eval",
   "version": 1,
   "title": "Risk & Limit Değerlendirme Servisi",
+  "icon": "verified_user",
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "customerKey": { "type": "string", "title": "Müşteri Anahtarı" },
+      "checkType": { "type": "string", "title": "Kontrol Tipi" },
+      "amount": { "type": "number", "title": "Talep Edilen Tutar (₺)" },
+      "riskScore": { "type": "integer", "title": "Risk Skoru" },
+      "recommendedLimit": { "type": "number", "title": "Önerilen Limit (₺)" }
+    }
+  },
   "start": {
     "key": "start",
     "target": "evaluate",
@@ -22,6 +33,7 @@
       "key": "evaluate",
       "title": "Otomatik Risk & Limit Analizi",
       "step": 1,
+      "view": { "layout": "risk-detail" },
       "onEntry": [
         {
           "task": "set",
@@ -84,6 +96,7 @@
       "title": "Tahsis Uzmanı İncelemesi (Alt Akış)",
       "step": 2,
       "subType": "Human",
+      "view": { "layout": "risk-detail" },
       "transitions": [
         {
           "key": "approve-underwriting",
@@ -132,14 +145,16 @@
       "title": "Risk Onaylandı",
       "step": 3,
       "type": "Finish",
-      "subType": "Success"
+      "subType": "Success",
+      "view": { "layout": "risk-detail" }
     },
     {
       "key": "rejected",
       "title": "Risk Reddedildi",
       "step": 3,
       "type": "Finish",
-      "subType": "Error"
+      "subType": "Error",
+      "view": { "layout": "risk-detail" }
     }
   ]
 }

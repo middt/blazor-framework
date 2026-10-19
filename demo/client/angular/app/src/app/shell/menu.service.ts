@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { AuthService, UI_API_CLIENT } from '@middt/angular/core';
+import { WORKFLOW_API_CLIENT } from '@middt/angular/workflow';
 import { isSuccess } from '@middt/ui-core';
 
 export interface MenuItem {
@@ -15,28 +16,21 @@ export interface MenuGroup {
   items: readonly MenuItem[];
 }
 
-/** The 5 demo workflows showcasing JSON document persistence and all workflow engine capabilities. */
-export const WORKFLOW_MENU: MenuGroup = {
-  name: 'İş Akışları',
-  icon: 'account_tree',
-  items: [
-    { name: 'Müşteri Kaydı & KYC', path: '/workflow/customer-onboarding', icon: 'person_add' },
-    { name: 'Kredi Tahsis & 4-Göz Onay', path: '/workflow/credit-allocation', icon: 'account_balance' },
-    { name: 'Sipariş & Ödeme Orkestrasyonu', path: '/workflow/order-payment-orchestration', icon: 'shopping_cart' },
-    { name: 'SLA & Eskalasyon Yönetimi', path: '/workflow/sla-escalation', icon: 'timer' },
-    { name: 'Risk & Limit Servisi (SubFlow)', path: '/workflow/risk-limit-eval', icon: 'verified_user' },
-  ],
-};
-
-/** Side menu: the workflow group, fixed entries plus every JSON layout page with a `menu` entry (same as the Blazor sample's MenuService). */
+/** Side menu: the workflow group (loaded dynamically from `GET /api/workflows`), fixed entries plus every JSON layout page with a `menu` entry. */
 @Injectable({ providedIn: 'root' })
 export class MenuService {
   readonly #ui = inject(UI_API_CLIENT);
+  readonly #workflows = inject(WORKFLOW_API_CLIENT);
   readonly #auth = inject(AuthService);
   readonly #layoutItems = signal<MenuItem[]>([]);
+  readonly #workflowItems = signal<readonly MenuItem[]>([]);
 
   readonly layoutItems = this.#layoutItems.asReadonly();
-  readonly workflowGroup = WORKFLOW_MENU;
+  readonly workflowGroup = computed<MenuGroup>(() => ({
+    name: 'İş Akışları',
+    icon: 'account_tree',
+    items: this.#workflowItems(),
+  }));
 
   /** Recomputed only when the user (roles) changes, not on every change detection pass. */
   readonly fixedItems = computed<MenuItem[]>(() => [
@@ -44,11 +38,24 @@ export class MenuService {
   ]);
 
   async refresh(): Promise<void> {
-    const response = await this.#ui.list('page');
-    if (isSuccess(response)) {
-      this.#layoutItems.set((response.data ?? [])
+    const [wfResponse, uiResponse] = await Promise.all([
+      this.#workflows.listWorkflows(),
+      this.#ui.list('page'),
+    ]);
+
+    if (isSuccess(wfResponse) && wfResponse.data && wfResponse.data.length > 0) {
+      this.#workflowItems.set(wfResponse.data.map(w => ({
+        name: w.title ?? w.key,
+        path: `/workflow/${w.key}`,
+        icon: w.icon ?? 'account_tree',
+      })));
+    }
+
+    if (isSuccess(uiResponse)) {
+      this.#layoutItems.set((uiResponse.data ?? [])
         .filter(layout => layout.menu)
         .map(layout => ({ name: layout.menu?.title ?? layout.title ?? layout.key, path: `/ui/${layout.key}`, icon: layout.menu?.icon ?? 'article' })));
     }
   }
 }
+

@@ -83,6 +83,7 @@
             "fields",
             "grid",
             "heading",
+            "layout",
             "link",
             "list",
             "record",
@@ -174,6 +175,18 @@
           },
           "then": {
             "$ref": "#/$defs/widget-heading"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "widget": {
+                "const": "layout"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/widget-layout"
           }
         },
         {
@@ -1099,6 +1112,44 @@
       "required": [
         "widget",
         "text"
+      ],
+      "additionalProperties": false
+    },
+    "widget-layout": {
+      "type": "object",
+      "description": "Embeds a reusable view layout by key (optionally scoping 'data' to a sub-expression). (interactive)",
+      "properties": {
+        "widget": {
+          "const": "layout",
+          "description": "Embeds a reusable view layout by key (optionally scoping 'data' to a sub-expression)."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "description": "Unique id within the layout."
+        },
+        "visibleWhen": {
+          "type": "string",
+          "description": "Portable expression; the widget is hidden when it is false."
+        },
+        "key": {
+          "type": "string",
+          "description": "Key of the reusable view layout (kind 'view'), e.g. workflow-footer."
+        },
+        "data": {
+          "type": "string",
+          "x-middt": "expression",
+          "description": "Optional expression whose value becomes 'data' inside the embedded layout, e.g. data.customer."
+        },
+        "title": {
+          "type": "string",
+          "x-middt": "template",
+          "description": "Optional label shown in static placeholders."
+        }
+      },
+      "required": [
+        "widget",
+        "key"
       ],
       "additionalProperties": false
     },

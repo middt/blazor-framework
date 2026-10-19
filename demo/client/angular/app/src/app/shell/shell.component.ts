@@ -44,9 +44,9 @@ function storedTheme(): string | null {
         <mat-nav-list aria-label="Ana menü">
           <a mat-list-item routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"><mat-icon matListItemIcon>home</mat-icon><span matListItemTitle>Home</span></a>
           <div mat-subheader class="shell-menu-group">
-            <mat-icon aria-hidden="true">{{ menu.workflowGroup.icon }}</mat-icon>{{ menu.workflowGroup.name }}
+            <mat-icon aria-hidden="true">{{ menu.workflowGroup().icon }}</mat-icon>{{ menu.workflowGroup().name }}
           </div>
-          @for (item of menu.workflowGroup.items; track item.path) {
+          @for (item of menu.workflowGroup().items; track item.path) {
             <a mat-list-item class="shell-menu-child" [routerLink]="item.path" routerLinkActive="active"><mat-icon matListItemIcon>{{ item.icon }}</mat-icon><span matListItemTitle>{{ item.name }}</span></a>
           }
           <mat-divider />

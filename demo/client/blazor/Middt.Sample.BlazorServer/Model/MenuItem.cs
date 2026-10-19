@@ -7,5 +7,5 @@ public sealed class MenuItem
     public required string Path { get; init; }
     public string? Title { get; init; }
     public bool Expanded { get; set; }
-    public IReadOnlyList<MenuItem>? Children { get; init; }
+    public IReadOnlyList<MenuItem>? Children { get; set; }
 }

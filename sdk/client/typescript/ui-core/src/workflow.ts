@@ -39,6 +39,7 @@ export interface WorkflowSummaryModel {
   key: string;
   version: number;
   title?: string | null;
+  icon?: string | null;
 }
 
 export interface WorkflowStateModel {
@@ -71,8 +72,10 @@ export interface WorkflowDefinitionModel {
   key: string;
   version: number;
   title?: string | null;
+  icon?: string | null;
   startState: string;
   startInputSchema?: WorkflowData | null;
+  dataSchema?: WorkflowData | null;
   states: WorkflowStateModel[];
   transitions: WorkflowTransitionModel[];
 }

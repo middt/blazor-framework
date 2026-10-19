@@ -20,10 +20,12 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import {
   errorText,
+  formatWorkflowDataCell,
   formatWorkflowDate,
   formatWorkflowJson,
   isSuccess,
   schemaHasInput,
+  workflowDataColumns,
   workflowHistoryPointStyle,
   workflowIsPending,
   workflowLayoutVariables,
@@ -45,6 +47,7 @@ import type {
   AvailableTransitionModel,
   BaseResponseDataModel,
   WorkflowData,
+  WorkflowDataColumn,
   WorkflowDefinitionModel,
   WorkflowHistoryModel,
   WorkflowIncidentModel,
@@ -125,6 +128,8 @@ export class MiddtWorkflowInstanceDetailComponent {
     return instance === null ? null : (this.#definitions().get(instance.workflowVersion) ?? null);
   });
 
+  protected readonly dataFields = computed<WorkflowDataColumn[]>(() => workflowDataColumns(this.definition(), true));
+  protected readonly dataCell = formatWorkflowDataCell;
   protected readonly steps = computed(() => workflowWizardSteps(this.definition(), this.instance(), this.history()));
 
   /** The inline transition rendered as the wizard step form. */

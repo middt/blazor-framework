@@ -3,8 +3,7 @@
   "key": "order-monitor",
   "title": "Sipariş & Ödeme İzleme (Workflow JSON)",
   "kind": "page",
-  "version": 1,
-  "menu": { "title": "Sipariş İzleme", "icon": "receipt_long", "order": 30 },
+  "version": 2,
   "body": [
     { "widget": "heading", "text": "Sipariş & Ödeme İzleme (Workflow JSON Verisi)" },
     { "widget": "link", "text": "Yeni Sipariş & Ödeme Başlat", "href": "/workflow/order-payment-orchestration?start=1", "style": "button" },

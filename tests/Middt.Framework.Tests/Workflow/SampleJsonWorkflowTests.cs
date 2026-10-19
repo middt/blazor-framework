@@ -59,7 +59,6 @@ public sealed class SampleJsonWorkflowTests
         FakeTimeProvider? time = null) =>
         WorkflowTestHost.StartAsync(
             definitions: SampleWorkflowFiles(),
-            configure: o => o.UseViews(Middt.Framework.Workflow.Razor.WorkflowViewCatalog.FromAssemblyOf<Middt.Sample.Views.OrderReviewView>().Views),
             services: s =>
             {
                 if (publisher is not null)

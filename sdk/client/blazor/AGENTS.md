@@ -5,8 +5,9 @@ classes – kept separate because the API and shared view libraries reference it
 
 - Authentication comes from `Middt.Framework.Bff`; `ServerSessionState` reads tokens from the server store for the
   circuit, API calls go through `Middt.Framework.Client` typed clients.
-- Layout renderer lives in `Middt.Framework.Blazor.Web/Ui/` (namespace `Middt.Framework.Blazor.Web.Ui`): display
-  widgets, `UiDataGrid`/`UiGridWidget`/`UiRecordWidget`/`UiFieldEditor`, `UiPageHost`, `UiLayoutHost`,
+- Layout renderer lives in `Middt.Framework.Blazor.Web/Ui/` (namespace `Middt.Framework.Blazor.Web.Ui`): `UiNodeView`
+  display widgets, `UiGridWidget` (`grid`), `UiRecordWidget` (`record`), `UiLayoutWidget` (`layout` – embeds another JSON
+  layout by `key` with optional `data` scope and `MaxDepth = 5` recursion guard), `UiFieldEditor`, `UiLayoutRenderer`,
   `UiLayoutEditor`, registry `UiBlazorWidgets`. Markup must match `UiHtmlRenderer` and the Angular widgets (same
   classes, ids, aria labels) – a parity test compares visible text.
 - Widgets derive from `UiWidgetBase`, which skips updates with unchanged `Node`/`Context`; override

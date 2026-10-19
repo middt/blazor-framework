@@ -42,7 +42,8 @@ public sealed class UiBlazorWidgets
             .Use<ListWidget>("list")
             .Use<LinkWidget>("link")
             .Use<UiGridWidget>("grid")
-            .Use<UiRecordWidget>("record");
+            .Use<UiRecordWidget>("record")
+            .Use<UiLayoutWidget>("layout");
 
     /// <summary>Adds a custom widget: its spec (also register it on the API) and its component.</summary>
     public UiBlazorWidgets Add<TComponent>(UiWidgetSpec spec)

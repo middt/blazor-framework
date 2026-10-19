@@ -16,6 +16,9 @@ public sealed class WorkflowDefinition
 
     public string? Title { get; set; }
 
+    /// <summary>Optional Material icon name for navigation menus and workflow lists.</summary>
+    public string? Icon { get; set; }
+
     /// <summary>Roles allowed to start, list and read instances. Empty = any authenticated user.</summary>
     public List<string> Roles { get; set; } = [];
 

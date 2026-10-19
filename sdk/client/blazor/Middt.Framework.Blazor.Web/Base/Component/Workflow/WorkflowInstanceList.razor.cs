@@ -16,6 +16,7 @@ public partial class WorkflowInstanceList
     private RadzenDataGrid<WorkflowInstanceModel> grid = default!;
     private JsonSchemaForm? startForm;
     private WorkflowDefinitionModel? definition;
+    private IReadOnlyList<WorkflowDataColumn> dataColumns = [];
     private List<WorkflowInstanceModel> items = [];
     private IList<WorkflowInstanceModel> selection = [];
     private int count;
@@ -162,6 +163,7 @@ public partial class WorkflowInstanceList
         if (response.IsSuccess)
         {
             definition = response.Data;
+            dataColumns = WorkflowUi.DataColumns(definition);
             if (definition is not null)
             {
                 await OnDefinitionLoaded.InvokeAsync(definition);
@@ -170,6 +172,7 @@ public partial class WorkflowInstanceList
         else
         {
             definition = null;
+            dataColumns = [];
             Notification.ShowErrorMessage("Akış tanımı alınamadı", response.ErrorText);
         }
 

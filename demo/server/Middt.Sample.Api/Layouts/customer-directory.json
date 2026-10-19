@@ -3,8 +3,7 @@
   "key": "customer-directory",
   "title": "Müşteri Rehberi (Workflow JSON)",
   "kind": "page",
-  "version": 1,
-  "menu": { "title": "Müşteri Rehberi", "icon": "groups", "order": 10 },
+  "version": 2,
   "body": [
     { "widget": "heading", "text": "Müşteri Rehberi (Workflow JSON Verisi)" },
     { "widget": "link", "text": "Yeni Müşteri Kaydı Başlat", "href": "/workflow/customer-onboarding?start=1", "style": "button" },

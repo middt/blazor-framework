@@ -1,0 +1,29 @@
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "risk-eval-card",
+  "title": "Risk & Limit Değerlendirme Kartı (Reusable Widget Grubu)",
+  "kind": "view",
+  "version": 1,
+  "body": [
+    {
+      "widget": "section",
+      "title": "Risk & Limit Analizi ({{ data.checkType }})",
+      "children": [
+        { "widget": "badge", "color": "success", "text": "Risk Skoru: {{ data.riskScore }} (Uygun)", "visibleWhen": "data.riskScore != null && data.riskScore >= 750" },
+        { "widget": "badge", "color": "warning", "text": "Risk Skoru: {{ data.riskScore }} (İnceleme)", "visibleWhen": "data.riskScore != null && data.riskScore < 750" },
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Müşteri Anahtarı", "value": "{{ data.customerKey }}", "visibleWhen": "data.customerKey != null" },
+            { "label": "Kontrol Tipi", "value": "{{ data.checkType }}", "visibleWhen": "data.checkType != null" },
+            { "label": "Talep Edilen Tutar (₺)", "value": "{{ data.amount }}", "format": "N2", "visibleWhen": "data.amount != null" },
+            { "label": "Önerilen Limit (₺)", "value": "{{ data.recommendedLimit }}", "format": "N2", "visibleWhen": "data.recommendedLimit != null" },
+            { "label": "Tahsis Uzmanı Notu", "value": "{{ data.underwriterNote }}", "visibleWhen": "data.underwriterNote != null" },
+            { "label": "İnceleyen Uzman", "value": "{{ data.underwrittenBy }}", "visibleWhen": "data.underwrittenBy != null" },
+            { "label": "Değerlendirme Zamanı", "value": "{{ data.evaluatedAt }}", "format": "g", "visibleWhen": "data.evaluatedAt != null" }
+          ]
+        }
+      ]
+    }
+  ]
+}

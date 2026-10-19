@@ -52,8 +52,8 @@ sdk/                              the framework (NuGet / npm packages)
     blazor/                       Blazor.Web · Workflow.Razor                   Blazor frontend
     angular/                      @middt/angular                                Angular frontend (library workspace)
 identity/Middt.Identity          the OAuth 2.0 / OpenID Connect server: one ready to run service (not an SDK package)
-demo/                             the bike store sample
-  shared/                         Sample.Common · Sample.Views · ServiceDefaults
+demo/                             the workflow & server-driven UI sample
+  shared/                         Sample.Common · ServiceDefaults
   server/                         Sample.Api (+ Layouts/, Workflows/ seeds) · identity.json (demo settings of Middt Identity)
   client/
     blazor/                       Sample.BlazorServer
@@ -198,7 +198,7 @@ builder.Services.AddMiddtWorkflow(o =>
 app.MapMiddtWorkflows("api/workflows");                     // REST API (authorized)
 ```
 
-A definition ([full example](demo/server/Middt.Sample.Api/Workflows/order-approval.json)):
+A definition ([full example](demo/server/Middt.Sample.Api/Workflows/customer-onboarding.json)):
 
 ```jsonc
 {
@@ -227,9 +227,9 @@ A definition ([full example](demo/server/Middt.Sample.Api/Workflows/order-approv
 |---|---|
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
-| Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [order-approval.v2.json](demo/server/Middt.Sample.Api/Workflows/order-approval.v2.json) |
-| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "name" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
-| Tasks | `onEntry`, `onExit`, `onExecute`; general `entity-*`, `db-*`, `set`, `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `setKey` (gives the instance its business key once it is known, e.g. `category-{{ data.categoryId }}`; a start with that key then returns the instance), and `operation` (dispatches an explicitly allowed application operation); `when` condition |
+| Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/server/Middt.Sample.Api/Workflows/credit-allocation.json) |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
+| Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
 | Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
@@ -247,23 +247,22 @@ REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are 
 `POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`.
 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
-`Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, start dialog generated from the
+`Middt.Framework.Blazor.Web.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
 start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
 with a form generated from its input schema) and `JsonSchemaForm`. A schema property with
-`"x-lookup": { "entity": "Customer", "valueField": "customerId", "textField": "email" }` is rendered as a select of the
+`"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` is rendered as a select of the
 entity's rows (same shape as the layout field `lookup`; the value type follows the property `type`). The demo has one
 generic page per workflow, `/workflow/{key}` (`demo/client/blazor/Middt.Sample.BlazorServer/Pages/Workflow/WorkflowPage.razor`,
 menu group "İş Akışları"); `?start=1` opens the start dialog once (`WorkflowInstanceList.OpenStart`), `key` prefills
 its business key and every other parameter named like a start input property prefills that field (typed by the schema,
-e.g. `/workflow/category-request?start=1&key=category-5&categoryId=5`); nothing starts before "Başlat", and these
+e.g. `/workflow/customer-onboarding?start=1`); nothing starts before "Başlat", and these
 parameters are removed from the URL once the dialog is open. A start with the business key of an existing instance
 returns that instance (200) with `messageList` = `WorkflowEndpoints.ExistingInstanceMessage`; both frontends then show
 "Mevcut akış açıldı" instead of "Akış başlatıldı".
 
 ### Server driven UI (Razor views)
 
-States and transitions can name a Razor component that renders them; the definition decides which screen is shown,
-the screens themselves stay compiled, type checked Razor (no runtime compilation, no view DSL):
+States and transitions can optionally name a Razor component that renders them (`view.component` – an SDK extension point in `Middt.Framework.Workflow.Razor`; the demo itself uses 100% frontend-independent JSON layouts via `view.layout`):
 
 ```jsonc
 { "key": "manager-review", "view": { "component": "order-review" },
@@ -279,16 +278,16 @@ the screens themselves stay compiled, type checked Razor (no runtime compilation
 - `WorkflowViewBase` (state screens) and `WorkflowTransitionViewBase` (input forms: call `SubmitAsync(body)`; API
   validation errors arrive in `Errors`) live in `Middt.Framework.Workflow.Razor`. Razor views are a Blazor feature;
   states that must work in every frontend use JSON layouts (`view.layout`).
-- Blazor: `builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>())` –
+- Blazor: `builder.Services.AddMiddtWorkflowViews(WorkflowViewCatalog.FromAssemblyOf<MyCustomView>())` –
   `WorkflowInstanceDetail` renders the state view with `DynamicComponent` (raw data stays available under "Ham veri")
   and uses the transition view instead of the schema generated form. Without a registered view it falls back to the
   generic UI.
-- API: `o.UseViews(WorkflowViewCatalog.FromAssemblyOf<OrderReviewView>().Views)` validates view names at startup and
+- API: `o.UseViews(WorkflowViewCatalog.FromAssemblyOf<MyCustomView>().Views)` validates view names at startup and
   enables `GET /api/workflows/{workflow}/instances/{id}/view`, which renders the state view to static HTML
   (`HtmlRenderer`) for non-Blazor clients, e-mails or PDFs. The endpoint asks every registered
   `IWorkflowViewRenderer` (Razor components, JSON layouts, your own) and returns the first result. Keep views free of JS interop and never output instance
   data with `MarkupString` – Razor encodes everything else.
-- Sample: `demo/shared/Middt.Sample.Views` (`order-review`, `order-result`, `reject-reason`) is shared by the API and the UI.
+- Sample: all workflow state views in `demo/server/Middt.Sample.Api/Layouts` (`kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`) and reusable widget groups (`customer-summary-card`, `risk-eval-card`, `workflow-footer`) are backend-driven JSON layouts (`view.layout` & `"widget": "layout"`).
 
 Compared to vNext this engine intentionally leaves out the separate execution host, Dapr (jobs, locks, pub/sub, state),
 an external inbox/outbox relay, Roslyn C# scripts, schema-per-flow storage, views/functions/extensions and long polling.
@@ -304,56 +303,68 @@ A layout is frontend independent: Blazor renders it today (`Middt.Framework.Blaz
 HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@middt/ui-core`).
 
 ```jsonc
-{ "key": "bike-category", "title": "Kategoriler", "kind": "page", "version": 1,
-  "menu": { "title": "Category", "icon": "category", "order": 10 }, "roles": [],
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "customer-directory",
+  "title": "Müşteri Rehberi (Workflow JSON)",
+  "kind": "page",
+  "version": 2,
   "body": [
-    { "widget": "heading", "text": "Kategoriler" },
-    { "widget": "grid", "entity": "Category",                       // api/v1/Category/getitems|insert|update|delete
-      "columns": [ { "field": "categoryName", "title": "Ad" } ],
-      "search":  [ { "field": "categoryName", "label": "Ad" } ],
-      "create": true, "edit": true, "delete": true,
-      "form":    [ { "field": "categoryName", "label": "Ad", "required": true, "maxLength": 255 } ],
-      "rowActions": [ { "text": "Ürünler", "icon": "search", "navigate": "/ui/bike-category-products?id={{ row.categoryId }}" } ] } ] }
+    { "widget": "heading", "text": "Müşteri Rehberi (Workflow JSON Verisi)" },
+    { "widget": "link", "text": "Yeni Müşteri Kaydı Başlat", "href": "/workflow/customer-onboarding?start=1", "style": "button" },
+    {
+      "widget": "grid",
+      "id": "customers",
+      "entity": "CustomerOnboarding",
+      "columns": [
+        { "field": "key", "title": "Müşteri Anahtarı", "width": "170px" },
+        { "field": "fullName", "title": "Ad Soyad / Ünvan" },
+        { "field": "segment", "title": "Segment", "width": "120px" },
+        { "field": "kycScore", "title": "KYC Skoru", "width": "110px" },
+        { "field": "stateTitle", "title": "Akış Durumu", "width": "160px" }
+      ],
+      "search": [
+        { "field": "fullName", "label": "Ad Soyad / Ünvan" },
+        { "field": "segment", "label": "Segment" }
+      ]
+    }
+  ]
+}
 ```
 
 | Widget | Purpose |
 |---|---|
-| `heading`, `text`, `alert`, `badge`, `divider`, `link` | Display; text properties are `{{ }}` templates |
-| `fields` | Label/value list with formats (`N2`, `d`, `g`) |
+| `heading`, `text`, `alert`, `badge`, `divider`, `link` | Display widgets; text properties are `{{ }}` templates |
+| `fields` | Label/value list with formats (`N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`) |
 | `section`, `columns`, `list` | Containers (`list` repeats its children per array item as `row`) |
-| `grid` *(interactive)* | Server paged/sorted grid of a CRUD controller: search fields, fixed `filter`, row actions, create/edit/delete dialog |
-| `record` *(interactive)* | Loads one entity by `recordId` and shows its children with it as `record` |
+| `layout` *(reusable / interactive)* | Embeds another `kind: "view"` layout by `key` with optional `data` scope expression and `title` (max nesting depth 5) |
+| `grid` *(interactive)* | Server paged/sorted grid over a workflow or CRUD controller (`entity`): search fields, fixed `filter`, row actions, create/edit/delete dialog |
+| `record` *(interactive)* | Loads one entity by `recordId` and renders its `children` with `record` in scope |
 
-- Every node accepts `visibleWhen` (e.g. `user.IsInRole("manager")`, `data.amount > 20000`). Variables: `data`,
+- Every node accepts `visibleWhen` (e.g. `user.IsInRole("manager")`, `data.kycScore >= 750`). Variables: `data`,
   `query`, `row`, `record`, `instance`, `user`, `now`. Expressions use the **portable language**: member access with
   null propagation, `! - * / % + < <= > >= == != && || ?? ?:`, text methods (`Contains`, `StartsWith`, `ToUpper`, …),
   `Math.Round/Abs/Floor/Ceiling/Min/Max`; `==` is strict (`query.id == "42"`, not `42`). Unknown variables or methods
   are rejected when the layout is saved. Formats: `N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`. Form/search field types: `text`, `textarea`, `number`,
   `integer`, `date`, `datetime`, `checkbox`, `select` (static `options` or a `lookup` entity) and `picker` (search
   dialog over a lookup entity).
+- **Reusable nested layouts (`"widget": "layout"`)**: Common UI blocks (such as `workflow-footer.json`) can be defined once as a `kind: "view"` layout and embedded inside any number of parent layouts via `{ "widget": "layout", "key": "workflow-footer", "data": "<optional-sub-object-expr>" }`. See [`docs/ai/backend-driven-json-ui.md`](docs/ai/backend-driven-json-ui.md).
 - **API**: `builder.Services.AddMiddtUi(o => o.UseDbContext(...).AddLayoutsFromDirectory("Layouts"))` and
   `app.MapMiddtUi()`. Seed files are validated at startup (a broken file stops the app) and overwrite stored layouts
   only when their `version` is higher, so runtime edits survive restarts. Reads are open to authenticated users
   (filtered by the layout's `roles`); `PUT/DELETE/validate/revisions` need `MiddtUiOptions.AdminRole` (`ui-admin`).
   `PUT` carries the version it is based on (0 = new) – a stale save gets 409; every change keeps a revision.
-- **Blazor**: `builder.Services.AddMiddtUi()`, a page `@page "/ui/{Key}"` with `<UiPageHost Key="@Key" />` and an
-  admin page with `<UiLayoutEditor />` (edit JSON, validate on the server, preview, save, revisions, delete).
-  Grid/record widgets call the CRUD controllers **with the signed-in user's token**, so API authorization is unchanged;
+- **Blazor & Angular**: `<UiPageHost Key="@Key" />` / `<UiLayoutHost />` (Blazor) and `<middt-layout-page />` / `<middt-layout-host />` (Angular), plus `<UiLayoutEditor />` / `<middt-layout-editor />` at `/ui-admin` (edit JSON, validate on the server, preview, save, revisions, delete).
+  Grid/record/layout widgets call the API **with the signed-in user's token**, so API authorization is unchanged;
   a layout can only show what the user may already read.
-- **Workflows**: a state can use `"view": { "layout": "order-escalated" }` instead of a Razor component;
-  `WorkflowInstanceDetail` renders it with `data` and `instance`. For `GET …/instances/{id}/view` register an
-  `IWorkflowViewRenderer` (the sample's `WorkflowLayoutRenderer` uses `UiLayoutStore` + `UiHtmlRenderer`).
+- **Workflows**: every state in the sample uses `"view": { "layout": "kyc-review" }` (or `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`);
+  both frontends render it automatically with `data` and `instance`.
 - **Editors**: `GET api/ui/schema` (also committed as `spec/ui-layout.schema.json`) is the JSON Schema of layouts;
   seed files reference it with `"$schema"` for completion in VS Code / Rider.
 - **Custom widgets**: register the spec in the API – `o.AddWidget(spec, html)` (optional static HTML) – and an
-  implementation in each frontend: `AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor (component deriving from
-  `UiWidgetBase`), `provideMiddtUiWidgets({ name, component })` in Angular.
-- Razor views (`[WorkflowView]`) remain the choice for complex, bespoke screens; layouts cover the many list / detail /
-  form / status screens that only need configuration.
+  implementation in each frontend: `AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, `provideMiddtUiWidgets({ name, component })` in Angular.
 
-The sample's Category, Category → Products, Product and Order screens are layouts
-(`demo/server/Middt.Sample.Api/Layouts`), reachable from the menu, which lists every page layout with a `menu` entry.
-Old `/Bike/...` URLs redirect.
+All screens in `demo/server/Middt.Sample.Api/Layouts` (`executive-overview`, `customer-directory`, `credit-pipeline`, `order-monitor`, `kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, and the reusable `workflow-footer`) are 100% backend-driven JSON layouts.
 
 ## Messaging (Rebus)
 

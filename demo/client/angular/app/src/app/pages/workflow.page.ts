@@ -8,9 +8,6 @@ import type { WorkflowStartOpened } from '@middt/angular/workflow';
 import { workflowStartQuery, WORKFLOW_START_KEY_PARAM, WORKFLOW_START_QUERY_PARAM } from '@middt/ui-core';
 import type { WorkflowDefinitionModel, WorkflowInstanceModel } from '@middt/ui-core';
 
-/** List headings kept from the former per-workflow pages (the E2E suites check them); others use the workflow title. */
-const LIST_TITLES: Readonly<Record<string, string>> = { 'order-approval': 'Sipariş onayları' };
-
 /**
  * Any workflow (`/workflow/:key`): instance list and detail side by side (counterpart of WorkflowPage.razor). The browser
  * title is the workflow title; `?start=1` opens the start dialog once (when the user may start), `key` prefills its business
@@ -24,7 +21,7 @@ const LIST_TITLES: Readonly<Record<string, string>> = { 'order-approval': 'Sipar
   template: `
     <h1 class="page-title sr-only">{{ heading() }}</h1>
     <div class="middt-wf-layout">
-      <middt-workflow-instance-list #list [workflow]="key()" [title]="listTitle()" [selectedId]="selectedId()" [openStart]="openStart()"
+      <middt-workflow-instance-list #list [workflow]="key()" [selectedId]="selectedId()" [openStart]="openStart()"
                                     [startKey]="startQuery().key" [startValues]="startQuery().values"
                                     (startOpened)="onStartOpened($event)" (definitionLoaded)="onDefinitionLoaded($event)" (selected)="onSelected($event)" />
       <middt-workflow-instance-detail [workflow]="key()" [instanceId]="selectedId()" (changed)="onChanged()" />
@@ -53,12 +50,10 @@ export class WorkflowPage {
   /** The start link of the query (`start`, `key`, start input values). */
   protected readonly startQuery = computed(() => workflowStartQuery(this.#queryParams()));
   protected readonly openStart = computed(() => this.startQuery().open);
-  /** null: the list shows the workflow definition title. */
-  protected readonly listTitle = computed(() => LIST_TITLES[this.key()] ?? null);
   readonly #definitionTitle = signal<{ key: string; title: string } | null>(null);
   protected readonly heading = computed(() => {
     const loaded = this.#definitionTitle();
-    return this.listTitle() ?? (loaded?.key === this.key() ? loaded.title : this.key());
+    return loaded?.key === this.key() ? loaded.title : this.key();
   });
 
   private readonly list = viewChild.required<MiddtWorkflowInstanceListComponent>('list');

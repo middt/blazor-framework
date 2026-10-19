@@ -180,7 +180,25 @@ public static partial class UiWidgets
         Validate = (node, path, errors) => ValidateEntity(node.StringProp("entity"), $"{path}.entity", errors),
     };
 
-    public static IReadOnlyList<UiWidgetSpec> All { get; } = [Heading, Text, Fields, Alert, Badge, Section, Columns, Divider, List, Link, Grid, Record];
+    public static UiWidgetSpec Layout { get; } = new("layout", "Embeds a reusable view layout by key (optionally scoping 'data' to a sub-expression).")
+    {
+        Interactive = true,
+        Props =
+        [
+            new("key", UiPropType.String, "Key of the reusable view layout (kind 'view'), e.g. workflow-footer.") { Required = true },
+            new("data", UiPropType.Expression, "Optional expression whose value becomes 'data' inside the embedded layout, e.g. data.customer."),
+            new("title", UiPropType.Template, "Optional label shown in static placeholders."),
+        ],
+        Validate = (node, path, errors) =>
+        {
+            if (node.StringProp("key") is { } key && !Validation.UiLayoutValidator.IsValidKey(key))
+            {
+                errors.Add($"{path}.key: must be a valid layout key (lowercase letters, digits, '-', '_', '.').");
+            }
+        },
+    };
+
+    public static IReadOnlyList<UiWidgetSpec> All { get; } = [Heading, Text, Fields, Alert, Badge, Section, Columns, Divider, List, Link, Grid, Record, Layout];
 
     private static UiPropSpec[] BasicFieldProps() =>
     [

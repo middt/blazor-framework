@@ -8,6 +8,7 @@ export * from './layout-editor.component';
 export * from './layout-host.component';
 export * from './layout-json';
 export * from './layout-page.component';
+export * from './layout-widget.component';
 export * from './lookup-cache.service';
 export * from './node.component';
 export * from './record-widget.component';

@@ -2,6 +2,7 @@
   "key": "customer-onboarding",
   "version": 1,
   "title": "Müşteri Kaydı & KYC",
+  "icon": "person_add",
   "instanceAccess": {
     "mode": "owner",
     "supervisorRoles": [ "manager" ]
@@ -18,11 +19,13 @@
       "email": {
         "type": "string",
         "title": "E-posta",
+        "x-list": false,
         "x-mask": { "pattern": "email", "exceptRoles": [ "manager", "idp-admin" ] }
       },
       "phone": {
         "type": "string",
         "title": "Telefon",
+        "x-list": false,
         "x-mask": { "pattern": "last4", "exceptRoles": [ "manager", "idp-admin" ] }
       },
       "segment": { "type": "string", "title": "Segment" },
@@ -32,6 +35,7 @@
       "internalRiskNote": {
         "type": "string",
         "title": "İç Denetim Notu (Sadece Yönetici)",
+        "x-list": false,
         "x-roles": [ "manager" ]
       }
     }
@@ -76,6 +80,7 @@
       "key": "kyc-scoring",
       "title": "KYC & Risk Skorlama",
       "step": 1,
+      "view": { "layout": "kyc-review" },
       "onEntry": [
         {
           "task": "setKey",
@@ -138,6 +143,7 @@
       "title": "Uyum & KYC İncelemesi",
       "step": 2,
       "subType": "Human",
+      "view": { "layout": "kyc-review" },
       "transitions": [
         {
           "key": "approve-kyc",
@@ -184,7 +190,6 @@
           "title": "Reddet",
           "target": "rejected",
           "roles": [ "manager" ],
-          "view": { "component": "reject-reason" },
           "input": {
             "schema": {
               "type": "object",
@@ -207,6 +212,7 @@
       "title": "Aktif Müşteri",
       "step": 3,
       "subType": "Human",
+      "view": { "layout": "kyc-review" },
       "transitions": [
         {
           "key": "update-income",
@@ -260,14 +266,16 @@
       "title": "Kapatıldı",
       "step": 4,
       "type": "Finish",
-      "subType": "Cancelled"
+      "subType": "Cancelled",
+      "view": { "layout": "kyc-review" }
     },
     {
       "key": "rejected",
       "title": "Reddedildi",
       "step": 4,
       "type": "Finish",
-      "subType": "Error"
+      "subType": "Error",
+      "view": { "layout": "kyc-review" }
     }
   ]
 }

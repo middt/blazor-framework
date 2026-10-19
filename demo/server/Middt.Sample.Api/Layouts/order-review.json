@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../../spec/ui-layout.schema.json",
+  "key": "order-review",
+  "title": "Sipariş & Ödeme İnceleme Özeti",
+  "kind": "view",
+  "version": 2,
+  "body": [
+    {
+      "widget": "alert",
+      "severity": "warning",
+      "text": "Yüksek tutarlı işlem veya yedek provizyon: Finans operasyon onayı bekleniyor.",
+      "visibleWhen": "data.amount >= 50000"
+    },
+    {
+      "widget": "section",
+      "title": "{{ data.customerName }}",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Sipariş Kodu", "value": "{{ data.orderCode }}", "visibleWhen": "data.orderCode != null" },
+            { "label": "Sipariş Tutarı", "value": "{{ data.amount }}", "format": "N2" },
+            { "label": "Ödeme Yöntemi", "value": "{{ data.paymentMethod }}", "visibleWhen": "data.paymentMethod != null" },
+            { "label": "Ödeme Referansı", "value": "{{ data.paymentReceipt }}", "visibleWhen": "data.paymentReceipt != null" },
+            { "label": "Oluşturan", "value": "{{ data.createdBy }}", "visibleWhen": "data.createdBy != null" },
+            { "label": "Oluşturulma Zamanı", "value": "{{ data.createdAt }}", "format": "g", "visibleWhen": "data.createdAt != null" }
+          ]
+        }
+      ]
+    },
+    { "widget": "layout", "key": "workflow-footer" }
+  ]
+}

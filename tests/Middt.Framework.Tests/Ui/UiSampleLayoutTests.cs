@@ -104,6 +104,16 @@ public sealed class UiSampleLayoutTests
         escalated.View!.Layout.Should().Be("order-escalated");
         escalated.View.Component.Should().BeNull();
 
+        foreach (var workflow in registry.Latest)
+        {
+            foreach (var state in workflow.States.Where(s => s.SubType == StateSubType.Human || s.IsFinal))
+            {
+                state.View.Should().NotBeNull($"{workflow.Key}/{state.Key} should have a backend-driven JSON layout");
+                state.View!.Component.Should().BeNull($"{workflow.Key}/{state.Key} must not use a hardcoded component");
+                state.View.Layout.Should().NotBeNullOrEmpty($"{workflow.Key}/{state.Key} must reference a JSON layout");
+            }
+        }
+
         var references = registry.Latest.SelectMany(w => w.States).Select(s => s.View?.Layout).OfType<string>().Distinct().ToList();
         references.Should().NotBeEmpty();
         foreach (var key in references)
@@ -139,4 +149,98 @@ public sealed class UiSampleLayoutTests
     public void Invalid_layout_keys_are_rejected(string key) =>
         Load(LayoutWorkflow.Replace("order-review", key, StringComparison.Ordinal))
             .Errors.Should().ContainSingle(e => e.Contains($"view.layout '{key}' is not a valid layout key.", StringComparison.Ordinal));
+
+    [Fact]
+    public void Embedded_layout_widgets_in_sample_layouts_reference_existing_view_layouts()
+    {
+        var layouts = LayoutFiles().Select(f => UiJson.Parse(File.ReadAllText(f))).ToDictionary(l => l.Key, StringComparer.Ordinal);
+        var embeddedKeys = new List<string>();
+
+        static void CollectEmbeddedKeys(UiNode node, List<string> target)
+        {
+            if (string.Equals(node.Widget, "layout", StringComparison.Ordinal))
+            {
+                var key = node.StringProp("key");
+                key.Should().NotBeNullOrWhiteSpace();
+                target.Add(key!);
+            }
+
+            if (node.Children is not null)
+            {
+                foreach (var child in node.Children)
+                {
+                    CollectEmbeddedKeys(child, target);
+                }
+            }
+        }
+
+        foreach (var layout in layouts.Values)
+        {
+            foreach (var node in layout.Body)
+            {
+                CollectEmbeddedKeys(node, embeddedKeys);
+            }
+        }
+
+        embeddedKeys.Should().Contain(["workflow-footer", "customer-summary-card", "risk-eval-card"]);
+        UiLayoutValidator.ValidateGraph(layouts).Should().BeEmpty();
+        foreach (var key in embeddedKeys.Distinct(StringComparer.Ordinal))
+        {
+            layouts.Should().ContainKey(key, $"embedded layout widget '{key}' must exist in Layouts/");
+            layouts[key].Kind.Should().Be(UiLayoutKind.View, $"embedded layout '{key}' should be a view layout");
+        }
+    }
+
+    [Theory]
+    [InlineData("Invalid_Key")]
+    [InlineData("../traversal")]
+    public void Layout_widget_rejects_invalid_target_key(string badKey)
+    {
+        var json = $$"""
+            {
+              "key": "host-view",
+              "version": 1,
+              "title": "Host",
+              "kind": "view",
+              "body": [
+                {
+                  "widget": "layout",
+                  "key": "{{badKey}}"
+                }
+              ]
+            }
+            """;
+
+        var result = new UiLayoutValidator(UiWidgetCatalog.CreateDefault()).Validate(json);
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e => e.Contains("must be a valid layout key", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Layout_widget_rejects_direct_self_embedding_and_circular_graph_references()
+    {
+        var selfJson = """
+            {
+              "key": "self-view",
+              "version": 1,
+              "title": "Self",
+              "kind": "view",
+              "body": [ { "widget": "layout", "key": "self-view" } ]
+            }
+            """;
+
+        var selfResult = new UiLayoutValidator(UiWidgetCatalog.CreateDefault()).Validate(selfJson);
+        selfResult.IsValid.Should().BeFalse();
+        selfResult.Errors.Should().ContainSingle(e => e.Contains("cannot embed itself", StringComparison.Ordinal));
+
+        var layoutA = UiJson.Parse("""{ "key": "view-a", "kind": "view", "body": [ { "widget": "layout", "key": "view-b" } ] }""");
+        var layoutB = UiJson.Parse("""{ "key": "view-b", "kind": "view", "body": [ { "widget": "layout", "key": "view-a" } ] }""");
+        var graphErrors = UiLayoutValidator.ValidateGraph(new Dictionary<string, UiLayoutDocument>(StringComparer.Ordinal)
+        {
+            ["view-a"] = layoutA,
+            ["view-b"] = layoutB,
+        });
+
+        graphErrors.Should().Contain(e => e.Contains("Circular layout reference detected: view-a -> view-b -> view-a", StringComparison.Ordinal));
+    }
 }

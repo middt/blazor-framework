@@ -165,6 +165,17 @@
             <summary>Ham veri</summary>
             <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
           </details>
+        } @else if (dataFields().length > 0) {
+          <h3 class="middt-wf-subheading">Veri Özeti</h3>
+          <dl class="middt-wf-props">
+            @for (field of dataFields(); track field.key) {
+              <dt>{{ field.title }}</dt><dd>{{ dataCell(instance.data, field) }}</dd>
+            }
+          </dl>
+          <details class="middt-wf-raw">
+            <summary>{{ stepTransition() !== null ? 'Girilen veriler (JSON)' : 'Ham veri' }}</summary>
+            <pre class="middt-wf-json" tabindex="0" aria-label="Akış verisi">{{ dataJson() }}</pre>
+          </details>
         } @else if (stepTransition() !== null) {
           <!-- Wizard step: the form is the focus, the collected data stays available but collapsed. -->
           <details class="middt-wf-raw">

@@ -2,6 +2,7 @@
   "key": "credit-allocation",
   "version": 1,
   "title": "Kredi Tahsis & 4-Göz Onay",
+  "icon": "account_balance",
   "instanceAccess": {
     "mode": "all"
   },
@@ -21,6 +22,7 @@
       "committeeSecretNote": {
         "type": "string",
         "title": "Komite Gizli Değerlendirme Notu",
+        "x-list": false,
         "x-roles": [ "manager" ]
       }
     }
@@ -70,6 +72,7 @@
       "key": "load-customer",
       "title": "Müşteri JSON Verisi Yükleniyor",
       "step": 1,
+      "view": { "layout": "credit-review" },
       "onEntry": [
         {
           "task": "loadWorkflow",
@@ -103,6 +106,7 @@
       "title": "Alt Akış: Risk & Limit Servisi",
       "step": 2,
       "type": "SubFlow",
+      "view": { "layout": "credit-review" },
       "subFlow": {
         "workflow": "risk-limit-eval",
         "input": {
@@ -134,6 +138,7 @@
       "title": "1. Onay: Tahsis Yetkilisi",
       "step": 3,
       "subType": "Human",
+      "view": { "layout": "credit-review" },
       "onEntry": [
         {
           "task": "set",
@@ -186,7 +191,6 @@
           "title": "Reddet",
           "target": "rejected",
           "roles": [ "manager" ],
-          "view": { "component": "reject-reason" },
           "input": {
             "schema": {
               "type": "object",
@@ -209,6 +213,7 @@
       "title": "2. Onay: Kredi Komitesi (4-Göz İlkesi)",
       "step": 4,
       "subType": "Human",
+      "view": { "layout": "credit-review" },
       "transitions": [
         {
           "key": "approve-stage2-four-eyes",
@@ -266,7 +271,7 @@
       "step": 5,
       "type": "Finish",
       "subType": "Success",
-      "view": { "component": "order-result" }
+      "view": { "layout": "order-result" }
     },
     {
       "key": "rejected",
@@ -274,7 +279,7 @@
       "step": 5,
       "type": "Finish",
       "subType": "Error",
-      "view": { "component": "order-result" }
+      "view": { "layout": "order-result" }
     }
   ]
 }
