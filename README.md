@@ -169,7 +169,7 @@ A definition ([full example](demo/Middt.Demo.Api/Workflows/customer-onboarding.j
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), `Event` (`event` name; triggered by a message, see [Messages](#messages-event-transitions)), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
 | Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/Middt.Demo.Api/Workflows/credit-allocation.json) |
-| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path), or – with `"format": "jsonPatch"` – the body is a JSON Patch on the data at `into` (see [JSON Patch](#updating-data-with-a-json-patch-inputformat-jsonpatch)); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
 | Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition; `"background": true` on a state's `onEntry` task runs it outside the instance lock (see [Long tasks](#long-tasks-background)) |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
@@ -186,7 +186,7 @@ Child cancellation, parent resumption and event delivery are written as jobs in 
 REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are ProblemDetails):
 `GET /api/workflows`, `GET /{workflow}`, `POST /{workflow}/instances`, `GET /{workflow}/instances`,
 `GET /{workflow}/instances/{id}` (includes the caller's available transitions and their input schemas),
-`POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`,
+`POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry` (a transition body is an object, or a JSON Patch array for `input.format: jsonPatch`),
 `POST /{workflow}/instances/{id}/messages/{message}` and `POST /{workflow}/messages/{message}?key=…` (`[&bufferFor=PT10M]`; 200 delivered, 202 buffered).
 
 ### Messages (event transitions)
@@ -262,29 +262,64 @@ the patch would not be smaller than the data itself. Any version is therefore re
 with at most `historySnapshotEvery` patches, and the final data of a finished instance is a single read.
 `WorkflowInstance.HistoryPatchCount` counts the patches since the last snapshot, so deciding never reads the history.
 
-**Reading it back.** `HistoryDataAsync` returns the data after every row, whatever the mode wrote (snapshot rows reset,
-patch rows are applied in order):
-
-```csharp
-var versions = await engine.HistoryDataAsync(instanceId, user, cancellationToken);
-// [ ("start", 1, {…}), ("partial-payment", 2, {…, "lastPartialPayment": {"amount": 5000, …}}), … ]
-```
-
-`GET …/history` is unchanged: it lists transitions, triggers, actors and tasks, not data, in every mode. For ad-hoc
-analysis in SQL, `Patch` is `jsonb`:
+**Reading it back.** `WorkflowEngine.HistoryDataAsync` returns the data after every row, whatever the mode wrote
+(snapshot rows reset, patch rows are applied in order). `GET …/history` is unchanged: it lists transitions, triggers,
+actors and tasks, not data. For ad-hoc analysis in SQL, `Patch` is `jsonb`:
 
 ```sql
 SELECT "DataVersion", "TransitionKey", coalesce("Data", "Patch") AS change
 FROM wf."WorkflowHistory" WHERE "WorkflowKey" = 'invoice-collection' AND "InstanceId" = @id ORDER BY "Id";
 ```
 
-`WorkflowJsonPatch.Diff(from, to)` and `WorkflowJsonPatch.Apply(target, patch)` are public if an application needs the
-same comparison.
+These history patches are produced by the engine; a client can also *send* a patch to change data – see
+[Updating data with a JSON Patch](#updating-data-with-a-json-patch-inputformat-jsonpatch).
 
 **The same patch merges background results.** A `"background": true` task works on a copy of the data while the instance
 stays usable. When it finishes, only its patch is applied to the data as it is then, so an update made meanwhile (for
 example by a `$self` transition) is kept: the ledger call of `invoice-collection` contributes just
 `[{"op":"add","path":"/ledgerResponse",…}]`. If both touch the same array, the task's version of that array wins.
+
+### Updating data with a JSON Patch (`input.format: jsonPatch`)
+
+A transition normally takes an object that is merged into the data. With `"format": "jsonPatch"` it takes an
+[RFC 6902](https://www.rfc-editor.org/rfc/rfc6902) JSON Patch instead: the client says exactly what changes – one field,
+a removal, an item appended to a list – without resending the rest, and can guard the change with a `test` operation.
+
+```jsonc
+{ "key": "update-billing-contact", "target": "$self",
+  "input": { "format": "jsonPatch", "into": "billingContact",
+             "schema": { "type": "object", "additionalProperties": false,
+                         "properties": { "email": { "type": "string", "format": "email" }, "phone": { "type": "string" },
+                                         "address": { "type": "string" } } },
+             "set": { "contactUpdatedBy": "user.Name" } } }
+```
+
+```http
+POST /api/workflows/invoice-collection/instances/{id}/transitions/update-billing-contact
+[ { "op": "test",    "path": "/phone", "value": "02124440123" },
+  { "op": "replace", "path": "/phone", "value": "02124440999" },
+  { "op": "remove",  "path": "/address" } ]
+```
+
+- **Paths are relative to `into`**, which is required: the patch can only change the part of the data the transition
+  owns (`data.billingContact` above), never fields written by tasks or other transitions. `schema` is required too and
+  validates that part after the patch.
+- **Operations**: `add`, `remove`, `replace`, `move`, `copy`, `test`; array indexes and `-` (append) work as in the RFC.
+  The patch is atomic – applied completely or not at all. An invalid operation or a result the schema rejects answers
+  400, a failed `test` 409 (an optimistic check: "only change the phone if it is still the one I saw"); either way the
+  instance stays as it was and Active.
+- **Body**: a bare JSON array over HTTP; programmatic callers pass `{ "patch": [ … ] }` (that is also how it travels inside
+  the engine). `set` expressions, tasks and the rest of the transition run as usual.
+- **History**: the client's patch is the transition input, so it is stored in the history row's `Input`; with
+  `history: delta` the row's `Patch` holds the resulting change from the data root (`/billingContact/phone`).
+- **Frontends**: `AvailableTransitionModel.InputFormat` is `jsonPatch`. Blazor and Angular open the form filled with the
+  current values at `into` and send the difference as a patch (`WorkflowUi.TransitionInput` / ui-core
+  `workflowTransitionInput`); a cleared field becomes `remove`.
+- **Not allowed** on the start transition, on event transitions (messages carry objects), with `sensitive` properties or
+  asynchronously (`?async=true`) – a rejected patch must reach the caller.
+- The implementation is `JsonPatch` in `Middt.Framework.Expressions` (`ApplyStrict`, `Diff`); the TypeScript `jsonPatchDiff`
+  is its twin, and both pass [`spec/json-patch.conformance.json`](spec/json-patch.conformance.json).
+
 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
 `Middt.Framework.Blazor.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
@@ -515,10 +550,13 @@ identity provider: <http://localhost:8083> (login, registration, password reset,
 <http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
 
-Message-driven steps have no buttons: start a "Fatura Tahsilatı" (`invoice-collection`) instance in a UI, then send its
-payment with Postman collection [06](postman/06-Invoice-Collection.postman_collection.json)
-(`POST /api/workflows/invoice-collection/messages/payment.received?key=INV-…`) and watch it move to "Muhasebe Mutabakatı"
-and – after the background ledger call – to "Tahsil Edildi". All collections are described in [postman/README.md](postman/README.md).
+"Fatura Tahsilatı" (`invoice-collection`) can be driven by hand: a manager records a partial or full payment with the
+buttons "Kısmi Ödeme Kaydet" / "Ödemeyi Kaydet (Tam)", the invoice moves to "Muhasebe Mutabakatı" and – after the
+background ledger call – to "Tahsil Edildi". "Fatura İletişim Bilgilerini Güncelle" edits the billing contact with a
+JSON Patch (the form opens with the current values; only the changes are sent). The payment steps are also triggered by a
+payment system's message (`POST /api/workflows/invoice-collection/messages/payment.received?key=INV-…`). Postman
+collection [06](postman/06-Invoice-Collection.postman_collection.json) runs all of it, including JSON Patch requests with
+`add`, `test` + `replace`, a failing `test` (409) and `remove`. All collections are described in [postman/README.md](postman/README.md).
 
 ## Development
 

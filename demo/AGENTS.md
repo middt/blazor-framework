@@ -15,7 +15,9 @@ The demo shows framework usage – keep framework logic in `sdk/`.
   - There are NO hardcoded Razor or Angular views in the demo.
 - Workflows: `customer-onboarding`, `credit-allocation` (+ `risk-limit-eval` subflow), `order-payment-orchestration`,
   `sla-escalation`, and `invoice-collection` (payment messages → `Event` transitions with `bufferFor`, a `background`
-  ledger call, `history: delta`). Messages have no buttons: send them with the REST endpoints or Postman collection 06.
+  ledger call, `history: delta`). The payment steps also have manual twins (`record-partial-payment`, `record-payment`, `record-late-payment`) so the demo
+  runs without a message source; Postman collection 06 drives both. `update-billing-contact` shows `input.format: jsonPatch` (the client sends an RFC 6902
+  patch on `data.billingContact`).
 - Sign-in: both BFFs use Middt Identity (`identity/Middt.Identity`, :8083) configured by `demo/identity.json` (seed).
   Demo user `test@test.com` / `test` has roles `manager`, `ui-admin`, `idp-admin`; `user@test.com` / `test` has none.
 - Running: `docker compose up -d --build` with `.env` (see `.env.example`). Rebuild only what changed:

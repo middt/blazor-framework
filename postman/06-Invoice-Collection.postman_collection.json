@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Middt Workflow 06 - Invoice Collection (Messages & Background Tasks)",
-    "description": "Workflow Key: `invoice-collection`\n\n### Özellikler:\n- **Mesajla tetiklenen geçişler (`trigger: Event`)**: `payment.received` mesajı iş anahtarı (`?key=INV-...`) veya instance id ile faturaya ulaşır; kurala göre tam (`payment-received`) ya da kısmi (`partial-payment`, `$self`) ödeme geçişi çalışır.\n- **Bekletmeli mesaj (`bufferFor`)**: Fatura mesajı o an alamıyorsa mesaj saklanır (202) ve uygun duruma girdiği anda teslim edilir.\n- **Arka plan görevi (`background: true`)**: Muhasebe kaydı (`post-ledger`, HTTP) instance kilidi dışında çalışır; fatura `Active` kalır, sonuç gelince otomatik `paid` olur.\n- **Delta geçmiş (`history: delta`)**: Geçmiş satırları çoğunlukla yalnızca değişikliği tutar; ilk/son satır ve her 10 satırda bir tam anlık görüntü.\n- **Zamanlanmış vade (`mark-overdue`, 7 gün)** ve gecikmeli ödeme (`late-payment-received`).",
+    "description": "Workflow Key: `invoice-collection`\n\n### Özellikler:\n- **Elle ilerletme**: Ödemeler `record-partial-payment` / `record-payment` / `record-late-payment` butonlarıyla kaydedilir (mesaj kaynağı gerekmez).\n- **JSON Patch ile güncelleme (`input.format: jsonPatch`)**: `update-billing-contact` gövdesi bir RFC 6902 patch dizisidir (`add`, `replace`, `remove`, `test` ...).\n- **Mesajla tetiklenen geçişler (`trigger: Event`)**: `payment.received` mesajı iş anahtarı (`?key=INV-...`) veya instance id ile faturaya ulaşır; kurala göre tam (`payment-received`) ya da kısmi (`partial-payment`, `$self`) ödeme geçişi çalışır.\n- **Bekletmeli mesaj (`bufferFor`)**: Fatura mesajı o an alamıyorsa mesaj saklanır (202) ve uygun duruma girdiği anda teslim edilir.\n- **Arka plan görevi (`background: true`)**: Muhasebe kaydı (`post-ledger`, HTTP) instance kilidi dışında çalışır; fatura `Active` kalır, sonuç gelince otomatik `paid` olur.\n- **Delta geçmiş (`history: delta`)**: Geçmiş satırları çoğunlukla yalnızca değişikliği tutar; ilk/son satır ve her 10 satırda bir tam anlık görüntü.\n- **Zamanlanmış vade (`mark-overdue`, 7 gün)** ve gecikmeli ödeme (`late-payment-received`).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -52,6 +52,11 @@
     },
     {
       "key": "invoiceKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "invoiceCancelInstanceId",
       "value": "",
       "type": "string"
     }
@@ -335,7 +340,7 @@
           }
         },
         {
-          "name": "3. Akış Durumunu Sorgula (GET Instance)",
+          "name": "3. Akış Durumunu Sorgula (manuel butonlar: record-partial-payment, record-payment)",
           "event": [],
           "request": {
             "method": "GET",
@@ -346,11 +351,187 @@
               }
             ],
             "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}",
-            "description": "Durum, veri ve bekleyen zamanlayıcılar (`mark-overdue`, 7 gün). Event geçişleri buton olarak listelenmez (`availableTransitions`)."
+            "description": "`availableTransitions` içinde manuel ödeme butonları görünür (`record-partial-payment`, `record-payment`, `cancel-invoice`). Mesajla tetiklenen geçişler (`payment-received`, `partial-payment`) buton olarak listelenmez."
           }
         },
         {
-          "name": "4. Mesaj - Kısmi Ödeme (iş anahtarıyla, -> awaiting-payment)",
+          "name": "4. Fatura İletişim Bilgileri - JSON Patch ile Güncelleme (update-billing-contact)",
+          "description": "`update-billing-contact` geçişi `input.format: jsonPatch` kullanır: istek gövdesi bir RFC 6902 JSON Patch dizisidir ve yollar `data.billingContact`a göredir (`into`). Patch atomik uygulanır, sonuç `input.schema` ile doğrulanır; başarısız bir `test` işlemi 409 döner. Arayüzde aynı geçiş, form mevcut değerlerle açılıp değişen alanlar patch olarak gönderilerek çalışır. Bu istekler fatura `awaiting-payment` durumundayken (ödemeden önce) çalıştırılmalıdır.",
+          "item": [
+            {
+              "name": "4A. İletişim Bilgilerini Ekle (add)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test(\"billingContact\", function () {",
+                      "        pm.expect(pm.response.json().data.data.billingContact).to.eql({\"email\": \"finans@anadolulojistik.com\", \"phone\": \"02124440123\", \"address\": \"Maslak Mah. Büyükdere Cad. No:1 Sarıyer/İstanbul\"});",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/update-billing-contact",
+                "description": "Henüz iletişim bilgisi yokken `add` işlemleriyle e-posta, telefon ve adres eklenir.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"op\": \"add\",\n    \"path\": \"/email\",\n    \"value\": \"finans@anadolulojistik.com\"\n  },\n  {\n    \"op\": \"add\",\n    \"path\": \"/phone\",\n    \"value\": \"02124440123\"\n  },\n  {\n    \"op\": \"add\",\n    \"path\": \"/address\",\n    \"value\": \"Maslak Mah. Büyükdere Cad. No:1 Sarıyer/İstanbul\"\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "4B. Telefonu Değiştir (test + replace)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/update-billing-contact",
+                "description": "`test` işlemi telefonun hâlâ beklenen değerde olduğunu doğrular (iyimser kontrol), ardından `replace` yalnızca telefonu değiştirir; diğer alanlar gönderilmez ve olduğu gibi kalır.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"op\": \"test\",\n    \"path\": \"/phone\",\n    \"value\": \"02124440123\"\n  },\n  {\n    \"op\": \"replace\",\n    \"path\": \"/phone\",\n    \"value\": \"02124440999\"\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "4C. Eski Değerle Test (409 beklenir)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 409\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([409]);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/update-billing-contact",
+                "description": "Telefon artık `02124440123` değil; `test` başarısız olur, patch hiç uygulanmaz ve 409 döner.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"op\": \"test\",\n    \"path\": \"/phone\",\n    \"value\": \"02124440123\"\n  },\n  {\n    \"op\": \"replace\",\n    \"path\": \"/phone\",\n    \"value\": \"0000\"\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "4D. Adresi Sil (remove)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test(\"billingContact\", function () {",
+                      "        pm.expect(pm.response.json().data.data.billingContact).to.eql({\"email\": \"finans@anadolulojistik.com\", \"phone\": \"02124440999\"});",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/update-billing-contact",
+                "description": "`remove` ile tek bir alan silinir.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"op\": \"remove\",\n    \"path\": \"/address\"\n  }\n]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Kısmi Ödeme Kaydet (record-partial-payment, -> awaiting-payment)",
           "event": [
             {
               "listen": "test",
@@ -379,8 +560,8 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
-            "description": "Mesaj iş anahtarıyla eşleştirilir. `amount < total` olduğu için `payment-received` kuralı tutmaz, `partial-payment` (`$self`) çalışır; ödeme `lastPartialPayment` altına yazılır.",
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-partial-payment",
+            "description": "Manuel kısmi ödeme (`$self`): ödeme `lastPartialPayment` altına yazılır, fatura ödeme beklemeye devam eder.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
@@ -393,7 +574,7 @@
           }
         },
         {
-          "name": "5. Mesaj - Tam Ödeme (instance id ile, -> reconciling)",
+          "name": "6. Ödemeyi Kaydet - Tam (record-payment, -> reconciling)",
           "event": [
             {
               "listen": "test",
@@ -422,8 +603,8 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/messages/payment.received",
-            "description": "Kural tutar (`input.amount >= data.total`), fatura `reconciling` durumuna geçer. Muhasebe çağrısı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-payment",
+            "description": "Tam ödeme: fatura `reconciling` durumuna geçer. Muhasebe kaydı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0002\"\n}",
@@ -436,7 +617,7 @@
           }
         },
         {
-          "name": "6. Akış Durumunu Tekrar Sorgula (-> paid)",
+          "name": "7. Akış Durumunu Tekrar Sorgula (-> paid)",
           "event": [
             {
               "listen": "test",
@@ -462,11 +643,11 @@
               }
             ],
             "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}",
-            "description": "Birkaç saniye sonra arka plan görevi biter: `ledgerResponse` veriye eklenir, `reconciledAt` yazılır ve otomatik `reconciled` geçişiyle `paid` durumuna geçilir."
+            "description": "Birkaç saniye sonra arka plan görevi biter: `ledgerResponse` eklenir, `reconciledAt` yazılır ve otomatik `reconciled` geçişiyle `paid` olur. Hâlâ `reconciling` görüyorsanız birkaç saniye sonra tekrar deneyin."
           }
         },
         {
-          "name": "7. Geçmişi Listele (GET History)",
+          "name": "8. Geçmişi Listele (GET History)",
           "event": [],
           "request": {
             "method": "GET",
@@ -477,91 +658,374 @@
               }
             ],
             "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/history",
-            "description": "Geçiş tetikleyicileri: `Start`, `Event` (mesaj), `Background` (`$background` satırı), `Automatic`. Akış `history: delta` kullanır: ilk ve son satır tam anlık görüntü, aradakiler yalnızca değişikliği (JSON Patch) tutar."
+            "description": "Geçişler, tetikleyiciler (`Start`, `Manual`, `Background`, `Automatic`), kullanıcı ve çalışan task'lar. JSON Patch ile yapılan güncellemelerde istek gövdesindeki patch, geçişin girdisi olarak geçmişe yazılır."
           }
         },
         {
-          "name": "8. Tamamlanmış Faturaya Mesaj (409 beklenir)",
-          "event": [
+          "name": "9. Mesajla İlerletme (opsiyonel - bir ödeme sistemi mesaj gönderdiğinde)",
+          "description": "Aynı adımlar dış bir sistemin mesajıyla da tetiklenebilir (`trigger: Event`, `payment.received`). Manuel butonlar ile mesajlar yan yana çalışır. Yeni bir faturayı `2. Başlat` ile açıp bu istekleri sırayla çalıştırın.",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP status 409\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([409]);",
-                  "});"
-                ]
+              "name": "9A. Mesaj - Kısmi Ödeme (iş anahtarıyla)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});",
+                      "pm.test(\"state = awaiting-payment\", function () {",
+                      "    pm.expect(pm.response.json().data.state).to.eql(\"awaiting-payment\");",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
+                "description": "Mesaj iş anahtarıyla eşleştirilir. `amount < total` olduğu için `payment-received` kuralı tutmaz, `partial-payment` (`$self`) çalışır; ödeme `lastPartialPayment` altına yazılır.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
+            },
+            {
+              "name": "9B. Mesaj - Tam Ödeme (instance id ile, -> reconciling)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});",
+                      "pm.test(\"state = reconciling\", function () {",
+                      "    pm.expect(pm.response.json().data.state).to.eql(\"reconciling\");",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/messages/payment.received",
+                "description": "Kural tutar (`input.amount >= data.total`), fatura `reconciling` durumuna geçer. Muhasebe çağrısı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0002\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
-            ],
-            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
-            "description": "Fatura bittiği için mesajı alamaz: `bufferFor` verilmediğinde 409 döner.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 12500\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+            },
+            {
+              "name": "9C. Tamamlanmış Faturaya Mesaj (409 beklenir)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 409\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([409]);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
+                "description": "Fatura bittiği için mesajı alamaz: `bufferFor` verilmediğinde 409 döner.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 12500\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "9D. Bekletmeli Mesaj (bufferFor=PT10M, 200 veya 202)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200/202\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key=INV-FTR-BEKLEYEN&bufferFor=PT10M",
+                "description": "Önce `2. Başlat` isteğini `invoiceNo: \"FTR-BEKLEYEN\"` ile çalıştırın. Fatura mesajı hemen alabiliyorsa 200 döner; meşgulse veya uygun durumda değilse mesaj 10 dakika bekletilir (202) ve fatura uygun duruma girdiği anda teslim edilir.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0003\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             }
-          }
+          ]
         },
         {
-          "name": "9. Bekletmeli Mesaj (bufferFor=PT10M, 200 veya 202)",
-          "event": [
+          "name": "10. Diğer Manuel Adımlar (iptal, gecikmeli ödeme, elle mutabakat)",
+          "description": "Akışın ana senaryo dışındaki manuel geçişleri. Hepsi `manager` rolü ister (`1. Token Al - Manager`).",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP status 200/202\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
-                  "});"
-                ]
+              "name": "10A. İptal Senaryosu İçin İkinci Faturayı Başlat",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 2xx\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                      "});",
+                      "try {",
+                      "    const val = pm.response.json().data.id;",
+                      "    if (val) {",
+                      "        pm.collectionVariables.set(\"invoiceCancelInstanceId\", val);",
+                      "        pm.environment.set(\"invoiceCancelInstanceId\", val);",
+                      "        console.log(\"invoiceCancelInstanceId =\", val);",
+                      "    }",
+                      "} catch (e) {",
+                      "    console.warn(\"Response parse warning:\", e);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances",
+                "description": "Ana senaryonun faturasını bozmamak için ayrı bir fatura açar; `id` `{{invoiceCancelInstanceId}}` değişkenine yazılır.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"data\": {\n    \"invoiceNo\": \"FTR-IPTAL-{{$timestamp}}\",\n    \"customerName\": \"Deniz Ticaret\",\n    \"total\": 900,\n    \"description\": \"İptal senaryosu\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
+            },
+            {
+              "name": "10B. Faturayı İptal Et (cancel-invoice, -> cancelled)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                      "});",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test(\"state = cancelled\", function () {",
+                      "        pm.expect(pm.response.json().data.state).to.eql(\"cancelled\");",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceCancelInstanceId}}/transitions/cancel-invoice",
+                "description": "Ödeme beklenen ya da vadesi geçmiş faturayı iptal eder; neden `cancellation.reason` altına yazılır ve sonuç ekranında gösterilir.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Fatura müşteri talebiyle iptal edildi.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
               }
-            ],
-            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key=INV-FTR-BEKLEYEN&bufferFor=PT10M",
-            "description": "Önce `2. Başlat` isteğini `invoiceNo: \"FTR-BEKLEYEN\"` ile çalıştırın. Fatura mesajı hemen alabiliyorsa 200 döner; meşgulse veya uygun durumda değilse mesaj 10 dakika bekletilir (202) ve fatura uygun duruma girdiği anda teslim edilir.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0003\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+            },
+            {
+              "name": "10C. Gecikmeli Ödemeyi Kaydet (record-late-payment, -> reconciling)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200/409\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+                      "});",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test(\"state = reconciling\", function () {",
+                      "        pm.expect(pm.response.json().data.state).to.eql(\"reconciling\");",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-late-payment",
+                "description": "Yalnızca `overdue` (Vadesi Geçti) durumundaki faturada çalışır: fatura 7 gün ödenmezse zamanlanmış `mark-overdue` geçişiyle bu duruma girer. Başka bir durumdaki fatura için 409 döner (beklenen).",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0099\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "10D. Elle Mutabakatı Onayla (confirm-reconciliation, -> paid)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP status 200/409\", function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+                      "});",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test(\"state = paid\", function () {",
+                      "        pm.expect(pm.response.json().data.state).to.eql(\"paid\");",
+                      "    });",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/confirm-reconciliation",
+                "description": "Yalnızca `manual-reconciliation` durumunda çalışır: muhasebe çağrısı 3 denemede de başarısız olursa fatura bu duruma düşer. Başka bir durumdaki fatura için 409 döner (beklenen).",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"note\": \"Muhasebe kaydı elle girildi.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 }
               }
             }
-          }
+          ]
         }
       ],
-      "description": "Workflow Key: `invoice-collection`. Ödeme mesajları (`Event` geçişleri, iş anahtarı ile eşleştirme, `bufferFor`), arka planda çalışan muhasebe görevi (`background: true`) ve `history: delta`."
+      "description": "Workflow Key: `invoice-collection`. JSON Patch ile güncelleme (`input.format: jsonPatch`), elle ilerletme (manuel ödeme butonları), arka planda muhasebe görevi (`background: true`) ve `history: delta`. Mesajla ilerletme opsiyonel alt klasördedir."
     }
   ]
 }

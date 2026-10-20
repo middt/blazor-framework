@@ -10,11 +10,14 @@ frontend render the same JSON layouts as the Blazor renderer of the framework:
 | `render-context.ts` – `UiRenderContext` (text, format, isVisible, with, idFor), `UiFormats`, `UiUrl` | `Middt.Framework.Ui.Abstractions/Rendering/UiRenderContext.cs` |
 | `fields.ts` – grid columns / form fields, validation (Turkish messages) | `Middt.Framework.Ui.Abstractions/Model/UiFieldModels.cs` |
 | `client.ts` – `UiApiClient` (layout API) and `UiDataClient` (CRUD controllers) | `Middt.Framework.Client/Http/UiClients.cs`, `UiEndpoints.cs` |
+| `workflow-ui.ts` – `jsonPatchDiff`, `workflowTransitionPrefill` / `workflowTransitionInput` (forms of `input.format: jsonPatch` transitions) | `Middt.Framework.Expressions/JsonPatch.cs`, `Middt.Framework.Blazor/Workflow/WorkflowUi.cs` |
 
 The **Blazor implementation is the reference**. Expressions must behave the same in every renderer, so both
 implementations run the shared conformance suite [`spec/expressions.conformance.json`](../../../spec/expressions.conformance.json)
 (C#: `PortableExpressionConformanceTests`, here: `test/conformance.test.ts`). To change the language, change the suite first
-and make both implementations pass it.
+and make both implementations pass it. The JSON Patch diff works the same way with
+[`spec/json-patch.conformance.json`](../../../spec/json-patch.conformance.json) (C#: `JsonPatchConformanceTests`, here:
+`test/json-patch.test.ts`).
 
 The sources are plain, erasable TypeScript (no enums, namespaces or parameter properties) with no runtime
 dependencies: Node.js ≥ 23.6 runs them directly, and bundlers (Angular CLI, Vite, esbuild) compile them as-is.

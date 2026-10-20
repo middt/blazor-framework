@@ -3,6 +3,7 @@
 // WorkflowViewBase (Middt.Framework.Workflow.Razor/WorkflowViews.cs).
 
 import type {
+  WorkflowJsonPatchOperation,
   AvailableTransitionModel,
   WorkflowData,
   WorkflowDefinitionModel,
@@ -290,6 +291,96 @@ export function workflowDataGet(data: WorkflowData | null | undefined, path: str
   }
 
   return current ?? null;
+}
+
+// ------------------------------------------------------------------------------------------- JSON Patch (input.format: jsonPatch)
+
+const escapePointer = (name: string): string => name.replaceAll('~', '~0').replaceAll('/', '~1');
+
+function jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => jsonEqual(item, b[i]));
+  }
+
+  if (isObject(a) && isObject(b)) {
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every(k => Object.hasOwn(b, k) && jsonEqual(a[k], b[k]));
+  }
+
+  return false;
+}
+
+function diffInto(from: WorkflowData, to: WorkflowData, path: string, operations: WorkflowJsonPatchOperation[]): void {
+  for (const [name, fromValue] of Object.entries(from)) {
+    const childPath = `${path}/${escapePointer(name)}`;
+    if (!Object.hasOwn(to, name)) {
+      operations.push({ op: 'remove', path: childPath });
+      continue;
+    }
+
+    const toValue = to[name];
+    if (isObject(fromValue) && isObject(toValue)) {
+      diffInto(fromValue, toValue, childPath, operations);
+    } else if (!jsonEqual(fromValue, toValue)) {
+      operations.push({ op: 'replace', path: childPath, value: cloneJson(toValue) });
+    }
+  }
+
+  for (const [name, toValue] of Object.entries(to)) {
+    if (!Object.hasOwn(from, name)) {
+      operations.push({ op: 'add', path: `${path}/${escapePointer(name)}`, value: cloneJson(toValue) });
+    }
+  }
+}
+
+/**
+ * RFC 6902 operations that turn `from` into `to`: objects are compared member by member, arrays and scalars are replaced
+ * whole. Twin of .NET `JsonPatch.Diff` (both are checked by `spec/json-patch.conformance.json`).
+ */
+export function jsonPatchDiff(from: WorkflowData, to: WorkflowData): WorkflowJsonPatchOperation[] {
+  const operations: WorkflowJsonPatchOperation[] = [];
+  diffInto(from, to, '', operations);
+  return operations;
+}
+
+/** Whether `transition` takes a JSON Patch (`input.format: jsonPatch`) instead of an object. */
+export function workflowTransitionIsPatch(transition: Pick<AvailableTransitionModel, 'inputFormat'> | null | undefined): boolean {
+  return transition?.inputFormat === 'jsonPatch';
+}
+
+/**
+ * Initial value of a transition form: for a `jsonPatch` transition the data it edits (at `inputInto`, limited to the
+ * schema's properties), so the user changes the current values; null for an ordinary transition (empty form).
+ */
+export function workflowTransitionPrefill(data: WorkflowData | null | undefined, transition: AvailableTransitionModel): WorkflowData | null {
+  return workflowTransitionIsPatch(transition) ? workflowStepPrefill(data, transition.inputInto, transition.inputSchema) : null;
+}
+
+/**
+ * Request body of a transition from its form value. For a `jsonPatch` transition: `{ patch: [...] }` with the difference
+ * between the data the form started from and the submitted value (cleared fields become `remove`); otherwise the value.
+ */
+export function workflowTransitionInput(
+  data: WorkflowData | null | undefined,
+  transition: AvailableTransitionModel,
+  value: WorkflowData | null,
+): WorkflowData | null {
+  if (!workflowTransitionIsPatch(transition)) {
+    return value;
+  }
+
+  const edited: WorkflowData = {};
+  for (const [name, item] of Object.entries(value ?? {})) {
+    if (item !== null && item !== undefined) {
+      edited[name] = item;
+    }
+  }
+
+  return { patch: jsonPatchDiff(workflowTransitionPrefill(data, transition) ?? {}, edited) };
 }
 
 /**

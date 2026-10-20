@@ -99,6 +99,9 @@ public sealed class FaultsController : BaseController
 
     [HttpGet("missing")]
     public IActionResult Missing() => throw new KeyNotFoundException("no such thing");
+
+    [HttpGet("unreadable")]
+    public IActionResult Unreadable() => throw new Microsoft.AspNetCore.Http.BadHttpRequestException("Failed to read parameter from the request body as JSON.");
 }
 
 [ApiVersion("1.0")]

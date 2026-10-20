@@ -47,6 +47,22 @@
         }
       ]
     },
+    {
+      "widget": "section",
+      "title": "Fatura İletişim Bilgileri",
+      "visibleWhen": "data.billingContact != null",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "E-posta", "value": "{{ data.billingContact.email }}", "visibleWhen": "data.billingContact.email != null" },
+            { "label": "Telefon", "value": "{{ data.billingContact.phone }}", "visibleWhen": "data.billingContact.phone != null" },
+            { "label": "Fatura Adresi", "value": "{{ data.billingContact.address }}", "visibleWhen": "data.billingContact.address != null" },
+            { "label": "Son Güncelleyen", "value": "{{ data.contactUpdatedBy }}", "visibleWhen": "data.contactUpdatedBy != null" }
+          ]
+        }
+      ]
+    },
     { "widget": "layout", "key": "workflow-footer" }
   ]
 }

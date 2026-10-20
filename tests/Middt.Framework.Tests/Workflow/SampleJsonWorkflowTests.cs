@@ -430,6 +430,43 @@ public sealed class SampleJsonWorkflowTests
     }
 
     [Fact]
+    public async Task Invoice_collection_can_be_driven_manually_without_a_message_source()
+    {
+        var httpHandler = new FakeHttpHandler { StatusCode = HttpStatusCode.OK, ResponseBody = """{"status":"Approved","referenceCode":"GW-LEDGER02"}""" };
+        await using var host = await CreateHostAsync(httpHandler);
+        var invoice = await host.StartInstanceAsync("invoice-collection",
+            new { invoiceNo = "FTR-2026-0101", customerName = "Deniz Ticaret", total = 12500, description = new string('x', 300) }, user: Alice);
+
+        // The billing contact is edited with a JSON Patch on data.billingContact (input.format: jsonPatch).
+        var contactTransition = (await host.GetAsync(invoice.Id, Alice)).AvailableTransitions.Single(t => t.Key == "update-billing-contact");
+        contactTransition.InputFormat.Should().Be("jsonPatch");
+        await host.TransitionAsync(invoice.Id, "update-billing-contact", new JsonObject
+        {
+            ["patch"] = JsonNode.Parse("""[ { "op": "add", "path": "/email", "value": "finans@deniz.com" }, { "op": "add", "path": "/phone", "value": "02125550000" } ]"""),
+        }, Alice);
+        var contactUpdated = await host.TransitionAsync(invoice.Id, "update-billing-contact", new JsonObject
+        {
+            ["patch"] = JsonNode.Parse("""[ { "op": "test", "path": "/phone", "value": "02125550000" }, { "op": "replace", "path": "/phone", "value": "02125551111" } ]"""),
+        }, Alice);
+        contactUpdated.Data["billingContact"]!.ToJsonString().Should().Be("""{"email":"finans@deniz.com","phone":"02125551111"}""");
+        contactUpdated.Data["contactUpdatedBy"]!.GetValue<string>().Should().Be("alice@test.com");
+
+        // Without a message source the same steps are buttons for a manager.
+        (await host.GetAsync(invoice.Id, Alice)).AvailableTransitions.Select(t => t.Key)
+            .Should().Contain(["record-partial-payment", "record-payment", "cancel-invoice"]).And.NotContain(["payment-received", "partial-payment"]);
+        await host.TransitionAsync(invoice.Id, "record-partial-payment", new { amount = 5000, reference = "EFT-0101" }, Alice);
+        var reconciling = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 12500, reference = "EFT-0102" }, Alice);
+        reconciling.State.Should().Be("reconciling");
+        reconciling.Status.Should().Be(WorkflowInstanceStatus.Active);
+
+        await host.RunJobsAsync();
+        (await host.GetAsync(invoice.Id)).State.Should().Be("paid");
+
+        (await host.HistoryAsync(invoice.Id)).Select(h => h.TransitionKey).Should().Equal(
+            "start", "update-billing-contact", "update-billing-contact", "record-partial-payment", "record-payment", "$background", "reconciled");
+    }
+
+    [Fact]
     public async Task Sla_escalation_chains_triage_supports_critical_escalation_self_transitions_dynamic_timer_and_timeout()
     {
         await using var host = await CreateHostAsync();

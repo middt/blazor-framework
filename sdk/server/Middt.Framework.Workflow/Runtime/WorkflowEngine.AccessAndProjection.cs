@@ -261,6 +261,7 @@ public sealed partial class WorkflowEngine
                     View = string.IsNullOrWhiteSpace(t.View?.Component) ? null : t.View.Component,
                     Inline = t.View?.Inline == true,
                     InputInto = t.Input?.Into,
+                    InputFormat = t.Input?.Format == InputFormat.JsonPatch ? "jsonPatch" : null,
                 })
                 .ToList()
             : [];

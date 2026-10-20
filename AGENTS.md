@@ -21,7 +21,8 @@ A .NET 10 framework for line-of-business apps with **two interchangeable fronten
   sign-in/registration/reset/MFA flows are workflow journeys, with a Blazor UI + admin console. The demos' BFFs sign in
   there; the API validates its tokens.
 - **Contracts shared by .NET and TypeScript**: layout model + widget specs, the **portable expression language**
-  (`{{ }}` templates, `visibleWhen`) with a shared conformance suite in `spec/`.
+  (`{{ }}` templates, `visibleWhen`) with a shared conformance suite in `spec/`, and RFC 6902 JSON Patch diffs
+  (`spec/json-patch.conformance.json`) used by `input.format: jsonPatch` transitions.
 
 ## Repository map
 

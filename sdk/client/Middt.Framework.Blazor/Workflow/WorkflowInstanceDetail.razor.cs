@@ -35,6 +35,9 @@ public partial class WorkflowInstanceDetail
     // Wizard step form (inline transition)
     private AvailableTransitionModel? stepTransition;
     private JsonObject? stepPrefill;
+
+    /// <summary>Initial value of the transition dialog form (the edited data of a <c>jsonPatch</c> transition).</summary>
+    private JsonObject? pendingPrefill;
     private JsonSchemaForm? stepForm;
     private ElementReference stateHeading;
     private List<string> stepErrors = [];
@@ -195,6 +198,7 @@ public partial class WorkflowInstanceDetail
     {
         transitionErrors = [];
         pendingHasInput = transition.InputSchema?["properties"] is JsonObject { Count: > 0 };
+        pendingPrefill = WorkflowUi.TransitionPrefill(instance?.Data, transition);
         pendingTransition = transition;
     }
 
@@ -319,7 +323,8 @@ public partial class WorkflowInstanceDetail
         {
             await ExecuteMethod(async () =>
             {
-                var response = await WorkflowClient.ExecuteTransitionAsync(Workflow, instance.Id, transition.Key, input, cancellationToken: ComponentCancellation);
+                var body = WorkflowUi.TransitionInput(instance.Data, transition, input);
+                var response = await WorkflowClient.ExecuteTransitionAsync(Workflow, instance.Id, transition.Key, body, cancellationToken: ComponentCancellation);
                 if (!response.IsSuccess || response.Data is null)
                 {
                     var errors = response.MessageList.Count > 0 ? response.MessageList : ["İşlem uygulanamadı."];

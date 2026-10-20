@@ -112,9 +112,12 @@ the definition supplies that header. An explicit retry is a new command and can 
 
 History rows keep a full data snapshot (`history: full`), mostly only the change as a JSON Patch with a snapshot
 checkpoint at the first and final row, every `historySnapshotEvery` rows and when a patch saves nothing (`delta`), or
-nothing (`none`; the instance data row is still written on every transition). Clients never see patches; the engine
-derives them after each transition (`WorkflowJsonPatch.Diff`) and `HistoryDataAsync` replays them – examples in the
-README section "History modes". The EF model is cached per workflow schema, so several workflow schemas can live in one process.
+nothing (`none`; the instance data row is still written on every transition). These history patches are derived by the
+engine after each transition (`JsonPatch.Diff`) and replayed by `HistoryDataAsync` – examples in the README section
+"History modes". Separately, a transition with `input.format: jsonPatch` takes a client's RFC 6902 patch on the data at
+its `into` path (`JsonPatch.ApplyStrict`, atomic, validated by the input schema); `JsonPatch` lives in the shared
+`Middt.Framework.Expressions` so the Blazor frontend computes form patches with the same code, and its TypeScript twin is
+checked against it by `spec/json-patch.conformance.json`. The EF model is cached per workflow schema, so several workflow schemas can live in one process.
 
 Definition versions are retained for running instances. Instance-level access checks and list filters apply each
 instance's stored version of `roles` and `instanceAccess`, rather than the newest definition's rules.

@@ -21,3 +21,4 @@ Answer these before finishing a change (add tests for anything security relevant
 - **Headers**: CSP not loosened (no inline scripts), security headers kept, compression not applied to pages that
   reflect input next to secrets (BREACH).
 - **Dependencies**: `dotnet list package --vulnerable --include-transitive`, `npm audit --omit=dev` clean.
+- **JSON Patch inputs** (`input.format: jsonPatch`): is `into` a subtree the caller may own, and does `schema` (with `additionalProperties: false`) bound what the patch can produce? Never point `into` at data written by tasks, roles or approvals.

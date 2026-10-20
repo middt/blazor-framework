@@ -93,6 +93,19 @@ export interface AvailableTransitionModel {
   inline?: boolean;
   /** Data path the input is stored under (lets UIs pre-fill the form when a step is revisited). */
   inputInto?: string | null;
+  /**
+   * `jsonPatch` when the transition expects an RFC 6902 JSON Patch on the data at `inputInto` (body `[{op, path, value}]`
+   * or `{ patch: [...] }`) instead of an object; null for a plain object body. See `workflowTransitionInput`.
+   */
+  inputFormat?: 'jsonPatch' | null;
+}
+
+/** One RFC 6902 JSON Patch operation. */
+export interface WorkflowJsonPatchOperation {
+  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
+  path: string;
+  value?: unknown;
+  from?: string;
 }
 
 export interface ScheduledTransitionModel {

@@ -71,7 +71,7 @@ public sealed partial class WorkflowEngine
             return new JsonObject
             {
                 ["status"] = "completed",
-                ["patch"] = WorkflowJsonPatch.Diff(before, run.Data),
+                ["patch"] = JsonPatch.Diff(before, run.Data),
                 ["tasks"] = JsonSerializer.SerializeToNode(run.CurrentHopTasks, WorkflowJson.Options),
                 ["continued"] = new JsonArray([.. run.ContinuedErrors.Select(e => (JsonNode)new JsonObject
                 {
@@ -113,7 +113,7 @@ public sealed partial class WorkflowEngine
 
             if (result["status"]?.GetValue<string>() == "completed")
             {
-                WorkflowJsonPatch.Apply(run.Data, (JsonArray)result["patch"]!);
+                JsonPatch.Apply(run.Data, (JsonArray)result["patch"]!);
                 foreach (var continued in result["continued"]?.AsArray() ?? [])
                 {
                     AddIncident(run, BackgroundTransition, continued!["taskKey"]!.GetValue<string>(), continued["error"]!.GetValue<string>(), continued["attempts"]!.GetValue<int>());

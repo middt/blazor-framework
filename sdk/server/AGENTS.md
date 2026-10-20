@@ -20,7 +20,7 @@ Common · Api · Workflow · Ui.Server · Rebus. **Must not reference any client
 - A running claim refreshes `BusySince` (`StartBusyHeartbeat`, `BusyHeartbeatInterval`); recovery only faults claims whose
   heartbeat stopped. Long calls belong in `"background": true` onEntry tasks (`WorkflowEngine.Background.cs`): a `Task` job
   runs the task outside the claim, stores the outcome on the job, then claims and merges it as a JSON Patch
-  (`WorkflowJsonPatch`); a result for a state that was left is discarded (`BackgroundTaskId`).
+  (`JsonPatch` (Middt.Framework.Expressions)); a result for a state that was left is discarded (`BackgroundTaskId`).
 - Jobs: on PostgreSQL claimed one at a time with `FOR UPDATE SKIP LOCKED`, leases renewed while running
   (`WorkflowHeartbeat`). After committing jobs call `WorkflowJobNotifier.NotifyAsync` (local signal + `NOTIFY`); other nodes
   wake through `WorkflowJobListener` (`LISTEN`).
@@ -29,6 +29,11 @@ Common · Api · Workflow · Ui.Server · Rebus. **Must not reference any client
   the instance enters a state that takes it.
 - History: `AddHistory` is the only writer – `full` snapshot, `delta` (patch + checkpoint snapshots: first/final row,
   `HistorySnapshotEvery`, patch not smaller than data), `none`. `HistoryDataAsync` replays both kinds of rows.
+- `input.format: jsonPatch`: the body is an RFC 6902 patch applied by `JsonPatch.ApplyStrict` (shared
+  `Middt.Framework.Expressions`) to the data at `into` only, then validated by the input schema (`ApplyPatchInput`). Keep
+  `into` + `schema` mandatory (the validator enforces it) – a root-level patch would let clients overwrite task output.
+  Bare array bodies are wrapped as `{ "patch": [...] }` by the endpoint. Any change to `JsonPatch` must keep
+  `spec/json-patch.conformance.json` green in .NET and ui-core.
 - Schema changes: new columns go at the END of the partitioned DDL (`WorkflowPartitionManager`, positional row copies) and
   nullable (`EnsureColumnsAsync` adds them to existing databases). The EF model is cached per schema
   (`WorkflowModelCacheKeyFactory`).

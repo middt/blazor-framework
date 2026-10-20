@@ -328,7 +328,7 @@
   @if (pendingTransition(); as pending) {
     <form [id]="idPrefix() + '-transition-form'" novalidate (submit)="$event.preventDefault(); executePending()">
       @if (pendingHasInput()) {
-        <middt-json-schema-form #transitionForm [schema]="pending.inputSchema" [idPrefix]="idPrefix() + '-tr-' + pending.key" [disabled]="executing()" />
+        <middt-json-schema-form #transitionForm [schema]="pending.inputSchema" [value]="pendingPrefill()" [idPrefix]="idPrefix() + '-tr-' + pending.key" [disabled]="executing()" />
       } @else {
         <p>"{{ transitionText(pending) }}" işlemi uygulanacak. Onaylıyor musunuz?</p>
       }

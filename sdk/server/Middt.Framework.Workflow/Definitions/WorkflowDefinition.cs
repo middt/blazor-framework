@@ -245,12 +245,35 @@ public sealed class InstanceAccessDefinition
     public bool IsOwnerOnly => string.Equals(Mode, Owner, StringComparison.Ordinal);
 }
 
+/// <summary>How a transition's request body changes the data (<see cref="InputDefinition.Format"/>).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<InputFormat>))]
+public enum InputFormat
+{
+    /// <summary>The body is an object, validated by the schema and merged into the data at <c>into</c> (default).</summary>
+    Merge,
+
+    /// <summary>
+    /// The body is an RFC 6902 JSON Patch (<c>[ {op, path, value} ]</c>) applied to the data at <c>into</c>; the schema
+    /// validates the result. Lets a client change one field, remove a field or append to a list without resending the rest.
+    /// </summary>
+    JsonPatch,
+}
+
 /// <summary>
 /// Validates the request body (<see cref="Schema"/>) and copies it into the instance data. Without a schema the body is
 /// ignored and only <see cref="Set"/> expressions are applied.
 /// </summary>
 public sealed class InputDefinition
 {
+    /// <summary>
+    /// <c>merge</c> (default: the body object is merged) or <c>jsonPatch</c>. A <c>jsonPatch</c> transition takes a JSON Patch whose paths are
+    /// relative to <see cref="Into"/> (required, so a client can only change the part of the data it owns); <see cref="Schema"/>
+    /// (required) validates that part after the patch. Operations: <c>add</c>, <c>remove</c>, <c>replace</c>, <c>move</c>,
+    /// <c>copy</c>, <c>test</c> (a failed <c>test</c> is a conflict, e.g. for optimistic checks). The patch is applied
+    /// atomically or not at all.
+    /// </summary>
+    public InputFormat Format { get; set; } = InputFormat.Merge;
+
     /// <summary>JSON Schema (subset: type, properties, required, additionalProperties, enum, min/max, minLength/maxLength, pattern, items; UI hint x-lookup, see <see cref="Schema.JsonSchemaValidator"/>).</summary>
     public JsonObject? Schema { get; set; }
 

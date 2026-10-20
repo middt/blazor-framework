@@ -95,6 +95,13 @@ public sealed class AvailableTransitionModel
 
     /// <summary>Data path the input is stored under (lets UIs pre-fill the form when a step is revisited).</summary>
     public string? InputInto { get; set; }
+
+    /// <summary>
+    /// <c>jsonPatch</c> when the transition expects an RFC 6902 JSON Patch on the data at <see cref="InputInto"/> (body
+    /// <c>[ {op, path, value} ]</c> or <c>{ "patch": [...] }</c>) instead of an object; <c>null</c> for a plain object body.
+    /// UIs pre-fill the form with that data and send the difference.
+    /// </summary>
+    public string? InputFormat { get; set; }
 }
 
 public sealed class ScheduledTransitionModel

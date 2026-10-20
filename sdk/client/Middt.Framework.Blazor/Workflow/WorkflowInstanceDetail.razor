@@ -251,7 +251,7 @@
         {
             @if (pendingHasInput)
             {
-                <JsonSchemaForm @ref="transitionForm" Schema="@pendingTransition.InputSchema" IdPrefix="@($"{IdPrefix}-tr-{pendingTransition.Key}")" Disabled="@executing" />
+                <JsonSchemaForm @ref="transitionForm" Schema="@pendingTransition.InputSchema" Value="@pendingPrefill" IdPrefix="@($"{IdPrefix}-tr-{pendingTransition.Key}")" Disabled="@executing" />
             }
             else
             {

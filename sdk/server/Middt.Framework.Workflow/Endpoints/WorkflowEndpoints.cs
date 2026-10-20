@@ -26,7 +26,8 @@ public static class WorkflowEndpoints
     /// <item><c>GET /</c> workflows · <c>GET /{workflow}</c> states and transitions</item>
     /// <item><c>POST /{workflow}/instances</c> start · <c>GET /{workflow}/instances</c> list</item>
     /// <item><c>GET /{workflow}/instances/{id}</c> instance with available transitions</item>
-    /// <item><c>POST /{workflow}/instances/{id}/transitions/{transition}[?async=true]</c> execute (200, or 202 when queued)</item>
+    /// <item><c>POST /{workflow}/instances/{id}/transitions/{transition}[?async=true]</c> execute (200, or 202 when queued);
+    /// the body is an object, or a JSON Patch array for <c>input.format: jsonPatch</c></item>
     /// <item><c>GET …/history</c> · <c>GET …/incidents</c> · <c>POST …/retry</c></item>
     /// <item><c>POST /{workflow}/instances/{id}/messages/{message}</c> · <c>POST /{workflow}/messages/{message}?key=</c>
     /// deliver a message to an event transition (200, or 202 when buffered with <c>?bufferFor=PT10M</c>)</item>
@@ -104,10 +105,19 @@ public static class WorkflowEndpoints
             return Results.Ok(BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1));
         }).WithName("GetWorkflowInstance");
 
-        group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
+        group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonNode? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
+            // A bare JSON array is a JSON Patch (input.format: jsonPatch); it travels as { "patch": [...] }.
+            var request = input switch
+            {
+                null => null,
+                JsonObject obj => obj,
+                JsonArray patch => new JsonObject { [WorkflowEngine.PatchProperty] = patch.DeepClone() },
+                _ => throw new WorkflowValidationException(["The body must be a JSON object or a JSON Patch array."]),
+            };
+
             // The engine checks access and the workflow on the row it loads anyway (no separate read).
-            var enrichedInput = WorkflowHttpInput.FromHttpContext(http, input);
+            var enrichedInput = WorkflowHttpInput.FromHttpContext(http, request);
             var instance = await engine.ExecuteTransitionAsync(workflow, id, transition, enrichedInput, WorkflowUser.From(principal), async == true, ct);
             http.Response.Headers.ETag = ComputeInstanceETag(instance);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);

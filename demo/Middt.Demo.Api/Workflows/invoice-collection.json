@@ -87,6 +87,63 @@
           }
         },
         {
+          "key": "record-partial-payment",
+          "title": "Kısmi Ödeme Kaydet",
+          "target": "$self",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 5000 },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
+              }
+            },
+            "into": "lastPartialPayment",
+            "set": { "recordedBy": "user.Name" }
+          }
+        },
+        {
+          "key": "record-payment",
+          "title": "Ödemeyi Kaydet (Tam)",
+          "target": "reconciling",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 12500 },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
+              }
+            },
+            "into": "payment",
+            "set": { "recordedBy": "user.Name" }
+          }
+        },
+        {
+          "key": "update-billing-contact",
+          "title": "Fatura İletişim Bilgilerini Güncelle",
+          "target": "$self",
+          "input": {
+            "format": "jsonPatch",
+            "into": "billingContact",
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "email": { "type": "string", "format": "email", "maxLength": 120, "title": "E-posta" },
+                "phone": { "type": "string", "maxLength": 20, "title": "Telefon" },
+                "address": { "type": "string", "maxLength": 300, "title": "Fatura Adresi" }
+              }
+            },
+            "set": { "contactUpdatedBy": "user.Name" }
+          }
+        },
+        {
           "key": "mark-overdue",
           "title": "Vade Doldu",
           "target": "overdue",
@@ -137,6 +194,25 @@
               }
             },
             "into": "payment"
+          }
+        },
+        {
+          "key": "record-late-payment",
+          "title": "Gecikmeli Ödemeyi Kaydet",
+          "target": "reconciling",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 12500 },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
+              }
+            },
+            "into": "payment",
+            "set": { "recordedBy": "user.Name" }
           }
         },
         {

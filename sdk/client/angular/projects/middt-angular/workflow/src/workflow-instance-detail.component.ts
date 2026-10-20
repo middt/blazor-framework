@@ -43,6 +43,8 @@ import {
   workflowTransitionStyle,
   workflowTransitionTitle,
   workflowTriggerText,
+  workflowTransitionInput,
+  workflowTransitionPrefill,
   workflowWizardSteps,
 } from '@middt/ui-core';
 import type {
@@ -130,6 +132,12 @@ export class MiddtWorkflowInstanceDetailComponent {
   protected readonly steps = computed(() => workflowWizardSteps(this.definition(), this.instance(), this.history()));
   protected readonly graph = computed(() => workflowBuildGraph(this.definition(), this.instance(), this.history()));
   protected readonly nodeClass = workflowGraphNodeClass;
+
+  /** Initial value of the transition dialog form (the edited data of a `jsonPatch` transition, otherwise empty). */
+  protected readonly pendingPrefill = computed(() => {
+    const pending = this.pendingTransition();
+    return pending === null ? null : workflowTransitionPrefill(this.instance()?.data, pending);
+  });
 
   /** The inline transition rendered as the wizard step form. */
   protected readonly stepTransition = computed(() => workflowStepTransition(this.instance()));
@@ -381,7 +389,9 @@ export class MiddtWorkflowInstanceDetailComponent {
     this.transitionErrors.set([]);
     this.stepErrors.set([]);
     try {
-      const response = await this.#client.executeTransition(this.workflow(), instance.id, transition.key, input, false, this.#abort.signal);
+      // A jsonPatch transition sends the difference between the data its form started from and the submitted value.
+      const body = workflowTransitionInput(instance.data, transition, input);
+      const response = await this.#client.executeTransition(this.workflow(), instance.id, transition.key, body, false, this.#abort.signal);
       if (!isSuccess(response) || !response.data) {
         const errors = response.messageList.length > 0 ? response.messageList : ['İşlem uygulanamadı.'];
         if (fromStep) {

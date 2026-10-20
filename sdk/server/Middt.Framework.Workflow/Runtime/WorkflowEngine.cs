@@ -228,6 +228,11 @@ public sealed partial class WorkflowEngine(
                 throw new WorkflowValidationException(["Transitions with sensitive input cannot run asynchronously."]);
             }
 
+            if (transition.Input?.Format == InputFormat.JsonPatch)
+            {
+                throw new WorkflowValidationException(["Transitions with a jsonPatch input cannot run asynchronously (a failed patch must reach the caller)."]);
+            }
+
             db.Jobs.Add(NewJob(snapshot, WorkflowJobKind.Transition, transitionKey, snapshot.State, Now, input?.ToJsonString(), user.AuditName));
             await db.SaveChangesAsync(cancellationToken);
             await jobNotifier.NotifyAsync(db, cancellationToken);
@@ -581,7 +586,7 @@ public sealed partial class WorkflowEngine(
             }
             else if (row.Patch is not null && JsonNode.Parse(row.Patch) is JsonArray patch)
             {
-                WorkflowJsonPatch.Apply(current, patch);
+                JsonPatch.Apply(current, patch);
             }
 
             result.Add((row.TransitionKey, row.DataVersion, (JsonObject)current.DeepClone()));
@@ -1299,11 +1304,15 @@ public sealed partial class WorkflowEngine(
             return; // no declared input: the body is never written into instance data
         }
 
-        var target = WorkflowHttpInput.ExtractBody(input, definition.Schema);
-
-        // The body is only written when a schema validated it; an input block with just "set" ignores the body.
-        if (target is not null && definition.Schema is not null && definition.Persistable(target) is { } persistable)
+        if (definition.Format == InputFormat.JsonPatch)
         {
+            ApplyPatchInput(run, definition, input);
+        }
+        else if (definition.Schema is not null
+            && WorkflowHttpInput.ExtractBody(input, definition.Schema) is { } target
+            && definition.Persistable(target) is { } persistable)
+        {
+            // The body is only written when a schema validated it; an input block with just "set" ignores the body.
             JsonPath.Merge(run.Data, persistable, definition.Into);
         }
 
@@ -1313,8 +1322,53 @@ public sealed partial class WorkflowEngine(
         }
     }
 
+    /// <summary>
+    /// <c>input.format: jsonPatch</c>: applies the client's patch to the data at <c>into</c> (atomically), validates the result
+    /// with the schema and writes it back. A failed <c>test</c> operation is a conflict (409), anything else a 400.
+    /// </summary>
+    private static void ApplyPatchInput(Run run, InputDefinition definition, JsonObject? input)
+    {
+        var patch = (JsonArray)WorkflowHttpInput.ExtractBody(input, definition.Schema)![PatchProperty]!;
+        var target = JsonPath.Get(run.Data, definition.Into) is JsonObject current ? (JsonObject)current.DeepClone() : [];
+        try
+        {
+            JsonPatch.ApplyStrict(target, patch);
+        }
+        catch (JsonPatchException ex) when (ex.IsTestFailure)
+        {
+            throw new WorkflowConflictException($"JSON Patch {ex.Message}");
+        }
+        catch (JsonPatchException ex)
+        {
+            throw new WorkflowValidationException([$"JSON Patch {ex.Message}"]);
+        }
+
+        var errors = JsonSchemaValidator.Validate(target, definition.Schema!);
+        if (errors.Count > 0)
+        {
+            throw new WorkflowValidationException(errors);
+        }
+
+        JsonPath.Set(run.Data, definition.Into!, target);
+    }
+
+    /// <summary>Body property that carries a JSON Patch (<c>{ "patch": [...] }</c>; a bare array body is wrapped into it).</summary>
+    internal const string PatchProperty = "patch";
+
     private static void ValidateInput(TransitionDefinition transition, JsonObject? input)
     {
+        if (transition.Input is { Format: InputFormat.JsonPatch } patchInput)
+        {
+            var body = WorkflowHttpInput.ExtractBody(input, patchInput.Schema);
+            var errors = JsonPatch.Validate(body?[PatchProperty]);
+            if (errors.Count > 0)
+            {
+                throw new WorkflowValidationException(errors);
+            }
+
+            return;
+        }
+
         if (transition.Input?.Schema is { } schema)
         {
             var target = WorkflowHttpInput.ExtractBody(input, schema);
@@ -1721,7 +1775,7 @@ public sealed partial class WorkflowEngine(
         string? patch = null;
         if (mode == HistoryMode.Delta)
         {
-            var candidate = data == previous ? "[]" : WorkflowJsonPatch.Diff(JsonPath.ParseObject(previous), run.Data).ToJsonString();
+            var candidate = data == previous ? "[]" : JsonPatch.Diff(JsonPath.ParseObject(previous), run.Data).ToJsonString();
             var since = run.Instance.HistoryPatchCount;
             var checkpoint = since is null                                              // first row (or rows written before delta)
                 || since.Value + 1 >= run.Definition.HistorySnapshotEvery               // bound the replay length

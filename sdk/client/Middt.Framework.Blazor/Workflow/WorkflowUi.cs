@@ -210,6 +210,40 @@ public static class WorkflowUi
         }
     }
 
+    /// <summary>Whether <paramref name="transition"/> takes a JSON Patch (<c>input.format: jsonPatch</c>) instead of an object.</summary>
+    public static bool IsPatch(AvailableTransitionModel transition) => transition.InputFormat == "jsonPatch";
+
+    /// <summary>
+    /// Initial value of a transition form: for a <c>jsonPatch</c> transition the data it edits (at <c>inputInto</c>, limited to
+    /// the schema's properties); <c>null</c> for an ordinary transition (empty form). Twin of ui-core <c>workflowTransitionPrefill</c>.
+    /// </summary>
+    public static JsonObject? TransitionPrefill(JsonObject? data, AvailableTransitionModel transition) =>
+        IsPatch(transition) ? StepPrefill(data, transition.InputInto, transition.InputSchema) : null;
+
+    /// <summary>
+    /// Request body of a transition from its form value: for a <c>jsonPatch</c> transition <c>{ "patch": [...] }</c> with the
+    /// difference between the data the form started from and the submitted value (cleared fields become <c>remove</c>);
+    /// otherwise the value. Twin of ui-core <c>workflowTransitionInput</c>.
+    /// </summary>
+    public static JsonObject? TransitionInput(JsonObject? data, AvailableTransitionModel transition, JsonObject? value)
+    {
+        if (!IsPatch(transition) || value is null)
+        {
+            return value;
+        }
+
+        var edited = new JsonObject();
+        foreach (var (name, item) in value)
+        {
+            if (item is not null)
+            {
+                edited[name] = item.DeepClone();
+            }
+        }
+
+        return new JsonObject { ["patch"] = Middt.Framework.Expressions.JsonPatch.Diff(TransitionPrefill(data, transition) ?? [], edited) };
+    }
+
     /// <summary>
     /// Initial value of a step form: the data stored at <paramref name="inputInto"/> (dot path; root when empty) when the step
     /// is revisited, limited to the properties declared by <paramref name="schema"/>. <c>null</c> when nothing is stored.

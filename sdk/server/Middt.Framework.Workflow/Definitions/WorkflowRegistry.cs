@@ -238,6 +238,11 @@ internal static class WorkflowDefinitionValidator
             yield return error;
         }
 
+        if (wf.Start.Input?.Format == InputFormat.JsonPatch)
+        {
+            yield return "start: the start transition cannot take a jsonPatch input (there is no data to patch yet).";
+        }
+
         if (wf.Start.Trigger == TriggerType.Event)
         {
             yield return "start: the start transition cannot be an event transition (messages correlate to existing instances).";
@@ -428,6 +433,29 @@ internal static class WorkflowDefinitionValidator
         else if (t.Trigger != TriggerType.Event && !string.IsNullOrWhiteSpace(t.Event))
         {
             yield return $"{where}: 'event' is only valid with \"trigger\": \"Event\".";
+        }
+
+        if (t.Input is { Format: InputFormat.JsonPatch } patchInput)
+        {
+            if (string.IsNullOrWhiteSpace(patchInput.Into))
+            {
+                yield return $"{where}: input.format jsonPatch needs 'into' (the part of the data the patch may change).";
+            }
+
+            if (patchInput.Schema is null)
+            {
+                yield return $"{where}: input.format jsonPatch needs 'schema' (it validates the data at 'into' after the patch).";
+            }
+
+            if (patchInput.Sensitive.Count > 0)
+            {
+                yield return $"{where}: input.format jsonPatch cannot declare 'sensitive' properties.";
+            }
+
+            if (t.Trigger == TriggerType.Event)
+            {
+                yield return $"{where}: event transitions cannot take a jsonPatch input (messages carry objects).";
+            }
         }
 
         foreach (var task in t.OnExecute.Where(task => task.Background))

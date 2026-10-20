@@ -1,11 +1,12 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Middt.Framework.Workflow.Expressions;
+using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Runtime;
 
 namespace Middt.Framework.Tests.Workflow;
 
-public sealed class WorkflowJsonPatchTests
+public sealed class JsonPatchTests
 {
     [Fact]
     public void Diff_then_apply_reproduces_the_target()
@@ -13,9 +14,9 @@ public sealed class WorkflowJsonPatchTests
         var from = JsonNode.Parse("""{ "a": 1, "keep": "x", "gone": true, "nested": { "b": 2, "c": [1, 2] }, "n": null }""")!.AsObject();
         var to = JsonNode.Parse("""{ "a": 2, "keep": "x", "nested": { "b": 2, "c": [1, 2, 3], "d": { "e": "f" } }, "n": null, "added": null, "a/b~c": 1 }""")!.AsObject();
 
-        var patch = WorkflowJsonPatch.Diff(from, to);
+        var patch = JsonPatch.Diff(from, to);
         var replayed = (JsonObject)from.DeepClone();
-        WorkflowJsonPatch.Apply(replayed, patch);
+        JsonPatch.Apply(replayed, patch);
 
         JsonNode.DeepEquals(replayed, to).Should().BeTrue();
         patch.Select(op => op!["path"]!.GetValue<string>()).Should().BeEquivalentTo(["/a", "/gone", "/nested/c", "/nested/d", "/added", "/a~1b~0c"]);
@@ -25,13 +26,13 @@ public sealed class WorkflowJsonPatchTests
     public void Equal_documents_give_an_empty_patch()
     {
         var data = JsonNode.Parse("""{ "a": { "b": [1, { "c": 2 }] } }""")!.AsObject();
-        WorkflowJsonPatch.Diff(data, (JsonObject)data.DeepClone()).Should().BeEmpty();
+        JsonPatch.Diff(data, (JsonObject)data.DeepClone()).Should().BeEmpty();
     }
 
     [Fact]
     public void Apply_rejects_unknown_operations()
     {
-        var act = () => WorkflowJsonPatch.Apply([], JsonNode.Parse("""[{ "op": "move", "path": "/a", "from": "/b" }]""")!.AsArray());
+        var act = () => JsonPatch.Apply([], JsonNode.Parse("""[{ "op": "move", "path": "/a", "from": "/b" }]""")!.AsArray());
         act.Should().Throw<FormatException>();
     }
 }

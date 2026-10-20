@@ -5,7 +5,7 @@
 | CI build | `dotnet build Middt.Framework.slnx -p:ContinuousIntegrationBuild=true` | warnings are errors |
 | .NET tests | `dotnet test --project tests/Middt.Framework.Tests` | complete xunit suite |
 | PostgreSQL tests | `dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*WorkflowPostgresTests"` | Testcontainers (`postgres:17-alpine`, needs Docker; skipped with the reason when Docker is missing): partitions, jsonb GIN plans, two-node claim races, `SKIP LOCKED`, `LISTEN`/`NOTIFY`, schema upgrade. Each host gets its own schema (`WorkflowTestHost.StartPostgresAsync`); two hosts on one schema act as two nodes |
-| Contracts | conformance + schema tests (part of the .NET tests) and `node --test` in ui-core | regenerate schema with `MIDDT_UPDATE_SPEC=1` |
+| Contracts | conformance + schema tests (part of the .NET tests: expressions, JSON Patch, UI layout schema) and `node --test` in ui-core (expressions and JSON Patch diff cases) | regenerate schema with `MIDDT_UPDATE_SPEC=1` |
 | TypeScript | `cd sdk/client/ui-core && npm run build && node --test test/` | |
 | Angular | `cd sdk/client/angular && npx ng build middt-angular`, then `cd demo/angular-app && npx ng build sample --configuration production` | 0 warnings |
 | Full stack | `docker compose up -d --build` (needs `.env`) | Blazor :8080, Angular :8081, API :8180 |

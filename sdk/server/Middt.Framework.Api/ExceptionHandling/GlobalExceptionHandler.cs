@@ -25,6 +25,8 @@ public sealed partial class GlobalExceptionHandler(
             _ when exception.GetType().Name == "DbUpdateException" => (StatusCodes.Status409Conflict, "Kayıt veritabanına yazılamadı."),
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Kayıt bulunamadı."),
             UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Bu işlem için yetkiniz yok."),
+            // Unreadable body, wrong JSON shape, too large: ASP.NET Core already knows the status (400, 413, …).
+            BadHttpRequestException badRequest => (badRequest.StatusCode, "İstek geçersiz."),
             ArgumentException or FormatException => (StatusCodes.Status400BadRequest, "İstek geçersiz."),
             _ => (StatusCodes.Status500InternalServerError, "Beklenmeyen bir hata oluştu."),
         };

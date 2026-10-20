@@ -27,6 +27,16 @@ public sealed class ProductionErrorHandlingTests(ProductionApiFixture fixture) :
     }
 
     [Fact]
+    public async Task An_unreadable_request_is_a_400_not_a_server_error()
+    {
+        using var response = await fixture.Host.Client.GetAsync("api/v1/faults/unreadable", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(TestApiHost.Json, TestContext.Current.CancellationToken);
+        problem!.Title.Should().Be("İstek geçersiz.");
+    }
+
+    [Fact]
     public async Task KeyNotFoundException_maps_to_404()
     {
         using var response = await fixture.Host.Client.GetAsync("api/v1/faults/missing", TestContext.Current.CancellationToken);
