@@ -79,6 +79,16 @@
       "key": "slaEscalationInstanceId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "invoiceInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "invoiceKey",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1789,6 +1799,308 @@
           }
         }
       ]
+    },
+    {
+      "name": "06 - Invoice Collection (Fatura Tahsilatı: Mesajlar, Arka Plan Görevi, Delta Geçmiş)",
+      "item": [
+        {
+          "name": "1. Tanımı Getir (GET /api/workflows/invoice-collection)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection",
+            "description": "`invoice-collection` tanımı: `history: delta`, `Event` tetikleyicili geçişler (`payment.received`) ve `background: true` muhasebe görevi."
+          }
+        },
+        {
+          "name": "2. Başlat (-> awaiting-payment, iş anahtarı INV-...)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"invoiceInstanceId\", val);",
+                  "        pm.environment.set(\"invoiceInstanceId\", val);",
+                  "        console.log(\"invoiceInstanceId =\", val);",
+                  "    }",
+                  "    if (json.data.key) {",
+                  "        pm.collectionVariables.set(\"invoiceKey\", json.data.key);",
+                  "        pm.environment.set(\"invoiceKey\", json.data.key);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances",
+            "description": "Faturayı başlatır; `setKey` iş anahtarını `INV-{faturaNo}` yapar. Dönen `id` `{{invoiceInstanceId}}`, anahtar `{{invoiceKey}}` değişkenine yazılır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"invoiceNo\": \"FTR-{{$timestamp}}\",\n    \"customerName\": \"Anadolu Lojistik A.Ş.\",\n    \"total\": 12500,\n    \"description\": \"Ekim 2026 lojistik hizmet bedeli\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Akış Durumunu Sorgula (GET Instance)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}",
+            "description": "Durum, veri ve bekleyen zamanlayıcılar (`mark-overdue`, 7 gün). Event geçişleri buton olarak listelenmez (`availableTransitions`)."
+          }
+        },
+        {
+          "name": "4. Mesaj - Kısmi Ödeme (iş anahtarıyla, -> awaiting-payment)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"state = awaiting-payment\", function () {",
+                  "    pm.expect(pm.response.json().data.state).to.eql(\"awaiting-payment\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
+            "description": "Mesaj iş anahtarıyla eşleştirilir. `amount < total` olduğu için `payment-received` kuralı tutmaz, `partial-payment` (`$self`) çalışır; ödeme `lastPartialPayment` altına yazılır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. Mesaj - Tam Ödeme (instance id ile, -> reconciling)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"state = reconciling\", function () {",
+                  "    pm.expect(pm.response.json().data.state).to.eql(\"reconciling\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/messages/payment.received",
+            "description": "Kural tutar (`input.amount >= data.total`), fatura `reconciling` durumuna geçer. Muhasebe çağrısı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0002\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. Akış Durumunu Tekrar Sorgula (-> paid)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"state = paid\", function () {",
+                  "    pm.expect(pm.response.json().data.state).to.eql(\"paid\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}",
+            "description": "Birkaç saniye sonra arka plan görevi biter: `ledgerResponse` veriye eklenir, `reconciledAt` yazılır ve otomatik `reconciled` geçişiyle `paid` durumuna geçilir."
+          }
+        },
+        {
+          "name": "7. Geçmişi Listele (GET History)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/history",
+            "description": "Geçiş tetikleyicileri: `Start`, `Event` (mesaj), `Background` (`$background` satırı), `Automatic`. Akış `history: delta` kullanır: ilk ve son satır tam anlık görüntü, aradakiler yalnızca değişikliği (JSON Patch) tutar."
+          }
+        },
+        {
+          "name": "8. Tamamlanmış Faturaya Mesaj (409 beklenir)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 409\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([409]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
+            "description": "Fatura bittiği için mesajı alamaz: `bufferFor` verilmediğinde 409 döner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 12500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "9. Bekletmeli Mesaj (bufferFor=PT10M, 200 veya 202)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200/202\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key=INV-FTR-BEKLEYEN&bufferFor=PT10M",
+            "description": "Önce `2. Başlat` isteğini `invoiceNo: \"FTR-BEKLEYEN\"` ile çalıştırın. Fatura mesajı hemen alabiliyorsa 200 döner; meşgulse veya uygun durumda değilse mesaj 10 dakika bekletilir (202) ve fatura uygun duruma girdiği anda teslim edilir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0003\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Workflow Key: `invoice-collection`. Ödeme mesajları (`Event` geçişleri, iş anahtarı ile eşleştirme, `bufferFor`), arka planda çalışan muhasebe görevi (`background: true`) ve `history: delta`."
     }
   ]
 }

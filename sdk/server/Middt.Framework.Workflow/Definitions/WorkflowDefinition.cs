@@ -46,7 +46,39 @@ public sealed class WorkflowDefinition
     /// <summary>Optional schema for instance data projection (<c>x-roles</c> field visibility and <c>x-mask</c> field masking).</summary>
     public JsonObject? DataSchema { get; set; }
 
+    /// <summary>
+    /// What each history row keeps of the instance data: <c>full</c> (default) a snapshot, <c>delta</c> mostly only the
+    /// change made by the transition (a JSON Patch) with a snapshot now and then (see <see cref="HistorySnapshotEvery"/>),
+    /// <c>none</c> no history rows at all.
+    /// </summary>
+    public HistoryMode History { get; set; } = HistoryMode.Full;
+
+    /// <summary>
+    /// <c>history: delta</c> only: at most this many patch rows follow each other before a full snapshot is written, so
+    /// rebuilding any version replays at most this many patches. The first row, rows that finish the instance and rows
+    /// whose patch would not be smaller than the data are snapshots anyway. Default 20.
+    /// </summary>
+    public int HistorySnapshotEvery { get; set; } = 20;
+
     public StateDefinition? FindState(string key) => States.FirstOrDefault(s => s.Key == key);
+}
+
+/// <summary>What a history row stores (<see cref="WorkflowDefinition.History"/>).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<HistoryMode>))]
+public enum HistoryMode
+{
+    /// <summary>A full data snapshot per transition.</summary>
+    Full,
+
+    /// <summary>
+    /// Mostly the data change per transition (a JSON Patch in <c>Patch</c>, <c>Data</c> empty), with a full snapshot in
+    /// <c>Data</c> for the first row, rows that finish the instance, every <see cref="WorkflowDefinition.HistorySnapshotEvery"/>
+    /// rows, and when the patch would not be smaller than the data. A version is rebuilt from the nearest snapshot before it.
+    /// </summary>
+    Delta,
+
+    /// <summary>No history rows (one-shot or high-volume flows whose audit lives elsewhere).</summary>
+    None,
 }
 
 public sealed class WorkflowTimeout
@@ -122,6 +154,9 @@ public enum TriggerType
 
     /// <summary>Executed by the scheduler <c>after</c> the given delay since entering the state.</summary>
     Scheduled,
+
+    /// <summary>Executed when a message named <see cref="TransitionDefinition.Event"/> is delivered to the instance.</summary>
+    Event,
 }
 
 public sealed class TransitionDefinition
@@ -148,6 +183,12 @@ public sealed class TransitionDefinition
 
     /// <summary>Marks the automatic "else" branch: evaluated last and always taken.</summary>
     public bool Default { get; set; }
+
+    /// <summary>
+    /// Event transitions only: the message name that triggers it (e.g. <c>payment.received</c>). The message body is the
+    /// transition input (validated by <see cref="Input"/>); <see cref="Rule"/> can further filter it.
+    /// </summary>
+    public string? Event { get; set; }
 
     /// <summary>Delay of a scheduled transition (ISO-8601, TimeSpan, or <c>{{ expression }}</c>).</summary>
     public string? After { get; set; }
@@ -259,6 +300,14 @@ public sealed class TaskDefinition
     public JsonObject Config { get; set; } = [];
 
     public ErrorPolicy? OnError { get; set; }
+
+    /// <summary>
+    /// State <c>onEntry</c> only: run the task outside the instance lock. The state is committed first (the instance stays
+    /// Active: readable, cancellable, other transitions allowed); the task runs as a durable job and its data changes are
+    /// merged when it finishes, then the remaining <c>onEntry</c> tasks and automatic transitions continue. A result that
+    /// arrives after the instance left the state is discarded. Use it for calls that may take minutes.
+    /// </summary>
+    public bool Background { get; set; }
 
     [JsonIgnore]
     public string DisplayKey => string.IsNullOrEmpty(Key) ? Task : Key;

@@ -1,0 +1,52 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "invoice-detail",
+  "title": "Fatura Tahsilat Durumu",
+  "kind": "view",
+  "version": 1,
+  "body": [
+    {
+      "widget": "alert",
+      "severity": "info",
+      "text": "Ödeme bekleniyor. Banka ödeme bildirimi \"payment.received\" mesajı olarak geldiğinde fatura otomatik ilerler.",
+      "visibleWhen": "instance.state == \"awaiting-payment\""
+    },
+    {
+      "widget": "alert",
+      "severity": "warning",
+      "text": "Vade geçti. Gecikmeli ödeme mesajı geldiğinde mutabakat otomatik başlar.",
+      "visibleWhen": "instance.state == \"overdue\""
+    },
+    {
+      "widget": "alert",
+      "severity": "info",
+      "text": "Muhasebe kaydı arka planda yapılıyor; fatura bu sırada görüntülenebilir.",
+      "visibleWhen": "instance.state == \"reconciling\""
+    },
+    {
+      "widget": "alert",
+      "severity": "warning",
+      "text": "Muhasebe servisi kaydı alamadı; mutabakatı elle onaylayın.",
+      "visibleWhen": "instance.state == \"manual-reconciliation\""
+    },
+    {
+      "widget": "section",
+      "title": "Fatura Bilgileri",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Fatura No", "value": "{{ data.invoiceNo }}" },
+            { "label": "Müşteri", "value": "{{ data.customerName }}" },
+            { "label": "Fatura Tutarı", "value": "{{ data.total }}", "format": "N2" },
+            { "label": "Açıklama", "value": "{{ data.description }}", "visibleWhen": "data.description != null" },
+            { "label": "Son Kısmi Ödeme", "value": "{{ data.lastPartialPayment.amount }}", "format": "N2", "visibleWhen": "data.lastPartialPayment != null" },
+            { "label": "Ödenen Tutar", "value": "{{ data.payment.amount }}", "format": "N2", "visibleWhen": "data.payment != null" },
+            { "label": "Banka Referansı", "value": "{{ data.payment.reference }}", "visibleWhen": "data.payment != null && data.payment.reference != null" }
+          ]
+        }
+      ]
+    },
+    { "widget": "layout", "key": "workflow-footer" }
+  ]
+}

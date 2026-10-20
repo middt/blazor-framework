@@ -58,6 +58,8 @@ public static class WorkflowPartitionManager
                 "CreatedAt" timestamptz NOT NULL,
                 "UpdatedAt" timestamptz NOT NULL,
                 "CompletedAt" timestamptz,
+                "BackgroundTaskId" uuid,
+                "HistoryPatchCount" int,
                 CONSTRAINT "PK_WorkflowInstances" PRIMARY KEY ("Id", "WorkflowKey")
             ) PARTITION BY LIST ("WorkflowKey");
             """,
@@ -87,10 +89,11 @@ public static class WorkflowPartitionManager
                 "ExecutedBy" varchar(256),
                 "Input" jsonb,
                 "DataVersion" int NOT NULL,
-                "Data" jsonb NOT NULL,
+                "Data" jsonb,
                 "Tasks" jsonb,
                 "StartedAt" timestamptz NOT NULL,
                 "FinishedAt" timestamptz NOT NULL,
+                "Patch" jsonb,
                 CONSTRAINT "PK_WorkflowHistory" PRIMARY KEY ("Id", "WorkflowKey")
             ) PARTITION BY LIST ("WorkflowKey");
             """,

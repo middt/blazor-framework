@@ -94,15 +94,27 @@ application-specific `IWorkflowTask` implementations.
 
 The engine claims an instance with a conditional `Active`/`Faulted` → `Busy` update and, for transition commands, stores
 its pending transition and persistable input in that claim. The claim is separate from task execution. On success, the
-instance snapshot, history, incidents and follow-up jobs commit together. A claim left Busy beyond `BusyTimeout` is marked Faulted by
-`WorkflowJobProcessor`; the retry endpoint can rerun the saved transition when its required input is available.
+instance snapshot, history, incidents and follow-up jobs commit together. A running claim refreshes `BusySince` every
+`BusyHeartbeatInterval`; only a claim whose heartbeat stopped (the process died) and that is older than `BusyTimeout` is
+marked Faulted by `WorkflowJobProcessor`. The retry endpoint can rerun the saved transition when its required input is
+available. Long calls belong in `"background": true` onEntry tasks, which run as jobs outside the claim and merge their
+data changes (a JSON Patch) when they finish.
 
 Scheduled and asynchronous transitions, child cancellation, parent resumption and event delivery use the workflow
-database's `WorkflowJobs` table. Workers claim due jobs with leases. Child cancellation waits while the child is Busy;
+database's `WorkflowJobs` table, as do buffered messages for event transitions and background tasks. Workers claim due
+jobs with leases that a running job renews; on PostgreSQL the claim is `FOR UPDATE SKIP LOCKED`, so nodes never wait for
+or race over the same row, and a node that writes jobs sends `NOTIFY` so the `WorkflowJobListener` of every other node
+wakes its processor immediately instead of after `JobPollingInterval`. Child cancellation waits while the child is Busy;
 event handlers may receive duplicates and must be idempotent. A failed job is retried with backoff and, after 20
 attempts, removed with an incident. Task data is copied for each in-process attempt; external side effects
 need an idempotency key. The built-in HTTP task sends `WorkflowTaskContext.IdempotencyKey` as `Idempotency-Key` unless
 the definition supplies that header. An explicit retry is a new command and can use a different key.
+
+History rows keep a full data snapshot (`history: full`), mostly only the change as a JSON Patch with a snapshot
+checkpoint at the first and final row, every `historySnapshotEvery` rows and when a patch saves nothing (`delta`), or
+nothing (`none`; the instance data row is still written on every transition). Clients never see patches; the engine
+derives them after each transition (`WorkflowJsonPatch.Diff`) and `HistoryDataAsync` replays them – examples in the
+README section "History modes". The EF model is cached per workflow schema, so several workflow schemas can live in one process.
 
 Definition versions are retained for running instances. Instance-level access checks and list filters apply each
 instance's stored version of `roles` and `instanceAccess`, rather than the newest definition's rules.

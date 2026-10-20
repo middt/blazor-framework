@@ -92,6 +92,9 @@ internal sealed class WorkflowStartup(
             $"ALTER TABLE \"{schema}\".\"WorkflowIncidents\" ADD COLUMN IF NOT EXISTS \"WorkflowKey\" varchar(128) NULL;",
             $"UPDATE \"{schema}\".\"WorkflowIncidents\" inc SET \"WorkflowKey\" = COALESCE(i.\"WorkflowKey\", 'Default') FROM \"{schema}\".\"WorkflowInstances\" i WHERE inc.\"InstanceId\" = i.\"Id\" AND inc.\"WorkflowKey\" IS NULL;",
             $"UPDATE \"{schema}\".\"WorkflowIncidents\" SET \"WorkflowKey\" = 'Default' WHERE \"WorkflowKey\" IS NULL;",
+
+            // history: delta rows keep a patch instead of a snapshot.
+            $"ALTER TABLE \"{schema}\".\"WorkflowHistory\" ALTER COLUMN \"Data\" DROP NOT NULL;",
         };
 
         foreach (var sql in statements)

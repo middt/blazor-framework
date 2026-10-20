@@ -10,7 +10,8 @@ of the folder you work in. Task playbooks: [`docs/ai/`](docs/ai/README.md).
 A .NET 10 framework for line-of-business apps with **two interchangeable frontends** over one backend:
 
 - **Backend**: REST API (controllers + dynamic `WorkflowInstanceDataQuery`), JSON-defined
-  **workflow engine** (partitioned by workflow key in PostgreSQL), **100% server-driven JSON UI** (menus, list columns,
+  **workflow engine** (partitioned by workflow key in PostgreSQL; message-driven `Event` transitions, background tasks,
+  history modes, multi-node jobs with `SKIP LOCKED` + `LISTEN`/`NOTIFY`), **100% server-driven JSON UI** (menus, list columns,
   forms, state views, and reusable nested `"widget": "layout"` blocks stored in DB and editable at runtime; see
   [`docs/ai/backend-driven-json-ui.md`](docs/ai/backend-driven-json-ui.md)).
 - **Frontends**: **Blazor Server** (Radzen) and **Angular 22** (Material). Both sit behind a **BFF** (cookie session,
@@ -59,6 +60,7 @@ dotnet build Middt.Framework.slnx                                   # dev build
 dotnet build Middt.Framework.slnx -p:ContinuousIntegrationBuild=true # CI build: warnings are ERRORS – must be 0
 dotnet test --project tests/Middt.Framework.Tests                   # all tests (xunit.v3, Microsoft.Testing.Platform)
 dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*WorkflowEngineTests"
+dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*WorkflowPostgresTests"  # real PostgreSQL (Testcontainers, needs Docker)
 MIDDT_UPDATE_SPEC=1 dotnet test --project tests/Middt.Framework.Tests  # regenerate spec/ui-layout.schema.json
 
 # TypeScript / Angular (order matters: ui-core → library → app)
@@ -107,6 +109,9 @@ docker compose up -d --build        # Blazor :8080 · Angular :8081 · IdP :8083
 - Number text in expressions follows ECMAScript `Number.prototype.toString`, not .NET "R".
 - Browsers don't separate cookies by port: each BFF app on the same host needs its own `CookieName`.
 - Workflow and job keys use UUIDv7 (`Guid.CreateVersion7()`) for chronological B-tree indexing in PostgreSQL.
+- `WorkflowDbContext`'s model depends on the workflow schema: EF caches it per schema (`WorkflowModelCacheKeyFactory`);
+  without that, a second schema in the same process silently used the first one's tables. More workflow pitfalls:
+  [`docs/ai/gotchas.md`](docs/ai/gotchas.md).
 - Seeds (`demo/Middt.Demo.Api/Layouts`, `Workflows`) are validated at startup – an invalid file stops the API.
 - E2E (Playwright) suites live in `tests/e2e`; see `docs/ai/testing.md`.
 - Identity admin pages materialize an `IAsyncEnumerable` from OpenIddict/EF before querying per row on the same connection.

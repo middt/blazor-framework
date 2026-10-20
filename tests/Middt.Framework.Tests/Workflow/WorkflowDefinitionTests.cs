@@ -99,7 +99,13 @@ public sealed class WorkflowDefinitionTests
             "credit-allocation",
             "order-payment-orchestration",
             "sla-escalation",
-            "risk-limit-eval");
+            "risk-limit-eval",
+            "invoice-collection");
+
+        var invoice = registry.GetLatest("invoice-collection");
+        invoice.History.Should().Be(HistoryMode.Delta);
+        invoice.FindState("awaiting-payment")!.Transitions.Where(t => t.Trigger == TriggerType.Event).Select(t => t.Event).Should().Equal("payment.received", "payment.received");
+        invoice.FindState("reconciling")!.OnEntry.Should().Contain(t => t.Background);
 
         var customer = registry.GetLatest("customer-onboarding");
         customer.DataSchema.Should().NotBeNull();
@@ -127,7 +133,7 @@ public sealed class WorkflowDefinitionTests
         var registry = services.BuildServiceProvider().GetRequiredService<WorkflowRegistry>();
 
         registry.Invoking(r => r.EnsureLoaded()).Should().NotThrow();
-        registry.Latest.Should().HaveCount(5);
+        registry.Latest.Should().HaveCount(6);
     }
 
     [Fact]

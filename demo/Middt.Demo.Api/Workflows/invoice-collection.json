@@ -1,0 +1,253 @@
+{
+  "key": "invoice-collection",
+  "version": 1,
+  "title": "Fatura Tahsilatı",
+  "icon": "receipt_long",
+  "history": "delta",
+  "historySnapshotEvery": 10,
+  "dataSchema": {
+    "type": "object",
+    "properties": {
+      "invoiceNo": { "type": "string", "title": "Fatura No", "x-search": true },
+      "customerName": { "type": "string", "title": "Müşteri Adı", "x-search": true },
+      "total": { "type": "number", "title": "Fatura Tutarı (₺)", "x-search": true }
+    }
+  },
+  "start": {
+    "key": "start",
+    "target": "awaiting-payment",
+    "input": {
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [ "invoiceNo", "customerName", "total" ],
+        "properties": {
+          "invoiceNo": { "type": "string", "minLength": 3, "maxLength": 40, "title": "Fatura No", "default": "FTR-2026-0001" },
+          "customerName": { "type": "string", "minLength": 2, "maxLength": 120, "title": "Müşteri Adı", "default": "Anadolu Lojistik A.Ş." },
+          "total": { "type": "number", "minimum": 1, "title": "Fatura Tutarı (₺)", "default": 12500 },
+          "description": { "type": "string", "maxLength": 500, "title": "Açıklama", "default": "Ekim 2026 lojistik hizmet bedeli" }
+        }
+      },
+      "set": {
+        "createdBy": "user.Name",
+        "createdAt": "now"
+      }
+    }
+  },
+  "states": [
+    {
+      "key": "awaiting-payment",
+      "title": "Ödeme Bekleniyor",
+      "view": { "layout": "invoice-detail" },
+      "step": 1,
+      "onEntry": [
+        {
+          "task": "setKey",
+          "config": { "key": "INV-{{ data.invoiceNo }}", "ensureUnique": true }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "payment-received",
+          "title": "Ödeme Alındı",
+          "target": "reconciling",
+          "trigger": "Event",
+          "event": "payment.received",
+          "rule": "input.amount >= data.total",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)" },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
+              }
+            },
+            "into": "payment"
+          }
+        },
+        {
+          "key": "partial-payment",
+          "title": "Kısmi Ödeme",
+          "target": "$self",
+          "trigger": "Event",
+          "event": "payment.received",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)" },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
+              }
+            },
+            "into": "lastPartialPayment"
+          }
+        },
+        {
+          "key": "mark-overdue",
+          "title": "Vade Doldu",
+          "target": "overdue",
+          "trigger": "Scheduled",
+          "after": "P7D"
+        },
+        {
+          "key": "cancel-invoice",
+          "title": "Faturayı İptal Et",
+          "target": "cancelled",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reason" ],
+              "properties": {
+                "reason": { "type": "string", "minLength": 3, "maxLength": 300, "title": "İptal Nedeni", "default": "Fatura müşteri talebiyle iptal edildi." }
+              }
+            },
+            "into": "cancellation"
+          }
+        }
+      ]
+    },
+    {
+      "key": "overdue",
+      "title": "Vadesi Geçti",
+      "view": { "layout": "invoice-detail" },
+      "step": 1,
+      "subType": "Human",
+      "transitions": [
+        {
+          "key": "late-payment-received",
+          "title": "Gecikmeli Ödeme Alındı",
+          "target": "reconciling",
+          "trigger": "Event",
+          "event": "payment.received",
+          "rule": "input.amount >= data.total",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "amount" ],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)" },
+                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
+              }
+            },
+            "into": "payment"
+          }
+        },
+        {
+          "key": "cancel-invoice",
+          "title": "Faturayı İptal Et",
+          "target": "cancelled",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reason" ],
+              "properties": {
+                "reason": { "type": "string", "minLength": 3, "maxLength": 300, "title": "İptal Nedeni", "default": "Tahsil edilemedi." }
+              }
+            },
+            "into": "cancellation"
+          }
+        }
+      ]
+    },
+    {
+      "key": "reconciling",
+      "title": "Muhasebe Mutabakatı (Arka Plan)",
+      "view": { "layout": "invoice-detail" },
+      "step": 2,
+      "onEntry": [
+        {
+          "key": "post-ledger",
+          "task": "http",
+          "background": true,
+          "onError": {
+            "maxAttempts": 3,
+            "delay": "00:00:02",
+            "backoffMultiplier": 2.0,
+            "retryOnStatusCodes": [ "408", "429", "5xx" ],
+            "action": "Transition",
+            "transition": "reconcile-manually"
+          },
+          "config": {
+            "method": "POST",
+            "url": "http://127.0.0.1:8080/api/v1/InvoiceCollection/ping",
+            "body": {
+              "invoiceNo": "{{ data.invoiceNo }}",
+              "amount": "{{ data.payment.amount }}",
+              "reference": "{{ data.payment.reference }}"
+            },
+            "into": "ledgerResponse"
+          }
+        },
+        {
+          "task": "set",
+          "config": { "values": { "reconciledAt": "now" } }
+        }
+      ],
+      "transitions": [
+        {
+          "key": "reconciled",
+          "target": "paid",
+          "trigger": "Automatic",
+          "default": true
+        },
+        {
+          "key": "reconcile-manually",
+          "title": "Elle Mutabakata Gönder",
+          "target": "manual-reconciliation",
+          "roles": [ "manager" ]
+        }
+      ]
+    },
+    {
+      "key": "manual-reconciliation",
+      "title": "Elle Mutabakat",
+      "view": { "layout": "invoice-detail" },
+      "step": 2,
+      "subType": "Human",
+      "transitions": [
+        {
+          "key": "confirm-reconciliation",
+          "title": "Mutabakatı Onayla",
+          "target": "paid",
+          "roles": [ "manager" ],
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "note": { "type": "string", "maxLength": 300, "title": "Mutabakat Notu", "default": "Muhasebe kaydı elle girildi." }
+              }
+            },
+            "into": "manualReconciliation",
+            "set": { "reconciledBy": "user.Name", "reconciledAt": "now" }
+          }
+        }
+      ]
+    },
+    {
+      "key": "paid",
+      "title": "Tahsil Edildi",
+      "view": { "layout": "invoice-result" },
+      "step": 3,
+      "type": "Finish",
+      "subType": "Success"
+    },
+    {
+      "key": "cancelled",
+      "title": "İptal Edildi",
+      "view": { "layout": "invoice-result" },
+      "step": 3,
+      "type": "Finish",
+      "subType": "Cancelled"
+    }
+  ]
+}

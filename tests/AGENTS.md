@@ -12,6 +12,9 @@ dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*SpaBffHard
 - Use the existing hosts instead of inventing new ones: `TestApiHost`, `WorkflowTestHost`, `UiTestHost`,
   `SpaBffTestHost`, `BlazorTestHost`; SQLite in-memory (keep the connection open), `FakeTimeProvider`,
   `TestContext.Current.CancellationToken`.
+- PostgreSQL-only behaviour: `Workflow/Postgres/WorkflowPostgresTests` (collection `Postgres`, one Testcontainers
+  `postgres:17-alpine` container, skipped with the reason when Docker is missing). Each `WorkflowTestHost.StartPostgresAsync`
+  gets its own schema (`PostgresFixture.NewSchema()`); two hosts on one schema act as two nodes.
 - Tests run in parallel: no shared mutable statics; parse `JsonObject` per test (lazy materialisation isn't thread-safe).
 - Warnings are errors in CI – analyzers apply to tests too (`CultureInfo.InvariantCulture`, `ConfigureAwait` not needed).
 - Spec files: `Expressions/PortableExpressionConformanceTests` (spec/expressions.conformance.json) and

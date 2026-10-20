@@ -11,7 +11,10 @@ public sealed class WorkflowNotFoundException(string message) : WorkflowExceptio
 public sealed class WorkflowForbiddenException(string message) : WorkflowException(message, 403);
 
 /// <summary>Instance busy, finished, waiting for a subflow, or transition not available in the current state.</summary>
-public sealed class WorkflowConflictException(string message) : WorkflowException(message, 409);
+public class WorkflowConflictException(string message) : WorkflowException(message, 409);
+
+/// <summary>The instance could not be claimed (busy, or changed since it was read): the same request may succeed later.</summary>
+public sealed class WorkflowClaimException(string message) : WorkflowConflictException(message);
 
 public sealed class WorkflowValidationException(IReadOnlyList<string> errors)
     : WorkflowException("The request is not valid for this transition.", 400)

@@ -31,11 +31,12 @@ public sealed partial class WorkflowEngine(
     IServiceScopeFactory scopeFactory,
     IOptions<MiddtWorkflowOptions> options,
     TimeProvider time,
-    WorkflowJobSignal jobSignal,
+    WorkflowJobNotifier jobNotifier,
     ILogger<WorkflowEngine> logger)
 {
     internal const string TimeoutTransition = "$timeout";
     internal const string ResumeTransition = "$subflow-completed";
+    internal const string BackgroundTransition = "$background";
 
     private DateTime Now => time.GetUtcNow().UtcDateTime;
 
@@ -138,7 +139,11 @@ public sealed partial class WorkflowEngine(
 
         try
         {
-            await ExecuteChainAsync(run, definition.Start, request.Data, "Start", cancellationToken);
+            await using (StartBusyHeartbeat(instance.Id))
+            {
+                await ExecuteChainAsync(run, definition.Start, request.Data, "Start", cancellationToken);
+            }
+
             await SaveAsync(run, cancellationToken);
         }
         catch (Exception ex)
@@ -225,7 +230,7 @@ public sealed partial class WorkflowEngine(
 
             db.Jobs.Add(NewJob(snapshot, WorkflowJobKind.Transition, transitionKey, snapshot.State, Now, input?.ToJsonString(), user.AuditName));
             await db.SaveChangesAsync(cancellationToken);
-            jobSignal.Notify();
+            await jobNotifier.NotifyAsync(db, cancellationToken);
             return await ToModelAsync(snapshot, user, cancellationToken);
         }
 
@@ -265,6 +270,12 @@ public sealed partial class WorkflowEngine(
 
         var run = await RunClaimedAsync(instanceId, WorkflowInstanceStatus.Faulted, user, async run =>
         {
+            if (run.Instance.PendingTransition == BackgroundTransition)
+            {
+                await RetryBackgroundAsync(run, cancellationToken);
+                return;
+            }
+
             var transition = ResolveTransition(run.Definition, run.Instance, run.Instance.PendingTransition!)
                 ?? throw new WorkflowConflictException($"Transition '{run.Instance.PendingTransition}' is no longer available.");
             var input = JsonPath.ParseObject(run.Instance.PendingInput);
@@ -295,6 +306,12 @@ public sealed partial class WorkflowEngine(
         if (instance is null || instance.IsTerminal)
         {
             return JobOutcome.Done;
+        }
+
+        // Buffered messages expire on their own clock, whatever the instance status.
+        if (job.Kind == WorkflowJobKind.Message)
+        {
+            return await ProcessMessageJobAsync(job, instance, cancellationToken);
         }
 
         // Timers of a faulted instance wait until it is retried (checked again later, without consuming attempts).
@@ -343,6 +360,9 @@ public sealed partial class WorkflowEngine(
 
                 case WorkflowJobKind.CancelChild:
                     return await CancelChildAsync(instance.Id, cancellationToken) ? JobOutcome.Done : JobOutcome.RetrySoon;
+
+                case WorkflowJobKind.Task:
+                    return await ProcessBackgroundJobAsync(job, instance, cancellationToken);
 
                 default:
                     return JobOutcome.Done;
@@ -537,6 +557,39 @@ public sealed partial class WorkflowEngine(
         }).ToList();
     }
 
+    /// <summary>
+    /// The instance data after each history row, oldest first – rebuilt from snapshots (<c>history: full</c>) and patches
+    /// (<c>history: delta</c>), so both modes answer the same question. Empty for <c>history: none</c>.
+    /// </summary>
+    public async Task<List<(string TransitionKey, int DataVersion, JsonObject Data)>> HistoryDataAsync(
+        Guid instanceId,
+        WorkflowUser user,
+        CancellationToken cancellationToken = default)
+    {
+        await FindAccessibleAsync(instanceId, null, user, cancellationToken);
+        var rows = await db.History.AsNoTracking().Where(h => h.InstanceId == instanceId).OrderBy(h => h.Id)
+            .Select(h => new { h.TransitionKey, h.DataVersion, h.Data, h.Patch })
+            .ToListAsync(cancellationToken);
+
+        var current = new JsonObject();
+        var result = new List<(string, int, JsonObject)>(rows.Count);
+        foreach (var row in rows)
+        {
+            if (row.Data is not null)
+            {
+                current = JsonPath.ParseObject(row.Data);
+            }
+            else if (row.Patch is not null && JsonNode.Parse(row.Patch) is JsonArray patch)
+            {
+                WorkflowJsonPatch.Apply(current, patch);
+            }
+
+            result.Add((row.TransitionKey, row.DataVersion, (JsonObject)current.DeepClone()));
+        }
+
+        return result;
+    }
+
     public Task<List<WorkflowIncidentModel>> IncidentsAsync(Guid instanceId, WorkflowUser user, CancellationToken cancellationToken = default) =>
         IncidentsAsync(null, instanceId, user, cancellationToken);
 
@@ -599,6 +652,15 @@ public sealed partial class WorkflowEngine(
         public List<Guid> CancelChildren { get; } = [];
         public bool ResolveIncidents { get; set; }
         public bool NotifyParent { get; set; }
+
+        /// <summary>Tasks that failed with <c>"action": "Continue"</c> in this run (a background run reports them back).</summary>
+        public List<(string TaskKey, string Error, int Attempts)> ContinuedErrors { get; } = [];
+
+        /// <summary>Stable prefix for task idempotency keys (a background job retried after a crash keeps its keys).</summary>
+        public string? IdempotencyScope { get; set; }
+
+        /// <summary>Buffered messages were woken because the instance now waits for them.</summary>
+        public bool MessagesWoken { get; set; }
     }
 
     internal enum JobOutcome
@@ -611,6 +673,9 @@ public sealed partial class WorkflowEngine(
 
         /// <summary>Instance faulted: check again later without consuming attempts.</summary>
         Postpone,
+
+        /// <summary>The engine already moved the job (new due time, lease released): leave it as it is.</summary>
+        Rescheduled,
     }
 
     private enum HopOutcome
@@ -661,7 +726,7 @@ public sealed partial class WorkflowEngine(
         {
             var current = await db.Instances.IgnoreAutoIncludes().AsNoTracking().FirstOrDefaultAsync(i => i.Id == instanceId, cancellationToken)
                 ?? throw new WorkflowNotFoundException($"Instance '{instanceId}' does not exist.");
-            throw new WorkflowConflictException(current.Status switch
+            throw new WorkflowClaimException(current.Status switch
             {
                 WorkflowInstanceStatus.Busy => "The instance is busy executing another transition; try again.",
                 _ when current.Status == expected => "The instance was changed concurrently; reload and try again.",
@@ -725,7 +790,11 @@ public sealed partial class WorkflowEngine(
 
         try
         {
-            await body(run);
+            await using (StartBusyHeartbeat(instanceId))
+            {
+                await body(run);
+            }
+
             await SaveAsync(run, cancellationToken);
             return run;
         }
@@ -792,6 +861,7 @@ public sealed partial class WorkflowEngine(
 
             if (run.Instance.Status != WorkflowInstanceStatus.Busy ||
                 run.Instance.WaitingForInstanceId is not null ||
+                run.Instance.BackgroundTaskId is not null ||
                 (transition.Target == TransitionDefinition.Self && trigger == nameof(TriggerType.Automatic)))
             {
                 return;
@@ -834,6 +904,7 @@ public sealed partial class WorkflowEngine(
         var jobsBefore = run.NewJobs.ToList();
         var leftBefore = run.LeftStates.ToList();
         var waitingBefore = instance.WaitingForInstanceId;
+        var backgroundBefore = instance.BackgroundTaskId;
         var activeSubFlowBefore = run.ActiveSubFlowModel;
         var keyBefore = instance.BusinessKey;
         var lastExecutedByBefore = instance.LastExecutedBy;
@@ -856,6 +927,7 @@ public sealed partial class WorkflowEngine(
                 }
 
                 instance.State = target;
+                instance.BackgroundTaskId = null; // a result of the left state's background task is discarded
                 var state = definition.FindState(target)!;
                 await RunTasksAsync(run, state.OnEntry, transition.Key, "onEntry", state.OnError, input, cancellationToken);
 
@@ -929,6 +1001,7 @@ public sealed partial class WorkflowEngine(
             instance.Status = WorkflowInstanceStatus.Busy;
             instance.CompletedAt = null;
             instance.WaitingForInstanceId = waitingBefore;
+            instance.BackgroundTaskId = backgroundBefore;
             run.ActiveSubFlowModel = activeSubFlowBefore;
             instance.BusinessKey = keyBefore;
             instance.LastExecutedBy = lastExecutedByBefore;
@@ -1006,11 +1079,13 @@ public sealed partial class WorkflowEngine(
         string hook,
         ErrorPolicy? stateErrorPolicy,
         JsonObject? input,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int indexOffset = 0)
     {
-        for (var taskIndex = 0; taskIndex < taskList.Count; taskIndex++)
+        for (var listIndex = 0; listIndex < taskList.Count; listIndex++)
         {
-            var task = taskList[taskIndex];
+            var task = taskList[listIndex];
+            var taskIndex = indexOffset + listIndex;
             var policy = task.OnError ?? stateErrorPolicy ?? run.Definition.OnError ?? new ErrorPolicy();
             if (!string.IsNullOrWhiteSpace(task.When))
             {
@@ -1034,6 +1109,16 @@ public sealed partial class WorkflowEngine(
                 {
                     continue;
                 }
+            }
+
+            if (task.Background && hook == "onEntry")
+            {
+                // Commit the state now; the task (and the onEntry tasks after it) continue in a job, outside the claim.
+                var job = NewJob(run.Instance, WorkflowJobKind.Task, transitionKey, run.Instance.State, Now,
+                    new JsonObject { ["taskIndex"] = taskIndex }.ToJsonString(), run.User.AuditName);
+                run.NewJobs.Add(job);
+                run.Instance.BackgroundTaskId = job.Id;
+                return;
             }
 
             var implementation = tasks.Resolve(services, task.Task);
@@ -1064,7 +1149,7 @@ public sealed partial class WorkflowEngine(
                     Scope = Scope(run, input, attemptData),
                     Expressions = expressions,
                     InstanceId = run.Instance.Id,
-                    IdempotencyKey = $"{run.Instance.Id:N}:{run.Instance.Revision}:{transitionKey}:{taskIndex}",
+                    IdempotencyKey = $"{run.IdempotencyScope ?? $"{run.Instance.Id:N}:{run.Instance.Revision}"}:{transitionKey}:{taskIndex}",
                     Workflow = run.Definition.Key,
                     State = run.Instance.State,
                     Services = services,
@@ -1124,6 +1209,7 @@ public sealed partial class WorkflowEngine(
                     if (policy.Action == ErrorAction.Continue)
                     {
                         AddIncident(run, transitionKey, task.DisplayKey, ex.Message, attempt);
+                        run.ContinuedErrors.Add((task.DisplayKey, ex.Message, attempt));
                         run.CurrentHopTasks.Add(new WorkflowTaskExecutionModel
                         {
                             TaskKey = task.DisplayKey,
@@ -1421,7 +1507,11 @@ public sealed partial class WorkflowEngine(
             persistActivity?.SetTag("middt.workflow.revision", instance.Revision);
 
             // SaveChanges is atomic on its own; an explicit transaction is only needed around the bulk statements.
-            var bulk = run.ClearAllJobs || run.LeftStates.Count > 0 || run.ResolveIncidents;
+            // A state that takes messages wakes the ones buffered for it.
+            var wakeMessages = instance.Status == WorkflowInstanceStatus.Active && instance.WaitingForInstanceId is null
+                ? EventsAvailableIn(run.Definition, instance.State)
+                : [];
+            var bulk = run.ClearAllJobs || run.LeftStates.Count > 0 || run.ResolveIncidents || wakeMessages.Count > 0;
             await using var transaction = bulk && db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
 
             if (run.ClearAllJobs)
@@ -1432,8 +1522,17 @@ public sealed partial class WorkflowEngine(
             else if (run.LeftStates.Count > 0)
             {
                 var leftStates = run.LeftStates.ToList();
-                await db.Jobs.Where(j => j.InstanceId == instance.Id && j.Kind == WorkflowJobKind.Scheduled && leftStates.Contains(j.State!))
+                await db.Jobs.Where(j => j.InstanceId == instance.Id
+                        && (j.Kind == WorkflowJobKind.Scheduled || j.Kind == WorkflowJobKind.Task) && leftStates.Contains(j.State!))
                     .ExecuteDeleteAsync(cancellationToken);
+            }
+
+            if (wakeMessages.Count > 0)
+            {
+                var now = Now;
+                run.MessagesWoken = await db.Jobs.Where(j => j.InstanceId == instance.Id && j.Kind == WorkflowJobKind.Message
+                        && j.DueAt > now && wakeMessages.Contains(j.TransitionKey!))
+                    .ExecuteUpdateAsync(s => s.SetProperty(j => j.DueAt, now), cancellationToken) > 0;
             }
 
             if (run.ResolveIncidents)
@@ -1483,9 +1582,9 @@ public sealed partial class WorkflowEngine(
 
     private async Task AfterCommitAsync(Run run, CancellationToken cancellationToken)
     {
-        if (run.NewJobs.Any(j => j.DueAt <= Now.AddSeconds(1)))
+        if (run.NewJobs.Count > 0 || run.MessagesWoken)
         {
-            jobSignal.Notify();
+            await jobNotifier.NotifyAsync(db, cancellationToken);
         }
 
         foreach (var child in run.CancelChildren)
@@ -1604,10 +1703,40 @@ public sealed partial class WorkflowEngine(
     private void AddHistory(Run run, string transitionKey, string from, string trigger, JsonObject? input, DateTime startedAt)
     {
         var data = run.Data.ToJsonString();
-        if (data != run.Instance.Data)
+        var previous = run.Instance.Data;
+        if (data != previous)
         {
             run.Instance.Data = data;
             run.Instance.DataVersion++;
+        }
+
+        var mode = run.Definition.History;
+        if (mode == HistoryMode.None)
+        {
+            run.CurrentHopTasks.Clear();
+            return;
+        }
+
+        string? snapshot = data;
+        string? patch = null;
+        if (mode == HistoryMode.Delta)
+        {
+            var candidate = data == previous ? "[]" : WorkflowJsonPatch.Diff(JsonPath.ParseObject(previous), run.Data).ToJsonString();
+            var since = run.Instance.HistoryPatchCount;
+            var checkpoint = since is null                                              // first row (or rows written before delta)
+                || since.Value + 1 >= run.Definition.HistorySnapshotEvery               // bound the replay length
+                || run.Instance.IsTerminal                                              // the final data in one read
+                || candidate.Length >= data.Length;                                     // a patch that saves nothing
+            if (checkpoint)
+            {
+                run.Instance.HistoryPatchCount = 0;
+            }
+            else
+            {
+                snapshot = null;
+                patch = candidate;
+                run.Instance.HistoryPatchCount = since!.Value + 1;
+            }
         }
 
         db.History.Add(new WorkflowHistory
@@ -1620,7 +1749,8 @@ public sealed partial class WorkflowEngine(
             Trigger = trigger,
             ExecutedBy = run.User.AuditName,
             Input = input?.ToJsonString(),
-            Data = data,
+            Data = snapshot,
+            Patch = patch,
             DataVersion = run.Instance.DataVersion,
             Tasks = run.CurrentHopTasks.Count > 0 ? JsonSerializer.Serialize(run.CurrentHopTasks, WorkflowJson.Options) : null,
             StartedAt = startedAt,
@@ -1628,6 +1758,12 @@ public sealed partial class WorkflowEngine(
         });
         run.CurrentHopTasks.Clear();
     }
+
+    /// <summary>Refreshes <c>BusySince</c> while a claim runs, so Busy recovery never faults an instance whose tasks are merely slow.</summary>
+    private WorkflowHeartbeat StartBusyHeartbeat(Guid instanceId) =>
+        WorkflowHeartbeat.Start(scopeFactory, options.Value.BusyHeartbeatInterval, time, logger, (beatDb, now, ct) =>
+            beatDb.Instances.Where(i => i.Id == instanceId && i.Status == WorkflowInstanceStatus.Busy)
+                .ExecuteUpdateAsync(s => s.SetProperty(i => i.BusySince, (DateTime?)now), ct));
 
     private WorkflowJob NewJob(WorkflowInstance instance, WorkflowJobKind kind, string? transition, string? state, DateTime dueAt, string? payload = null, string? requestedBy = null) => new()
     {

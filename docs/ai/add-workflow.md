@@ -1,9 +1,10 @@
 # Playbook: add or change a workflow
 
-Definitions are JSON(C) files in `demo/Middt.Demo.Api/Workflows/` (`customer-onboarding.json`, `credit-allocation.json`, and `order-payment-orchestration.json` are full examples: `dataSchema`, `icon`, rules, subflows, `fanOut`, `loadWorkflow`, `cache`, roles, timers, and backend-driven `view.layout` screens).
+Definitions are JSON(C) files in `demo/Middt.Demo.Api/Workflows/` (`customer-onboarding.json`, `credit-allocation.json`, and `order-payment-orchestration.json` are full examples: `dataSchema`, `icon`, rules, subflows, `fanOut`, `loadWorkflow`, `cache`, roles, timers, and backend-driven `view.layout` screens; `invoice-collection.json` shows message-driven `Event` transitions, a `background` task and `history: delta`).
 
 1. **Definition & Dynamic Menu / List Columns**:
-   - Top-level properties: `key`, `version` (bump `version` when updating a seeded file so `WorkflowSeedService` updates the DB), `title`, `icon` (Material icon rendered automatically in the sidebar menu of both frontends), `roles`, optional `instanceAccess` (`owner` + `supervisorRoles`), `dataSchema`, `start`, `states` (`type`, `subType`, `step`, `view`, `actors`, `onEntry`, `onExit`, `transitions`).
+   - Top-level properties: `key`, `version` (bump `version` when updating a seeded file so `WorkflowSeedService` updates the DB), `title`, `icon` (Material icon rendered automatically in the sidebar menu of both frontends), `roles`, optional `instanceAccess` (`owner` + `supervisorRoles`), `dataSchema`, optional `history` (`full` default, `delta`, `none`) and `historySnapshotEvery` (delta only, default 20), `start`, `states` (`type`, `subType`, `step`, `view`, `actors`, `onEntry`, `onExit`, `transitions`).
+   - **History**: keep `full` unless the history grows large. `delta` stores mostly the change per transition (a JSON Patch) with a snapshot at the first and final row, every `historySnapshotEvery` rows and when a patch saves nothing. `none` writes no history rows – the instance data is still saved on every transition; use it for one-shot or high-volume flows whose audit lives elsewhere. What a row looks like, how the patch is produced and how to read versions back: [README – History modes](../../README.md#history-modes-and-how-json-patch-is-used).
    - **`dataSchema`**: Declares the JSON Schema for the workflow's `Data` document. Both frontends automatically generate the **workflow instance table columns** (`/workflows/{key}`) from `dataSchema.properties` in property order.
      - Set `"x-list": false` on any property you want to hide from the list table while keeping it in the schema.
      - Use `"x-mask": "tckn" | "phone" | "iban" | "credit-card"` for automatic formatting/masking and `"x-roles": ["Admin"]` for field-level role masking.
@@ -29,16 +30,20 @@ Definitions are JSON(C) files in `demo/Middt.Demo.Api/Workflows/` (`customer-onb
        }
        ```
 
-4. **Tasks**:
+4. **Triggers**:
+   - `Manual` (buttons), `Automatic` (`rule` / `default`), `Scheduled` (`after` / `at`) and `Event`: `"trigger": "Event", "event": "payment.received"` runs when a message of that name is delivered to the instance (`WorkflowEngine.DeliverMessageAsync`, `POST /api/workflows/{key}/instances/{id}/messages/{name}` or `POST /api/workflows/{key}/messages/{name}?key=<business key>`). The message body is the transition `input`; several event transitions may listen for one message and the first whose `rule` holds (it can read `input`) runs. Event transitions are never shown as buttons. The sender needs the transition `roles`; `?bufferFor=PT10M` keeps a message the instance cannot take yet. The start transition cannot be an event transition.
+
+5. **Tasks**:
    - Built-in tasks: `set`, `setKey` (business key once known), `log`, `http` (respect `AllowedHttpHosts`, no redirects), `publish`, `startWorkflow` (sync or async subflow), `loadWorkflow` (loads another workflow instance's JSON data by key into scope), `fanOut` (parallel execution of multiple branches with `all` or `any` join strategy), and `cache` (`get`/`set`/`remove` with TTL).
    - Each task attempt gets a private copy of instance data; only a successful attempt's changes are retained. External side effects (`http`, `publish`, `startWorkflow`) must be idempotent. Use `WorkflowTaskContext.IdempotencyKey` with a deduplicating receiver; the built-in `http` task sends it as `Idempotency-Key` unless the definition supplies that header.
+   - **Long calls**: mark a state `onEntry` task `"background": true` (not in finish or SubFlow states, not `setKey`). The state commits first and the instance stays Active; the task runs as a job outside the lock, its data changes are merged when it finishes, then the remaining `onEntry` tasks and automatic transitions run. A failure follows the task's `onError` (`Fault` → `retry` runs it again). Background tasks receive no transition `input`.
    - **Record lifecycle** (master data such as `customer-onboarding.json`): don't finish immediately after creation – set the business key with `setKey`, stay in a `Human` `Active` state with update (`UpdateProfile`), risk recalculation (`RecalculateRisk`), or freeze (`FreezeCustomer`) transitions, and expose the active instances as a directory via `WorkflowInstanceDataQuery` (`/api/customer-onboarding/GetListWithModel`).
 
-5. **Partitioning & indexing**:
+6. **Partitioning & indexing**:
    - Declare searchable/filterable fields in `dataSchema.properties` (with explicit types: `integer`, `number`, `boolean`, `string`). The engine automatically creates dedicated PostgreSQL partition tables (`WorkflowInstances_{Suffix}`, `WorkflowInstanceData_{Suffix}`, `WorkflowJobs_{Suffix}`, `WorkflowHistory_{Suffix}`, `WorkflowIncidents_{Suffix}`) and typed functional B-Tree indexes + trigram GIN index at startup.
    - See [`workflow-partitioning-and-indexing.md`](workflow-partitioning-and-indexing.md) for architecture, partition-wise joins, and custom indexing patterns.
 
-6. **Verify**:
+7. **Verify**:
    - Run `dotnet test --project tests/Middt.Framework.Tests -- --filter-class "*WorkflowDefinitionTests" --filter-class "*UiSampleLayoutTests" --filter-class "*SampleJsonWorkflowTests"`.
    - Click through both frontends (`/workflows/{key}`).
 

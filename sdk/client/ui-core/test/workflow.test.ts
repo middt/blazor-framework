@@ -246,6 +246,8 @@ test('status, sub type and trigger texts', () => {
   assert.equal(workflowSubTypeText('Human'), 'Kullanıcı işlemi bekleniyor');
   assert.equal(workflowTriggerText('Scheduled'), 'Zamanlanmış');
   assert.equal(workflowTriggerText('Custom'), 'Custom');
+  assert.equal(workflowTriggerText('Event'), 'Mesaj');
+  assert.equal(workflowTriggerText('Background'), 'Arka plan görevi');
 });
 
 test('dates without a zone are UTC', () => {
@@ -262,6 +264,7 @@ test('state and transition titles, styles and icons', () => {
   assert.equal(workflowStateTitle(definition, null), 'Başlangıç');
   assert.equal(workflowTransitionTitle(definition, 'cancel'), 'İptal et');
   assert.equal(workflowTransitionTitle(definition, 'to-company'), 'to-company');
+  assert.equal(workflowTransitionTitle(definition, '$background'), 'Arka plan görevi');
   assert.equal(workflowTransitionStyle(definition, { key: 'a', target: 'approved' }), 'success');
   assert.equal(workflowTransitionStyle(definition, { key: 'r', target: 'rejected' }), 'danger');
   assert.equal(workflowTransitionIcon(definition, { key: 'c', target: 'cancelled' }), 'cancel');

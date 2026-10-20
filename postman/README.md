@@ -7,12 +7,13 @@ Bu klasör, **Middt Framework** üzerindeki tüm iş akışlarını (`Workflows`
 | Dosya | Açıklama |
 |---|---|
 | [`Middt.Local.postman_environment.json`](./Middt.Local.postman_environment.json) | Docker Compose yerel ortam değişkenleri (`apiUrl: http://localhost:8180`, `idpUrl: http://localhost:8083`, `clientId: middt-postman` ve otomatik doldurulan token/instance değişkenleri). |
-| [`Middt-All-Workflows.postman_collection.json`](./Middt-All-Workflows.postman_collection.json) | **Tek pakette tüm akışlar**: Kimlik doğrulama + dinamik veri sorguları + 5 iş akışının tamamı. |
+| [`Middt-All-Workflows.postman_collection.json`](./Middt-All-Workflows.postman_collection.json) | **Tek pakette tüm akışlar**: Kimlik doğrulama + dinamik veri sorguları + 6 iş akışının tamamı. |
 | [`01-Customer-Onboarding.postman_collection.json`](./01-Customer-Onboarding.postman_collection.json) | **Müşteri Kaydı & KYC (`customer-onboarding`)**: Otomatik onay, manuel KYC incelemesi, not ekleme, gelir güncelleme ve hesap kapatma. |
 | [`02-Risk-Limit-Eval.postman_collection.json`](./02-Risk-Limit-Eval.postman_collection.json) | **Risk & Limit Değerlendirme (`risk-limit-eval`)**: Otomatik onay, manuel underwriting incelemesi ve otomatik red senaryoları. |
 | [`03-Credit-Allocation.postman_collection.json`](./03-Credit-Allocation.postman_collection.json) | **Kredi Tahsis & 4-Göz Onay (`credit-allocation`)**: `loadWorkflow`, `SubFlow` (`risk-limit-eval` geçiş iletimi), teminat yeniden hesaplama (`$self` reenter) ve 2 farklı yönetici ile **4-Göz (`denyRoles: ["$previousUser"]`)** onayı. |
 | [`04-Order-Payment-Orchestration.postman_collection.json`](./04-Order-Payment-Orchestration.postman_collection.json) | **Sipariş & Ödeme Orkestrasyonu (`order-payment-orchestration`)**: 3'lü paralel `fanOut`, `http` ödeme ağ geçidi çağrısı, `cache` (Redis) ve Rebus/RabbitMQ `publish` senaryoları. |
 | [`05-SLA-Escalation.postman_collection.json`](./05-SLA-Escalation.postman_collection.json) | **SLA & Eskalasyon Yönetimi (`sla-escalation`)**: Zamanlayıcı (`Scheduled` transition), 5 saniyelik otomatik eskalasyon testi, zamanlayıcıyı sıfırlamadan `heartbeat-ping` (`reenter: false`) ve SLA uzatma (`reenter: true`). |
+| [`06-Invoice-Collection.postman_collection.json`](./06-Invoice-Collection.postman_collection.json) | **Fatura Tahsilatı (`invoice-collection`)**: Ödeme mesajları (`Event` geçişleri, iş anahtarı veya instance id ile eşleştirme, kurala göre tam/kısmi ödeme), bekletmeli mesaj (`bufferFor`, 202), arka planda muhasebe kaydı (`background: true`) ve `history: delta`. |
 
 ## Hızlı Başlangıç
 

@@ -213,6 +213,11 @@ internal static class WorkflowDefinitionValidator
             yield return "version must be ≥ 1.";
         }
 
+        if (wf.HistorySnapshotEvery < 1)
+        {
+            yield return "historySnapshotEvery must be ≥ 1.";
+        }
+
         if (wf.States.Count == 0)
         {
             yield return "at least one state is required.";
@@ -231,6 +236,11 @@ internal static class WorkflowDefinitionValidator
         foreach (var error in ValidateTransition(wf.Start, "start", stateKeys, allTransitionKeys, expressions, tasks, services))
         {
             yield return error;
+        }
+
+        if (wf.Start.Trigger == TriggerType.Event)
+        {
+            yield return "start: the start transition cannot be an event transition (messages correlate to existing instances).";
         }
 
         if (wf.Timeout is { } timeout)
@@ -303,6 +313,24 @@ internal static class WorkflowDefinitionValidator
                 foreach (var error in ValidateTask(task, expressions, tasks, services, allTransitionKeys))
                 {
                     yield return $"{where}: {error}";
+                }
+            }
+
+            foreach (var task in state.OnExit.Where(t => t.Background))
+            {
+                yield return $"{where}: task '{task.DisplayKey}': background tasks are only allowed in onEntry.";
+            }
+
+            foreach (var task in state.OnEntry.Where(t => t.Background))
+            {
+                if (state.IsFinal || state.Type == StateType.SubFlow)
+                {
+                    yield return $"{where}: task '{task.DisplayKey}': background tasks are not allowed in finish or SubFlow states.";
+                }
+
+                if (string.Equals(task.Task, "setKey", StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return $"{where}: task '{task.DisplayKey}': setKey cannot run in the background (the key is claimed with the state).";
                 }
             }
 
@@ -391,6 +419,20 @@ internal static class WorkflowDefinitionValidator
         if (t.Target != TransitionDefinition.Self && !stateKeys.Contains(t.Target))
         {
             yield return $"{where}: target '{t.Target}' is not a state.";
+        }
+
+        if (t.Trigger == TriggerType.Event && string.IsNullOrWhiteSpace(t.Event))
+        {
+            yield return $"{where}: event transitions need an 'event' (the message name).";
+        }
+        else if (t.Trigger != TriggerType.Event && !string.IsNullOrWhiteSpace(t.Event))
+        {
+            yield return $"{where}: 'event' is only valid with \"trigger\": \"Event\".";
+        }
+
+        foreach (var task in t.OnExecute.Where(task => task.Background))
+        {
+            yield return $"{where}: task '{task.DisplayKey}': background tasks are only allowed in a state's onEntry.";
         }
 
         switch (t.Trigger)

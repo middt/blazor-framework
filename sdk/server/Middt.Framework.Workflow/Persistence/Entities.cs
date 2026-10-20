@@ -88,6 +88,12 @@ public sealed class WorkflowInstance
     /// <summary>Child instance this instance waits for (subflow state).</summary>
     public Guid? WaitingForInstanceId { get; set; }
 
+    /// <summary>Background task job this instance waits for (<c>"background": true</c> onEntry task); cleared when it finishes or the state is left.</summary>
+    public Guid? BackgroundTaskId { get; set; }
+
+    /// <summary><c>history: delta</c>: patch rows written since the last snapshot row; <c>null</c> until the first history row.</summary>
+    public int? HistoryPatchCount { get; set; }
+
     /// <summary>Transition to re-run by <c>retry</c> when the instance is Faulted.</summary>
     public string? PendingTransition { get; set; }
 
@@ -160,7 +166,12 @@ public sealed class WorkflowHistory
     public string? ExecutedBy { get; set; }
     public string? Input { get; set; }
     public int DataVersion { get; set; }
-    public string Data { get; set; } = "{}";
+
+    /// <summary>Full data snapshot after the transition (<c>history: full</c>); <c>null</c> in <c>delta</c> mode.</summary>
+    public string? Data { get; set; }
+
+    /// <summary>RFC 6902 JSON Patch from the previous version to this one (<c>history: delta</c>); <c>null</c> in <c>full</c> mode.</summary>
+    public string? Patch { get; set; }
 
     /// <summary>JSON array of <see cref="WorkflowTaskExecutionModel"/> executed during this transition.</summary>
     public string? Tasks { get; set; }
@@ -188,6 +199,12 @@ public enum WorkflowJobKind
 
     /// <summary>Deliver an event committed with the workflow state.</summary>
     Event,
+
+    /// <summary>Run a <c>"background": true</c> onEntry task outside the instance lock and merge its result.</summary>
+    Task,
+
+    /// <summary>A message for an event transition, buffered until the instance can take it (or it expires).</summary>
+    Message,
 }
 
 /// <summary>Durable timer / deferred work item processed by <c>WorkflowJobProcessor</c>.</summary>

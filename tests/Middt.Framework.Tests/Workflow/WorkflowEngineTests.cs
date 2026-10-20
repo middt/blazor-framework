@@ -333,8 +333,8 @@ public sealed class WorkflowEngineTests
         history[1].StartedAt.Should().Be(WorkflowTestHost.StartTime.UtcDateTime.AddMinutes(5));
 
         var rows = await host.WithDbAsync(db => db.History.AsNoTracking().Where(h => h.InstanceId == instance.Id).OrderBy(h => h.Id).ToListAsync(TestContext.Current.CancellationToken));
-        JsonNode.Parse(rows[0].Data)!["submission"].Should().BeNull();
-        JsonNode.Parse(rows[1].Data)!["submission"]!["comment"]!.GetValue<string>().Should().Be("c");
+        JsonNode.Parse(rows[0].Data!)!["submission"].Should().BeNull();
+        JsonNode.Parse(rows[1].Data!)!["submission"]!["comment"]!.GetValue<string>().Should().Be("c");
         rows[1].Input.Should().Be("""{"comment":"c"}""");
     }
 

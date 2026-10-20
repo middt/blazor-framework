@@ -23,11 +23,13 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Called through the DbContext instance.")]
     public Guid NewId() => Guid.CreateVersion7();
 
+    /// <summary>The schema the model maps to (SQLite has no schemas); part of the model cache key.</summary>
+    internal string? ModelSchema => (Database.ProviderName ?? string.Empty).Contains("Sqlite", StringComparison.Ordinal) ? null : workflowOptions.Value.Schema;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var provider = Database.ProviderName ?? string.Empty;
-        // SQLite has no schemas.
-        var schema = provider.Contains("Sqlite", StringComparison.Ordinal) ? null : workflowOptions.Value.Schema;
+        var schema = ModelSchema;
         var isPostgres = provider.Contains("Npgsql", StringComparison.Ordinal);
 
         modelBuilder.Entity<WorkflowInstance>(e =>
@@ -97,6 +99,7 @@ public sealed class WorkflowDbContext(DbContextOptions<WorkflowDbContext> option
             {
                 e.Property(x => x.Input).HasColumnType("jsonb");
                 e.Property(x => x.Data).HasColumnType("jsonb");
+                e.Property(x => x.Patch).HasColumnType("jsonb");
                 e.Property(x => x.Tasks).HasColumnType("jsonb");
             }
 

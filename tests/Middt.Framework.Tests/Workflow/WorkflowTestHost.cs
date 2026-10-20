@@ -27,7 +27,8 @@ using Middt.Framework.Workflow.Tasks;
 namespace Middt.Framework.Tests.Workflow;
 
 /// <summary>
-/// In-process workflow host: SQLite in-memory (connection open for the test lifetime), <see cref="FakeTimeProvider"/>,
+/// In-process workflow host: SQLite in-memory (connection open for the test lifetime) or a real PostgreSQL schema
+/// (<see cref="StartPostgresAsync"/>), <see cref="FakeTimeProvider"/>,
 /// job processor driven manually through <see cref="RunJobsAsync"/>, and a TestServer exposing <c>MapMiddtWorkflows</c>
 /// with a header based test authentication (<c>X-Test-User</c>, <c>X-Test-Roles</c>).
 /// </summary>
@@ -37,10 +38,10 @@ public sealed class WorkflowTestHost : IAsyncDisposable
 
     private readonly bool ownsConnection;
 
-    private WorkflowTestHost(WebApplication app, SqliteConnection connection, bool ownsConnection, FakeTimeProvider time)
+    private WorkflowTestHost(WebApplication app, SqliteConnection? connection, bool ownsConnection, FakeTimeProvider time)
     {
         App = app;
-        Connection = connection;
+        Connection = connection!;
         this.ownsConnection = ownsConnection;
         Time = time;
         Client = app.GetTestClient();
@@ -50,6 +51,7 @@ public sealed class WorkflowTestHost : IAsyncDisposable
 
     public IServiceProvider Services => App.Services;
 
+    /// <summary>The SQLite connection (not set for PostgreSQL hosts).</summary>
     public SqliteConnection Connection { get; }
 
     public FakeTimeProvider Time { get; }
@@ -64,16 +66,34 @@ public sealed class WorkflowTestHost : IAsyncDisposable
 
     public static Task<WorkflowTestHost> StartAsync(params string[] definitions) => StartAsync(definitions, null);
 
+    /// <summary>
+    /// A host on PostgreSQL: its own schema (<paramref name="schema"/>) on <paramref name="connectionString"/>. Several hosts
+    /// on the same schema behave like several nodes of one application (shared tables, jobs and NOTIFY channel).
+    /// </summary>
+    public static Task<WorkflowTestHost> StartPostgresAsync(
+        string connectionString,
+        string schema,
+        IEnumerable<string> definitions,
+        Action<MiddtWorkflowOptions>? configure = null,
+        Action<IServiceCollection>? services = null,
+        FakeTimeProvider? time = null) =>
+        StartAsync(definitions, o =>
+        {
+            o.Schema = schema;
+            configure?.Invoke(o);
+        }, services, time: time, postgres: connectionString);
+
     public static async Task<WorkflowTestHost> StartAsync(
         IEnumerable<string> definitions,
         Action<MiddtWorkflowOptions>? configure = null,
         Action<IServiceCollection>? services = null,
         Action<DbContextOptionsBuilder>? configureDb = null,
         SqliteConnection? connection = null,
-        FakeTimeProvider? time = null)
+        FakeTimeProvider? time = null,
+        string? postgres = null)
     {
-        var ownsConnection = connection is null;
-        if (connection is null)
+        var ownsConnection = connection is null && postgres is null;
+        if (connection is null && postgres is null)
         {
             connection = new SqliteConnection("DataSource=:memory:");
             await connection.OpenAsync();
@@ -103,7 +123,15 @@ public sealed class WorkflowTestHost : IAsyncDisposable
         {
             o.UseDbContext(db =>
             {
-                db.UseSqlite(sqlite);
+                if (postgres is not null)
+                {
+                    db.UseNpgsql(postgres);
+                }
+                else
+                {
+                    db.UseSqlite(sqlite!);
+                }
+
                 configureDb?.Invoke(db);
             });
             o.AutoCreateSchema = true;
@@ -142,7 +170,7 @@ public sealed class WorkflowTestHost : IAsyncDisposable
             await app.DisposeAsync();
             if (ownsConnection)
             {
-                await connection.DisposeAsync();
+                await connection!.DisposeAsync();
             }
 
             throw;

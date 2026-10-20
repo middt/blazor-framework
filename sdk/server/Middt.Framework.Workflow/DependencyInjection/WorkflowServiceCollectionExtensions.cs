@@ -32,13 +32,19 @@ public static class WorkflowServiceCollectionExtensions
         }
 
         services.Configure(configure);
-        services.AddDbContext<WorkflowDbContext>(options.ConfigureDbContext);
+        var configureDb = options.ConfigureDbContext;
+        services.AddDbContext<WorkflowDbContext>(db =>
+        {
+            configureDb(db);
+            db.ReplaceService<Microsoft.EntityFrameworkCore.Infrastructure.IModelCacheKeyFactory, WorkflowModelCacheKeyFactory>();
+        });
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddSingleton<WorkflowExpressionEngine>();
         services.AddSingleton<WorkflowTaskRegistry>();
         services.AddSingleton<WorkflowRegistry>();
         services.AddSingleton<WorkflowJobSignal>();
+        services.TryAddSingleton<WorkflowJobNotifier>();
         services.AddScoped<WorkflowEngine>();
         services.AddScoped<WorkflowInstanceDataQuery>();
         services.AddScoped<WorkflowViewRenderer>();
@@ -68,6 +74,8 @@ public static class WorkflowServiceCollectionExtensions
         {
             services.AddSingleton<WorkflowJobProcessor>();
             services.AddHostedService(sp => sp.GetRequiredService<WorkflowJobProcessor>());
+            services.AddSingleton<WorkflowJobListener>();
+            services.AddHostedService(sp => sp.GetRequiredService<WorkflowJobListener>());
         }
 
         return services;

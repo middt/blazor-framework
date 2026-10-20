@@ -1,0 +1,41 @@
+{
+  "$schema": "../../../spec/ui-layout.schema.json",
+  "key": "invoice-result",
+  "title": "Fatura Tahsilat Sonucu",
+  "kind": "view",
+  "version": 1,
+  "body": [
+    {
+      "widget": "alert",
+      "severity": "success",
+      "text": "Fatura tahsil edildi ve muhasebe kaydı tamamlandı.",
+      "visibleWhen": "instance.state == \"paid\""
+    },
+    {
+      "widget": "alert",
+      "severity": "danger",
+      "text": "Fatura iptal edildi: {{ data.cancellation.reason }}",
+      "visibleWhen": "instance.state == \"cancelled\""
+    },
+    {
+      "widget": "section",
+      "title": "Tahsilat Özeti",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Fatura No", "value": "{{ data.invoiceNo }}" },
+            { "label": "Müşteri", "value": "{{ data.customerName }}" },
+            { "label": "Fatura Tutarı", "value": "{{ data.total }}", "format": "N2" },
+            { "label": "Ödenen Tutar", "value": "{{ data.payment.amount }}", "format": "N2", "visibleWhen": "data.payment != null" },
+            { "label": "Banka Referansı", "value": "{{ data.payment.reference }}", "visibleWhen": "data.payment != null && data.payment.reference != null" },
+            { "label": "Muhasebe Referansı", "value": "{{ data.ledgerResponse.body.referenceCode }}", "visibleWhen": "data.ledgerResponse != null" },
+            { "label": "Mutabakat Zamanı", "value": "{{ data.reconciledAt }}", "visibleWhen": "data.reconciledAt != null" },
+            { "label": "Elle Mutabakat Yapan", "value": "{{ data.reconciledBy }}", "visibleWhen": "data.reconciledBy != null" }
+          ]
+        }
+      ]
+    },
+    { "widget": "layout", "key": "workflow-footer" }
+  ]
+}

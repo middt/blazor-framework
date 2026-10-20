@@ -10,10 +10,10 @@ Middt Framework'te iş akışı motoru 5 ana tablodan oluşur ve tüm tablolar *
 
 | Tablo | Sorumluluk | Anahtar (PK) | Partition Tipi | Büyüme Hızı |
 | :--- | :--- | :---: | :---: | :---: |
-| **`WorkflowInstances`** | Akışın durum ve yaşam döngüsü metadata'sı (`State`, `Status`, `BusySince`, `Revision`, `Audit`) | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` | Orta |
+| **`WorkflowInstances`** | Akışın durum ve yaşam döngüsü metadata'sı (`State`, `Status`, `BusySince`, `Revision`, `BackgroundTaskId`, `HistoryPatchCount`, `Audit`) | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` | Orta |
 | **`WorkflowInstanceData`** | Akışın tüm JSON iş verisi (`Data` column `jsonb`, `DataVersion`, `DataHash`, `ETag`) | `(InstanceId, WorkflowKey)` | `LIST (WorkflowKey)` | Hızlı (Büyük payload) |
-| **`WorkflowHistory`** | Her geçişin audit kaydı ve geçiş anındaki JSON snapshot'ları | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` | Çok Hızlı (En büyük tablo) |
-| **`WorkflowJobs`** | Zamanlanmış geçişler, gecikmeli kuyruk işleri ve zaman aşımları | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` / Queue | Dinamik (Geçici kuyruk) |
+| **`WorkflowHistory`** | Her geçişin audit kaydı. `history: full` modunda geçiş anındaki JSON snapshot (`Data`), `delta` modunda çoğunlukla yalnızca değişiklik (`Patch`, JSON Patch) ve arada snapshot'lar; `none` modunda satır yazılmaz | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` | Çok Hızlı (En büyük tablo) |
+| **`WorkflowJobs`** | Zamanlanmış geçişler, asenkron geçişler, zaman aşımları, bekletilen mesajlar (`Message`) ve arka plan görevleri (`Task`); PostgreSQL'de `FOR UPDATE SKIP LOCKED` ile alınır | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` / Queue | Dinamik (Geçici kuyruk) |
 | **`WorkflowIncidents`** | Akış sırasında oluşan hatalar, retry denemeleri ve incident kayıtları | `(Id, WorkflowKey)` | `LIST (WorkflowKey)` | Düşük/Orta |
 
 ### Neden Tüm Tablolarda Bileşik Anahtar: `(..., WorkflowKey)`?
@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS wf."WorkflowInstances" (
     "CreatedAt" timestamptz NOT NULL,
     "UpdatedAt" timestamptz NOT NULL,
     "CompletedAt" timestamptz,
+    "BackgroundTaskId" uuid,       -- beklenen arka plan görevinin job id'si
+    "HistoryPatchCount" int,       -- history: delta – son snapshot'tan beri yazılan patch sayısı
     CONSTRAINT "PK_WorkflowInstances" PRIMARY KEY ("Id", "WorkflowKey")
 ) PARTITION BY LIST ("WorkflowKey");
 
@@ -109,10 +111,11 @@ CREATE TABLE IF NOT EXISTS wf."WorkflowHistory" (
     "ExecutedBy" varchar(256),
     "Input" jsonb,
     "DataVersion" int NOT NULL,
-    "Data" jsonb NOT NULL,
+    "Data" jsonb,                  -- snapshot (full modda her satır, delta modda yalnızca checkpoint satırları)
     "Tasks" jsonb,
     "StartedAt" timestamptz NOT NULL,
     "FinishedAt" timestamptz NOT NULL,
+    "Patch" jsonb,                 -- history: delta – önceki sürüme göre değişiklik (RFC 6902 JSON Patch, örnekler: README "History modes")
     CONSTRAINT "PK_WorkflowHistory" PRIMARY KEY ("Id", "WorkflowKey")
 ) PARTITION BY LIST ("WorkflowKey");
 
@@ -149,6 +152,14 @@ CREATE INDEX IF NOT EXISTS "IX_WorkflowJobs_DueAt"
     ON wf."WorkflowJobs" ("DueAt");
 CREATE INDEX IF NOT EXISTS "IX_WorkflowJobs_WorkflowKey_DueAt" 
     ON wf."WorkflowJobs" ("WorkflowKey", "DueAt");
+
+-- İşler node'lar arasında böyle alınır: kilitli satır atlanır, kimse kimseyi beklemez.
+-- UPDATE wf."WorkflowJobs" AS j SET "LockedUntil" = @lease, "Attempts" = j."Attempts" + 1
+-- FROM (SELECT "Id", "WorkflowKey" FROM wf."WorkflowJobs"
+--       WHERE "DueAt" <= @now AND ("LockedUntil" IS NULL OR "LockedUntil" < @now)
+--       ORDER BY "DueAt" LIMIT 1 FOR UPDATE SKIP LOCKED) AS next
+-- WHERE j."Id" = next."Id" AND j."WorkflowKey" = next."WorkflowKey" RETURNING j."Id";
+-- Job yazan node NOTIFY middt_wf_jobs_<şema> gönderir; diğer node'lar LISTEN ile hemen uyanır.
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. WorkflowIncidents (Hata & Retry Kayıtları)

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,8 +12,11 @@ using Middt.Framework.Workflow.Persistence;
 namespace Middt.Framework.Workflow.Runtime;
 
 /// <summary>
-/// Processes due jobs (scheduled transitions, timeouts, async transitions, subflow work, event delivery) and recovers instances left
-/// Busy by a crashed process. Safe to run on several instances: jobs are claimed with a conditional UPDATE (lease).
+/// Processes due jobs (scheduled transitions, timeouts, async transitions, subflow work, event delivery, buffered messages,
+/// background tasks) and recovers instances left Busy by a crashed process. Safe to run on several nodes: on PostgreSQL a job
+/// is claimed with <c>FOR UPDATE SKIP LOCKED</c> (nodes never wait on, or race for, the same row), elsewhere with a
+/// conditional UPDATE; either way the claim is a lease that a running job keeps renewing. Nodes are woken by
+/// <see cref="WorkflowJobListener"/> (PostgreSQL <c>LISTEN</c>/<c>NOTIFY</c>) instead of waiting for the polling interval.
 /// </summary>
 public sealed partial class WorkflowJobProcessor(
     IServiceScopeFactory scopeFactory,
@@ -84,6 +89,20 @@ public sealed partial class WorkflowJobProcessor(
             await RecoverStuckInstancesAsync(db, now, cancellationToken);
         }
 
+        if (db.Database.ProviderName?.Contains("Npgsql", StringComparison.Ordinal) == true)
+        {
+            // One job at a time, claimed right before it runs: a slow job never holds back the ones other nodes could take.
+            var processed = 0;
+            while (processed < BatchSize && await ClaimNextAsync(db, now, now + Lease, cancellationToken) is { } claimedId)
+            {
+                processed++;
+                await ProcessAsync(claimedId, cancellationToken);
+                now = time.GetUtcNow().UtcDateTime;
+            }
+
+            return processed;
+        }
+
         var due = await db.Jobs.AsNoTracking()
             .Where(j => j.DueAt <= now && (j.LockedUntil == null || j.LockedUntil < now))
             .OrderBy(j => j.DueAt)
@@ -105,6 +124,48 @@ public sealed partial class WorkflowJobProcessor(
         }
 
         return due.Count;
+    }
+
+    /// <summary>
+    /// PostgreSQL: claims the earliest due job that no other node holds. <c>SKIP LOCKED</c> makes concurrent processors pick
+    /// different rows instead of blocking on (or losing the race for) the same one.
+    /// </summary>
+    private static async Task<Guid?> ClaimNextAsync(WorkflowDbContext db, DateTime now, DateTime leaseUntil, CancellationToken cancellationToken)
+    {
+        var entity = db.Model.FindEntityType(typeof(WorkflowJob))!;
+        var sql = db.GetService<ISqlGenerationHelper>();
+        var table = sql.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema());
+
+        var connection = db.Database.GetDbConnection();
+        await db.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"""
+                UPDATE {table} AS j SET "LockedUntil" = @lease, "Attempts" = j."Attempts" + 1
+                FROM (SELECT "Id", "WorkflowKey" FROM {table}
+                      WHERE "DueAt" <= @now AND ("LockedUntil" IS NULL OR "LockedUntil" < @now)
+                      ORDER BY "DueAt" LIMIT 1
+                      FOR UPDATE SKIP LOCKED) AS next
+                WHERE j."Id" = next."Id" AND j."WorkflowKey" = next."WorkflowKey"
+                RETURNING j."Id"
+                """;
+            AddParameter(command, "lease", leaseUntil);
+            AddParameter(command, "now", now);
+            return await command.ExecuteScalarAsync(cancellationToken) is Guid id ? id : null;
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static void AddParameter(System.Data.Common.DbCommand command, string name, DateTime value)
+    {
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        command.Parameters.Add(parameter);
     }
 
     private async Task ProcessAsync(Guid jobId, CancellationToken cancellationToken)
@@ -132,7 +193,21 @@ public sealed partial class WorkflowJobProcessor(
         bool done;
         try
         {
-            var outcome = await engine.ProcessJobAsync(job, cancellationToken);
+            WorkflowEngine.JobOutcome outcome;
+            // Renew the lease while the job runs (a background task may take longer than the lease); stopped before the
+            // job is released or deleted below, so a late beat cannot lock it again.
+            await using (WorkflowHeartbeat.Start(scopeFactory, options.Value.BusyHeartbeatInterval, time, logger, (beatDb, now, ct) =>
+                beatDb.Jobs.Where(j => j.Id == jobId && j.LockedUntil != null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(j => j.LockedUntil, (DateTime?)(now + Lease)), ct)))
+            {
+                outcome = await engine.ProcessJobAsync(job, cancellationToken);
+            }
+
+            if (outcome == WorkflowEngine.JobOutcome.Rescheduled)
+            {
+                return;
+            }
+
             if (outcome == WorkflowEngine.JobOutcome.Postpone)
             {
                 var later = time.GetUtcNow().UtcDateTime.AddMinutes(1);

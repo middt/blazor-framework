@@ -531,7 +531,8 @@ public partial class WorkflowInstanceDetail
     }
 
     private string TransitionTitle(string key) =>
-        definition?.Transitions.FirstOrDefault(t => t.Key == key && !string.IsNullOrEmpty(t.Title))?.Title ?? key;
+        definition?.Transitions.FirstOrDefault(t => t.Key == key && !string.IsNullOrEmpty(t.Title))?.Title
+            ?? (key == "$background" ? "Arka plan görevi" : key);
 
     private static string TriggerText(string trigger) => trigger switch
     {
@@ -541,6 +542,8 @@ public partial class WorkflowInstanceDetail
         "SubFlow" => "Alt akış",
         "Start" => "Başlangıç",
         "Timeout" => "Zaman aşımı",
+        "Event" => "Mesaj",
+        "Background" => "Arka plan görevi",
         _ => trigger,
     };
 

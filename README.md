@@ -17,7 +17,7 @@ Targets **.NET 10 (LTS)**.
 | Contracts | `Middt.Framework.Ui.Abstractions` | Server driven UI contract: layout model, widget specs, validator, portable formats, JSON Schema generator. No UI technology. |
 | Backend | `Middt.Framework.Common` | Server side helpers for API and frontend hosts: security headers, forwarded headers, local URL checks, SignalR hub base. |
 | Backend | `Middt.Framework.Api` | `AddMiddtApi()` / `UseMiddtApi()`, token & API controllers, ProblemDetails, versioning, OpenAPI + Scalar, JWT/OIDC, rate limiting. |
-| Backend | `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions, tasks, retries, timers, subflows, history, PostgreSQL declarative partitioning & dynamic `WorkflowInstanceDataQuery` – on EF Core, no Dapr. |
+| Backend | `Middt.Framework.Workflow` | Embedded, JSON defined workflow (state machine) engine: manual/automatic/scheduled transitions and message-driven event transitions, tasks (also in the background, outside the instance lock), retries, timers, subflows, history (full / delta / none), multi-node job processing (`SKIP LOCKED`, `LISTEN`/`NOTIFY`), PostgreSQL declarative partitioning & dynamic `WorkflowInstanceDataQuery` – on EF Core, no Dapr. |
 | Backend | `Middt.Framework.Ui.Server` | Layout store on EF Core (`ui` schema, revisions, optimistic concurrency), seeding, `MapMiddtUi()` REST API (incl. widgets and JSON Schema), plain C# static HTML renderer. |
 | Client SDK | `Middt.Framework.Client` | Typed API clients (`WorkflowApiClient`, `UiApiClient`, `UiDataClient`) on `IHttpClientFactory` + resilience, token refresh, SignalR client. |
 | Frontends | `Middt.Framework.Bff` | Backend-for-frontend blocks for any browser frontend: HttpOnly cookie session, server side token store with refresh, Login/Logout pages, `GET /bff/user`, YARP proxy of `/api` + `/hubs` with the session's token and CSRF protection (`AddMiddtSpaBff()` / `UseMiddtSpaBff()`). |
@@ -167,16 +167,17 @@ A definition ([full example](demo/Middt.Demo.Api/Workflows/customer-onboarding.j
 | Concept | Supported |
 |---|---|
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
-| Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
+| Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), `Event` (`event` name; triggered by a message, see [Messages](#messages-event-transitions)), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
 | Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/Middt.Demo.Api/Workflows/credit-allocation.json) |
 | Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path); `set` computes values (an input without schema ignores the body). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
-| Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition |
+| Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition; `"background": true` on a state's `onEntry` task runs it outside the instance lock (see [Long tasks](#long-tasks-background)) |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
 | Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
-| Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), atomic final state + history + follow-up jobs, incidents, idempotent start by business key, async transitions (202), durable timers and follow-up jobs with leases (multi-instance safe), crash recovery of Busy instances, queued `IWorkflowEventHandler` notifications after commit |
+| History | `"history": "full"` (default: data snapshot per transition), `"delta"` (mostly only the change, as a JSON Patch in `Patch`, with a full snapshot for the first row, the row that finishes the instance, every `historySnapshotEvery` rows (default 20) and whenever the patch would not be smaller than the data – so any version is rebuilt from the nearest snapshot with at most that many patches; `WorkflowEngine.HistoryDataAsync`) or `"none"` (no history rows; the instance data itself is still saved on every transition) – see [History modes](#history-modes-and-how-json-patch-is-used) |
+| Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), a heartbeat that keeps a running claim alive (`BusyHeartbeatInterval`), atomic final state + history + follow-up jobs, incidents, idempotent start by business key, async transitions (202), durable timers and follow-up jobs with renewed leases, claimed with `FOR UPDATE SKIP LOCKED` on PostgreSQL and woken across nodes by `LISTEN`/`NOTIFY` (multi-instance safe, no polling delay), crash recovery of Busy instances, queued `IWorkflowEventHandler` notifications after commit |
 
-The engine first records a Busy claim with the pending transition and persistable input. It then runs tasks and commits the resulting instance data, history, incidents and follow-up jobs together. If execution is interrupted, the job processor marks a stale Busy instance Faulted; `POST …/retry` reruns its pending transition. Input fields declared `sensitive` are excluded from persisted input. If a recovered transition requires those fields, the retry endpoint cannot reconstruct them and the instance needs operator remediation. Instances retain their definition version; list permissions use each instance's version, including its `roles` and `instanceAccess` settings.
+The engine first records a Busy claim with the pending transition and persistable input. It then runs tasks and commits the resulting instance data, history, incidents and follow-up jobs together. While the tasks run, the claim refreshes `BusySince` every `BusyHeartbeatInterval` (default 1 minute), so a slow task is never mistaken for a crash. If the process stops, the heartbeat stops too and the job processor marks the instance Faulted once `BusySince` is older than `BusyTimeout`; `POST …/retry` reruns its pending transition. Input fields declared `sensitive` are excluded from persisted input. If a recovered transition requires those fields, the retry endpoint cannot reconstruct them and the instance needs operator remediation. Instances retain their definition version; list permissions use each instance's version, including its `roles` and `instanceAccess` settings.
 
 Task attempts use separate data snapshots. A failed attempt cannot leave partial data in the next attempt. Custom tasks receive `WorkflowTaskContext.IdempotencyKey`, which stays the same during the attempts of one command; the built-in HTTP task sends it as `Idempotency-Key` unless the definition supplies that header. External systems must deduplicate with this key if retries could repeat a side effect. Configure a stable business key for `startWorkflow` when the same child must not be started twice. A later explicit retry of a faulted instance is a new command and may use a different key.
 
@@ -185,7 +186,105 @@ Child cancellation, parent resumption and event delivery are written as jobs in 
 REST API (all responses use the `BaseResponseDataModel<T>` envelope; errors are ProblemDetails):
 `GET /api/workflows`, `GET /{workflow}`, `POST /{workflow}/instances`, `GET /{workflow}/instances`,
 `GET /{workflow}/instances/{id}` (includes the caller's available transitions and their input schemas),
-`POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`.
+`POST /{workflow}/instances/{id}/transitions/{key}[?async=true]`, `GET …/history`, `GET …/incidents`, `POST …/retry`,
+`POST /{workflow}/instances/{id}/messages/{message}` and `POST /{workflow}/messages/{message}?key=…` (`[&bufferFor=PT10M]`; 200 delivered, 202 buffered).
+
+### Messages (event transitions)
+
+A transition with `"trigger": "Event"` runs when a message of its `event` name reaches the instance. The message body is
+the transition input (validated by `input.schema`, written with `into`); several event transitions may listen for the same
+message and the first whose `rule` holds is taken – `input` is the message body there:
+
+```jsonc
+{ "key": "paid", "target": "paid", "trigger": "Event", "event": "payment.received", "rule": "input.amount >= data.total",
+  "input": { "schema": { "type": "object", "properties": { "amount": { "type": "number" } } }, "into": "payment" } },
+{ "key": "partial", "target": "$self", "trigger": "Event", "event": "payment.received",
+  "input": { "schema": { "type": "object", "properties": { "amount": { "type": "number" } } }, "into": "partialPayment" } }
+```
+
+A message is correlated to one instance by its id or by the workflow's business key
+(`WorkflowEngine.DeliverMessageAsync(new WorkflowMessage { Name, Workflow, Key | InstanceId, Data, BufferFor }, user)` or the
+REST endpoints above). The sender needs read access to the instance and must satisfy the `roles` of at least one event
+transition for that message ([invoice-collection.json](demo/Middt.Demo.Api/Workflows/invoice-collection.json) is a
+complete example: full and partial payments, a late payment after the due date). When the instance cannot take the message now (busy, faulted, or in a state without a matching
+transition) it is rejected with 409 – or, with `BufferFor`, kept as a durable job and delivered as soon as the instance enters
+a state that waits for it; it is dropped when it expires. Event transitions are never offered as buttons.
+
+### Long tasks (background)
+
+A transition that calls a slow system holds the instance Busy for as long as the call takes. Mark such a state `onEntry`
+task `"background": true` instead: the state is committed first and the instance stays Active (readable, cancellable,
+other transitions allowed) while the task runs as a job. When it finishes, its data changes are merged into the current
+data (changes made meanwhile are kept), a `$background` history row is written, the remaining `onEntry` tasks and the
+automatic transitions run. The outcome is stored on the job before it is applied, so a busy instance or a restart never
+runs the task twice; a result that arrives after the instance left the state is discarded. A failure follows the task's
+`onError` (`Fault` → `retry` runs the task again, `Transition`, `Continue`). Background tasks are allowed in `onEntry` of
+non-finish, non-subflow states only, and not for `setKey`; they receive no transition `input`. Example: the `post-ledger`
+task of [invoice-collection.json](demo/Middt.Demo.Api/Workflows/invoice-collection.json).
+
+### History modes (and how JSON Patch is used)
+
+Every transition writes one row to `WorkflowHistory` (who, when, from → to, input, executed tasks). The `history` setting
+of a definition decides what that row keeps of the instance **data**:
+
+```jsonc
+{ "key": "invoice-collection", "history": "delta", "historySnapshotEvery": 10, ... }
+```
+
+| Mode | `Data` column | `Patch` column | Use it for |
+|---|---|---|---|
+| `full` (default) | the whole data after the transition | – | small or short-lived flows; the old behaviour |
+| `delta` | only on checkpoint rows | the change made by this transition | long-lived records with many updates and large data |
+| `none` | no row at all | – | one-shot or high-volume flows whose audit lives elsewhere |
+
+The instance's current data (`WorkflowInstanceData`) is saved on every transition in all three modes; the mode only changes
+the history.
+
+**Nothing changes for clients.** A client never sends or receives a patch: it calls transitions and sends messages exactly
+as before (`POST …/messages/payment.received?key=INV-FTR-2026-0001` with `{ "amount": 5000, "reference": "EFT-5000" }`).
+After the transition the engine compares the data before and after it and stores the difference as an
+[RFC 6902](https://www.rfc-editor.org/rfc/rfc6902) JSON Patch – a list of `add` / `replace` / `remove` operations on JSON
+paths. These are the rows the `invoice-collection` demo writes for a start and two partial payments:
+
+| Transition | `DataVersion` | `Data` | `Patch` |
+|---|---|---|---|
+| `start` | 1 | `{"invoiceNo":"FTR-2026-0001","customerName":"Anadolu Lojistik A.Ş.","total":12500,…}` | `null` |
+| `partial-payment` | 2 | `null` | `[{"op":"add","path":"/lastPartialPayment","value":{"amount":5000,"reference":"EFT-5000"}}]` |
+| `partial-payment` | 3 | `null` | `[{"op":"replace","path":"/lastPartialPayment/amount","value":7000},{"op":"replace","path":"/lastPartialPayment/reference","value":"EFT-7000"}]` |
+
+Objects are compared member by member, so the third row only names the two values that changed; arrays and plain values
+are replaced whole. `remove` and an explicit `"value": null` are different operations, so a field set to `null` is never
+confused with a deleted one.
+
+**Checkpoints.** In `delta` mode a row is a full snapshot (in `Data`, `Patch` empty) instead of a patch when it is the first
+row, when it finishes the instance, when `historySnapshotEvery` patch rows (default 20) followed the last snapshot, or when
+the patch would not be smaller than the data itself. Any version is therefore rebuilt from the nearest snapshot before it
+with at most `historySnapshotEvery` patches, and the final data of a finished instance is a single read.
+`WorkflowInstance.HistoryPatchCount` counts the patches since the last snapshot, so deciding never reads the history.
+
+**Reading it back.** `HistoryDataAsync` returns the data after every row, whatever the mode wrote (snapshot rows reset,
+patch rows are applied in order):
+
+```csharp
+var versions = await engine.HistoryDataAsync(instanceId, user, cancellationToken);
+// [ ("start", 1, {…}), ("partial-payment", 2, {…, "lastPartialPayment": {"amount": 5000, …}}), … ]
+```
+
+`GET …/history` is unchanged: it lists transitions, triggers, actors and tasks, not data, in every mode. For ad-hoc
+analysis in SQL, `Patch` is `jsonb`:
+
+```sql
+SELECT "DataVersion", "TransitionKey", coalesce("Data", "Patch") AS change
+FROM wf."WorkflowHistory" WHERE "WorkflowKey" = 'invoice-collection' AND "InstanceId" = @id ORDER BY "Id";
+```
+
+`WorkflowJsonPatch.Diff(from, to)` and `WorkflowJsonPatch.Apply(target, patch)` are public if an application needs the
+same comparison.
+
+**The same patch merges background results.** A `"background": true` task works on a copy of the data while the instance
+stays usable. When it finishes, only its patch is applied to the data as it is then, so an update made meanwhile (for
+example by a `$self` transition) is kept: the ledger call of `invoice-collection` contributes just
+`[{"op":"add","path":"/ledgerResponse",…}]`. If both touch the same array, the task's version of that array wins.
 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
 `Middt.Framework.Blazor.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
@@ -415,6 +514,11 @@ identity provider: <http://localhost:8083> (login, registration, password reset,
 (roles `manager`, `ui-admin`, `idp-admin`) and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference:
 <http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
+
+Message-driven steps have no buttons: start a "Fatura Tahsilatı" (`invoice-collection`) instance in a UI, then send its
+payment with Postman collection [06](postman/06-Invoice-Collection.postman_collection.json)
+(`POST /api/workflows/invoice-collection/messages/payment.received?key=INV-…`) and watch it move to "Muhasebe Mutabakatı"
+and – after the background ledger call – to "Tahsil Edildi". All collections are described in [postman/README.md](postman/README.md).
 
 ## Development
 

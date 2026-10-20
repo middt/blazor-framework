@@ -13,6 +13,9 @@ The demo shows framework usage – keep framework logic in `sdk/`.
   - State detail views come from `Layouts/*.json` (`kind: "view"`, referenced via `"view": { "layout": "..." }`) and are editable at runtime in `/admin/layouts`.
   - Reusable partial layouts (e.g. `workflow-footer.json`) can be embedded inside any layout via `{ "widget": "layout", "key": "workflow-footer", "data": "<optional-expr>" }`.
   - There are NO hardcoded Razor or Angular views in the demo.
+- Workflows: `customer-onboarding`, `credit-allocation` (+ `risk-limit-eval` subflow), `order-payment-orchestration`,
+  `sla-escalation`, and `invoice-collection` (payment messages → `Event` transitions with `bufferFor`, a `background`
+  ledger call, `history: delta`). Messages have no buttons: send them with the REST endpoints or Postman collection 06.
 - Sign-in: both BFFs use Middt Identity (`identity/Middt.Identity`, :8083) configured by `demo/identity.json` (seed).
   Demo user `test@test.com` / `test` has roles `manager`, `ui-admin`, `idp-admin`; `user@test.com` / `test` has none.
 - Running: `docker compose up -d --build` with `.env` (see `.env.example`). Rebuild only what changed:

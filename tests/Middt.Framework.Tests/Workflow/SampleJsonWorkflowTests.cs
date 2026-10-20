@@ -19,7 +19,7 @@ using Middt.Framework.Workflow.Tasks;
 namespace Middt.Framework.Tests.Workflow;
 
 /// <summary>
-/// Comprehensive integration tests for all 5 JSON-backed demo workflows (<c>demo/Middt.Demo.Api/Workflows</c>) and
+/// Comprehensive integration tests for all 6 JSON-backed demo workflows (<c>demo/Middt.Demo.Api/Workflows</c>) and
 /// <see cref="WorkflowInstanceDataQuery"/> operating purely on <c>WorkflowDbContext</c> JSON documents without relational domain tables.
 /// </summary>
 public sealed class SampleJsonWorkflowTests
@@ -358,6 +358,75 @@ public sealed class SampleJsonWorkflowTests
         fallbackOrder = await host.TransitionAsync(fallbackOrder.Id, "cancel-order", new { reason = "Ödeme geçidi yanıt vermedi" }, user: Alice);
         fallbackOrder.State.Should().Be("cancelled");
         fallbackOrder.Status.Should().Be(WorkflowInstanceStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task Invoice_collection_takes_payment_messages_reconciles_in_the_background_and_keeps_delta_history()
+    {
+        var httpHandler = new FakeHttpHandler
+        {
+            StatusCode = HttpStatusCode.OK,
+            ResponseBody = """{"status":"Approved","referenceCode":"GW-LEDGER01"}""",
+        };
+        await using var host = await CreateHostAsync(httpHandler);
+        async Task<WorkflowMessageResult> PayAsync(string key, decimal amount, TimeSpan bufferFor = default) =>
+            await host.WithEngineAsync(e => e.DeliverMessageAsync(new WorkflowMessage
+            {
+                Name = "payment.received",
+                Workflow = "invoice-collection",
+                Key = key,
+                Data = new JsonObject { ["amount"] = amount, ["reference"] = "EFT-" + amount.ToString(CultureInfo.InvariantCulture) },
+                BufferFor = bufferFor,
+            }, Owner, TestContext.Current.CancellationToken));
+
+        // 1. A partial payment stays in awaiting-payment ($self event transition chosen by its rule).
+        var invoice = await host.StartInstanceAsync("invoice-collection",
+            new { invoiceNo = "FTR-2026-0001", customerName = "Anadolu Lojistik A.Ş.", total = 12500, description = new string('x', 300) }, user: Owner);
+        invoice.State.Should().Be("awaiting-payment");
+        invoice.Key.Should().Be("INV-FTR-2026-0001");
+
+        var partial = await PayAsync("INV-FTR-2026-0001", 5000);
+        partial.Instance!.State.Should().Be("awaiting-payment");
+        partial.Instance.Data["lastPartialPayment"]!["amount"]!.GetValue<decimal>().Should().Be(5000);
+
+        // 2. The due date passes (scheduled transition); a late full payment then starts the reconciliation.
+        await host.RunJobsAsync(TimeSpan.FromDays(7));
+        (await host.GetAsync(invoice.Id)).State.Should().Be("overdue");
+
+        var paid = await PayAsync("INV-FTR-2026-0001", 12500);
+        paid.Instance!.State.Should().Be("reconciling");
+        paid.Instance.Status.Should().Be(WorkflowInstanceStatus.Active, "the ledger call runs in the background, not inside the lock");
+        httpHandler.Requests.Should().BeEmpty();
+
+        // 3. The background job posts to the ledger, then the remaining onEntry task and the automatic transition run.
+        await host.RunJobsAsync();
+        var done = await host.GetAsync(invoice.Id);
+        done.State.Should().Be("paid");
+        done.Data["ledgerResponse"]!.ToJsonString().Should().Contain("GW-LEDGER01");
+        done.Data["reconciledAt"].Should().NotBeNull();
+        httpHandler.Requests.Should().ContainSingle().Which.Uri.AbsolutePath.Should().Be("/api/v1/InvoiceCollection/ping");
+
+        var history = await host.HistoryAsync(invoice.Id);
+        history.Select(h => (h.TransitionKey, h.Trigger)).Should().Equal(
+            ("start", "Start"), ("partial-payment", "Event"), ("mark-overdue", "Scheduled"),
+            ("late-payment-received", "Event"), ("$background", "Background"), ("reconciled", "Automatic"));
+
+        // 4. history: delta – snapshots for the first and the final row, patches in between; every version replays.
+        var rows = await host.WithDbAsync(db => db.History.AsNoTracking().Where(h => h.InstanceId == invoice.Id).OrderBy(h => h.Id).ToListAsync(TestContext.Current.CancellationToken));
+        rows.First().Data.Should().NotBeNull();
+        rows.Last().Data.Should().NotBeNull();
+        rows.Skip(1).SkipLast(1).Should().OnlyContain(r => r.Data == null && r.Patch != null);
+        var replay = await host.WithEngineAsync(e => e.HistoryDataAsync(invoice.Id, WorkflowUser.System, TestContext.Current.CancellationToken));
+        replay[^1].Data.ToJsonString().Should().Be(done.Data.ToJsonString());
+
+        // 5. A payment for an invoice that is not waiting yet can be buffered; it is delivered when the state takes it.
+        var second = await host.StartInstanceAsync("invoice-collection", new { invoiceNo = "FTR-2026-0002", customerName = "Deniz Ticaret", total = 900 }, user: Owner);
+        await host.SetStatusAsync(second.Id, WorkflowInstanceStatus.Busy, WorkflowTestHost.StartTime.UtcDateTime);
+        (await PayAsync("INV-FTR-2026-0002", 900, TimeSpan.FromHours(1))).Outcome.Should().Be(WorkflowMessageOutcome.Buffered);
+        await host.SetStatusAsync(second.Id, WorkflowInstanceStatus.Active);
+        await host.RunJobsAsync(TimeSpan.FromSeconds(30));
+        await host.RunJobsAsync();
+        (await host.GetAsync(second.Id)).State.Should().Be("paid");
     }
 
     [Fact]

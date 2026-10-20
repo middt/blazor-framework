@@ -95,6 +95,10 @@ export function workflowTriggerText(trigger: string): string {
       return 'Başlangıç';
     case 'Timeout':
       return 'Zaman aşımı';
+    case 'Event':
+      return 'Mesaj';
+    case 'Background':
+      return 'Arka plan görevi';
     default:
       return trigger;
   }
@@ -140,7 +144,8 @@ export function workflowStateTitle(definition: WorkflowDefinitionModel | null | 
 }
 
 export function workflowTransitionTitle(definition: WorkflowDefinitionModel | null | undefined, key: string): string {
-  return definition?.transitions.find(t => t.key === key && t.title !== null && t.title !== undefined && t.title !== '')?.title ?? key;
+  return definition?.transitions.find(t => t.key === key && t.title !== null && t.title !== undefined && t.title !== '')?.title
+    ?? (key === '$background' ? 'Arka plan görevi' : key);
 }
 
 /** `true` when the JSON Schema declares at least one property (a form is needed). */

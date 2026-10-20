@@ -23,6 +23,13 @@ public sealed class MiddtWorkflowOptions
     /// <summary>A Busy instance older than this is considered interrupted (crash) and marked Faulted.</summary>
     public TimeSpan BusyTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// How often a running claim refreshes its <c>BusySince</c> (and a running job its lease). A transition whose tasks run
+    /// for longer than <see cref="BusyTimeout"/> is therefore never mistaken for a crash; only an instance whose process
+    /// stopped refreshing is recovered. Must be well below <see cref="BusyTimeout"/>; zero disables the heartbeat.
+    /// </summary>
+    public TimeSpan BusyHeartbeatInterval { get; set; } = TimeSpan.FromMinutes(1);
+
     /// <summary>How often the job processor scans for instances stuck Busy longer than <see cref="BusyTimeout"/>.</summary>
     public TimeSpan BusyRecoveryInterval { get; set; } = TimeSpan.FromMinutes(1);
 

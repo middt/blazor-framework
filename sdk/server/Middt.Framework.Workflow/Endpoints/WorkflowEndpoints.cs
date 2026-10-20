@@ -28,6 +28,8 @@ public static class WorkflowEndpoints
     /// <item><c>GET /{workflow}/instances/{id}</c> instance with available transitions</item>
     /// <item><c>POST /{workflow}/instances/{id}/transitions/{transition}[?async=true]</c> execute (200, or 202 when queued)</item>
     /// <item><c>GET …/history</c> · <c>GET …/incidents</c> · <c>POST …/retry</c></item>
+    /// <item><c>POST /{workflow}/instances/{id}/messages/{message}</c> · <c>POST /{workflow}/messages/{message}?key=</c>
+    /// deliver a message to an event transition (200, or 202 when buffered with <c>?bufferFor=PT10M</c>)</item>
     /// </list>
     /// Responses use <see cref="BaseResponseDataModel{T}"/>; errors are ProblemDetails (400/403/404/409).
     /// </summary>
@@ -137,8 +139,31 @@ public static class WorkflowEndpoints
             return BaseResponseDataModel<WorkflowInstanceModel>.Success(await engine.RetryAsync(workflow, id, WorkflowUser.From(principal), ct), 1);
         }).WithName("RetryWorkflowInstance");
 
+        group.MapPost("{workflow}/instances/{id:guid}/messages/{message}", (string workflow, Guid id, string message, string? bufferFor, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? data, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
+            DeliverMessageAsync(new WorkflowMessage { Name = message, Workflow = workflow, InstanceId = id, Data = data, BufferFor = ParseBuffer(bufferFor) }, engine, principal, http, ct))
+            .WithName("DeliverWorkflowInstanceMessage");
+
+        group.MapPost("{workflow}/messages/{message}", (string workflow, string message, string? key, string? bufferFor, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonObject? data, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
+            DeliverMessageAsync(new WorkflowMessage { Name = message, Workflow = workflow, Key = key, Data = data, BufferFor = ParseBuffer(bufferFor) }, engine, principal, http, ct))
+            .WithName("DeliverWorkflowMessage");
+
         return group;
     }
+
+    private static async Task<IResult> DeliverMessageAsync(WorkflowMessage message, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct)
+    {
+        var user = WorkflowUser.From(principal);
+        var result = await engine.DeliverMessageAsync(message, user, ct);
+        var instance = result.Instance ?? await engine.GetAsync(message.Workflow, result.InstanceId, user, ct);
+        http.Response.Headers.ETag = ComputeInstanceETag(instance);
+        var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
+        return result.Outcome == WorkflowMessageOutcome.Buffered ? Results.Accepted(null, body) : Results.Ok(body);
+    }
+
+    private static TimeSpan ParseBuffer(string? bufferFor) =>
+        string.IsNullOrWhiteSpace(bufferFor) ? TimeSpan.Zero
+        : Middt.Framework.Expressions.Durations.TryParse(bufferFor, out var duration) ? duration
+        : throw new WorkflowValidationException([$"bufferFor '{bufferFor}' is not a valid duration (ISO-8601 such as PT10M, or hh:mm:ss)."]);
 
     private static async ValueTask<object?> HandleWorkflowErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
