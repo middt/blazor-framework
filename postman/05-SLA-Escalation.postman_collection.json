@@ -1,0 +1,606 @@
+{
+  "info": {
+    "name": "Middt Workflow 05 - SLA & Escalation Management (Timer)",
+    "description": "Workflow Key: `sla-escalation`\n\n### Özellikler:\n- **Zincirleme Otomatik Geçiş (`triage` -> `priority-routing`)**:\n  - **Senaryo A (`severity == \"Kritik\"`)**: Doğrudan `critical-immediate-escalation` geçişiyle `escalated` durumuna geçer ve Rebus üzerinden `SlaBreached` mesajı yayınlar.\n  - **Senaryo B (`severity == \"Normal\"` veya `\"Yüksek\"`)**: `waiting-agent` durumuna geçer ve `{{ data.slaDuration }}` süreli bir zamanlayıcı (`Scheduled` transition: `auto-escalate`) kurar.\n- **`waiting-agent` Durumundaki İşlemler**:\n  - `heartbeat-ping`: `$self` (`reenter: false`) — Zamanlayıcıyı **sıfırlamadan** ilerleme notu ekler.\n  - `extend-sla`: `$self` (`reenter: true`) — Mevcut zamanlayıcıyı iptal edip yeni `slaDuration` ile **yeniden kurar**.\n  - `resolve`: SLA dolmadan talebi çözer (`resolved`) ve zamanlayıcıyı iptal eder.\n  - `auto-escalate` (Zamanlayıcı): Süre dolduğunda `WorkflowJobProcessor` arka planda otomatik olarak akışı `escalated` durumuna taşır.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "apiUrl",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "idpUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "middt-postman",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "manager2_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerKey",
+      "value": "CUST-1001",
+      "type": "string"
+    },
+    {
+      "key": "customerOnboardingInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riskLimitInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationSubFlowInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderOrchestrationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slaEscalationInstanceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Kimlik Doğrulama (Middt Identity OAuth2)",
+      "description": "Middt Identity (`http://localhost:8083`) üzerinden `middt-postman` public client ile JWT Bearer token alır ve otomatik olarak `{{access_token}}`, `{{manager2_access_token}}`, `{{user_access_token}}` değişkenlerine yazar.",
+      "item": [
+        {
+          "name": "1. Token Al - Manager & Admin (test@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "    pm.environment.set(\"access_token\", json.access_token);",
+                  "    console.log(\"access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "test@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Ana test kullanıcısı (`manager`, `ui-admin`, `idp-admin` rollerine sahip). Alınan token otomatik olarak `{{access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "2. Token Al - 2. Onaycı Manager (manager2@test.com - 4-Göz İçin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"manager2_access_token\", json.access_token);",
+                  "    pm.environment.set(\"manager2_access_token\", json.access_token);",
+                  "    console.log(\"manager2_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "manager2@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "`credit-allocation` akışındaki 4-Göz (`approve-stage2-four-eyes`, `denyRoles: [\"$previousUser\"]`) adımını farklı bir yönetici ile onaylamak için kullanılır. Otomatik olarak `{{manager2_access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "3. Token Al - Standart Kullanıcı (user@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"user_access_token\", json.access_token);",
+                  "    pm.environment.set(\"user_access_token\", json.access_token);",
+                  "    console.log(\"user_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "user@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Yönetici rolü olmayan standart kullanıcı (`user@test.com`). Yetki kontrollerini (403 Forbidden) veya standart kullanıcı geçişlerini test etmek için kullanılır."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - SLA & Escalation Management (SLA & Zamanlayıcı Eskalasyon)",
+      "description": "Workflow Key: `sla-escalation`\n\n### Özellikler:\n- **Zincirleme Otomatik Geçiş (`triage` -> `priority-routing`)**:\n  - **Senaryo A (`severity == \"Kritik\"`)**: Doğrudan `critical-immediate-escalation` geçişiyle `escalated` durumuna geçer ve Rebus üzerinden `SlaBreached` mesajı yayınlar.\n  - **Senaryo B (`severity == \"Normal\"` veya `\"Yüksek\"`)**: `waiting-agent` durumuna geçer ve `{{ data.slaDuration }}` süreli bir zamanlayıcı (`Scheduled` transition: `auto-escalate`) kurar.\n- **`waiting-agent` Durumundaki İşlemler**:\n  - `heartbeat-ping`: `$self` (`reenter: false`) — Zamanlayıcıyı **sıfırlamadan** ilerleme notu ekler.\n  - `extend-sla`: `$self` (`reenter: true`) — Mevcut zamanlayıcıyı iptal edip yeni `slaDuration` ile **yeniden kurar**.\n  - `resolve`: SLA dolmadan talebi çözer (`resolved`) ve zamanlayıcıyı iptal eder.\n  - `auto-escalate` (Zamanlayıcı): Süre dolduğunda `WorkflowJobProcessor` arka planda otomatik olarak akışı `escalated` durumuna taşır.",
+      "item": [
+        {
+          "name": "1. Tanımı Getir (GET /api/workflows/sla-escalation)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation",
+            "description": "`sla-escalation` iş akışının tanımını döner."
+          }
+        },
+        {
+          "name": "2A. Başlat - Senaryo A: Normal Öncelik + 2 Dakika SLA (-> waiting-agent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"slaEscalationInstanceId\", val);",
+                  "        pm.environment.set(\"slaEscalationInstanceId\", val);",
+                  "        console.log(\"slaEscalationInstanceId =\", val);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances",
+            "description": "`waiting-agent` durumuna geçer ve 2 dakikalık (`00:02:00`) SLA zamanlayıcısı (`wf.WorkflowJobs`) kurar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"SLA-WAIT-{{$randomInt}}\",\n  \"data\": {\n    \"ticketTitle\": \"POS Gün Sonu Raporu Uyumsuzluğu\",\n    \"customerName\": \"Bereket Marketçilik Ltd.\",\n    \"amount\": 42000,\n    \"severity\": \"Yüksek\",\n    \"slaDuration\": \"00:02:00\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2B. Başlat - Senaryo B: Kısa Süreli SLA (5 Saniye Sonra Otomatik Eskalasyon -> escalated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"slaEscalationInstanceId\", val);",
+                  "        pm.environment.set(\"slaEscalationInstanceId\", val);",
+                  "        console.log(\"slaEscalationInstanceId =\", val);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances",
+            "description": "5 saniyelik (`00:00:05`) SLA süresiyle başlatır. 5-6 saniye bekleyip `3. Akış Durumunu Sorgula` isteğini çalıştırdığınızda `WorkflowJobProcessor` tarafından otomatik olarak `escalated` durumuna geçirildiğini görebilirsiniz.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"SLA-TIMER-{{$randomInt}}\",\n  \"data\": {\n    \"ticketTitle\": \"ATM Nakit Sıkışması İtirazı (5sn SLA Testi)\",\n    \"customerName\": \"Mehmet Demir\",\n    \"amount\": 15000,\n    \"severity\": \"Normal\",\n    \"slaDuration\": \"00:00:05\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2C. Başlat - Senaryo C: Kritik Öncelik (Anında Eskalasyon -> escalated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"slaEscalationInstanceId\", val);",
+                  "        pm.environment.set(\"slaEscalationInstanceId\", val);",
+                  "        console.log(\"slaEscalationInstanceId =\", val);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances",
+            "description": "`severity: \"Kritik\"` olduğu için beklemeden doğrudan `escalated` durumuna geçer ve Rebus ile `SlaBreached` bildirimi yayınlar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"SLA-CRIT-{{$randomInt}}\",\n  \"data\": {\n    \"ticketTitle\": \"Kurumsal İnternet Şubesi Erişim Kesintisi\",\n    \"customerName\": \"Global Holding A.Ş.\",\n    \"amount\": 950000,\n    \"severity\": \"Kritik\",\n    \"slaDuration\": \"00:01:00\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Akış Durumunu Sorgula (GET Instance)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}",
+            "description": "SLA talebinin güncel durumunu (`waiting-agent`, `escalated`, `resolved`), `heartbeatCount` sayacını ve aktif geçişlerini döner."
+          }
+        },
+        {
+          "name": "4. [waiting-agent] İlerleme Kaydet - Zamanlayıcıyı Sıfırlamadan (heartbeat-ping -> $self reenter:false)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}/transitions/heartbeat-ping",
+            "description": "`reenter: false` olduğu için mevcut SLA zamanlayıcısını bozmadan `heartbeatCount` değerini 1 artırır ve not ekler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"progressNote\": \"Log kayıtları inceleniyor, banka takas merkeziyle görüşüldü.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. [waiting-agent] SLA Süresini Uzat - Zamanlayıcıyı Yeniden Kur (extend-sla -> $self reenter:true)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}/transitions/extend-sla",
+            "description": "`reenter: true` olduğu için mevcut SLA zamanlayıcısını iptal eder ve yeni `00:05:00` (5 dakika) süresiyle zamanlayıcıyı sıfırdan kurar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slaDuration\": \"00:05:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6A. [waiting-agent] SLA Dolmadan Çözümle (resolve -> resolved)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}/transitions/resolve",
+            "description": "`waiting-agent` durumundaki talebi SLA süresi dolmadan çözümler (`resolved`) ve bekleyen SLA zamanlayıcısını otomatik iptal eder.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolutionNote\": \"Gün sonu mutabakat farkı düzeltildi ve müşteriye bilgi verildi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6B. [escalated] Yönetici Çözümü İle Kapat (manager-resolve -> resolved)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}/transitions/manager-resolve",
+            "description": "`escalated` (SLA Aşıldı) durumuna düşmüş talebi `manager` rolüyle çözümler (`resolved`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolutionNote\": \"Eskale edilen talep bölge müdürlüğü onayıyla çözümlendi ve iade gerçekleştirildi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. Geçmişi Listele (GET History)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/sla-escalation/instances/{{slaEscalationInstanceId}}/history",
+            "description": "SLA akışının tüm geçiş geçmişini döner."
+          }
+        }
+      ]
+    }
+  ]
+}

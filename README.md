@@ -83,7 +83,7 @@ Design choices:
 - **Options pattern** – every settings class is bound with `IOptions<T>` (validated on start where it matters, e.g. `JwtSettings`).
 - **Result envelope + ProblemDetails** – successful calls return `BaseResponseDataModel<T>`; failures are RFC 9457 ProblemDetails produced by a global `IExceptionHandler`. Exception details are only exposed in Development. The typed clients map both back to `Result = Error` so UI code keeps a single code path.
 - **Async all the way** with `CancellationToken`, no `.Result` / `async void`.
-- **Observability** – `ILogger<T>` with structured logging, OpenTelemetry via the sample `ServiceDefaults`, `/health` and `/alive` endpoints.
+- **Observability (OpenTelemetry OTLP + OpenObserve)** – `builder.AddMiddtOpenTelemetry()` in `Middt.Framework.Common` configures OpenTelemetry logs, metrics and traces (including `Middt.Framework.Workflow` transition/task `Activity` spans and `Meter` instruments) and exports them via the standard OpenTelemetry OTLP exporter (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_HEADERS` or `Telemetry:Otlp` / `Telemetry:Exporters` in `appsettings.json`) to any OTLP-compatible backend (**OpenObserve**, OpenTelemetry Collector, Jaeger, Elastic APM, Grafana Tempo, Seq, Aspire Dashboard) purely from configuration. Health probes are mapped at `/health` and `/alive`.
 
 ## Getting started
 
@@ -410,8 +410,10 @@ docker compose up --build
 
 Blazor UI: <http://localhost:8080> · Angular UI: <http://localhost:8081> (same screens, layouts and workflows) ·
 identity provider: <http://localhost:8083> (login, registration, password reset, authenticator, `/admin` console,
-`/dev/mailbox` for verification codes) · demo users `test@test.com` / `test` (roles `manager`, `ui-admin`, `idp-admin`)
-and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference: <http://localhost:8180/scalar>.
+`/dev/mailbox` for verification codes) · OpenObserve (OTLP logs, metrics, traces): <http://localhost:5180>
+(`admin@middt.local` / `Complexpass#123` unless overridden in `.env`) · demo users `test@test.com` / `test`
+(roles `manager`, `ui-admin`, `idp-admin`) and `user@test.com` / `test` · layout editor: `/ui-admin` · API reference:
+<http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
 
 ## Development

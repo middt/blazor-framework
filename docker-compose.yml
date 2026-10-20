@@ -1,12 +1,18 @@
 # Container based alternative to the Aspire AppHost (demo/Middt.Demo.AppHost).
 #   docker compose up --build   → Blazor UI: http://localhost:8080   Angular UI: http://localhost:8081
 #                                 Identity provider (login, /admin): http://localhost:8083   API docs: http://127.0.0.1:8180/scalar
+#                                 OpenObserve (logs, metrics, traces): http://127.0.0.1:5180
 name: middt-sample
 
 # Secrets have no defaults: copy .env.example to .env (git ignored) and set them, or export them in the shell.
 x-postgres-password: &postgres-password ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD (see .env.example)}
 x-blazor-client-secret: &blazor-client-secret ${IDP_BLAZOR_CLIENT_SECRET:?Set IDP_BLAZOR_CLIENT_SECRET (see .env.example)}
 x-angular-client-secret: &angular-client-secret ${IDP_ANGULAR_CLIENT_SECRET:?Set IDP_ANGULAR_CLIENT_SECRET (see .env.example)}
+x-openobserve-user: &openobserve-user ${OPENOBSERVE_USER:-admin@middt.local}
+x-openobserve-password: &openobserve-password ${OPENOBSERVE_PASSWORD:-Complexpass#123}
+x-otlp-endpoint: &otlp-endpoint ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://openobserve:5080/api/default}
+x-otlp-protocol: &otlp-protocol ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+x-otlp-headers: &otlp-headers ${OTEL_EXPORTER_OTLP_HEADERS:-Authorization=Basic YWRtaW5AbWlkZHQubG9jYWw6Q29tcGxleHBhc3MjMTIz,stream-name=default}
 
 services:
   middt-sample-blazorserver:
@@ -81,6 +87,10 @@ services:
       # (the per-IP login rate limiter depends on it).
       ForwardedHeaders__KnownProxies__0: 172.29.0.250
       ForwardedHeaders__KnownProxies__1: 172.29.0.251
+      OTEL_SERVICE_NAME: middt-sample-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: *otlp-endpoint
+      OTEL_EXPORTER_OTLP_PROTOCOL: *otlp-protocol
+      OTEL_EXPORTER_OTLP_HEADERS: *otlp-headers
     ports:
       # Local tooling only (Scalar, curl); browsers go through the BFFs.
       - "127.0.0.1:8180:8080"
@@ -92,6 +102,8 @@ services:
         condition: service_healthy
       mq:
         condition: service_healthy
+      openobserve:
+        condition: service_started
 
   # Middt Identity (identity/Middt.Identity) – the OAuth 2.0 / OpenID Connect server, configured for the demo by
   # demo/identity.json (clients, demo users, relaxed password policy); secrets come from .env.
@@ -122,6 +134,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    networks: [backend]
+    environment:
+      ZO_ROOT_USER_EMAIL: *openobserve-user
+      ZO_ROOT_USER_PASSWORD: *openobserve-password
+      ZO_DATA_DIR: /data
+    volumes:
+      - openobserve-data:/data
+    ports:
+      - "127.0.0.1:5180:5080"
+      - "127.0.0.1:5181:5081"
 
   mq:
     image: rabbitmq:4-management
@@ -174,3 +199,4 @@ networks:
 volumes:
   postgres-data:
   identity-keys:
+  openobserve-data:

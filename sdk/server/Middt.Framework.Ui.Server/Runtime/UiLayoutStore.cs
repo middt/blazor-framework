@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -24,6 +25,8 @@ public sealed class UiLayoutConflictException(string message) : Exception(messag
 /// </summary>
 public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutValidator validator, TimeProvider timeProvider, IOptions<MiddtUiOptions> options)
 {
+    private static readonly ActivitySource ActivitySource = new("Middt.Framework.Api", "1.0.0");
+
     /// <summary>
     /// Singleton coordination of snapshot reloads: one reload at a time (no stampede on expiry) and a generation number so a
     /// reload that raced with a write does not cache the pre-write state.
@@ -48,6 +51,12 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
     /// <summary>All layouts the user may open (layouts without roles are open to every authenticated user).</summary>
     public async Task<IReadOnlyList<UiLayoutSummary>> ListAsync(ExpressionUser user, string? kind = null, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity("ui.layouts.list");
+        if (!string.IsNullOrEmpty(kind))
+        {
+            activity?.SetTag("middt.ui.kind", kind);
+        }
+
         var all = await SnapshotAsync(cancellationToken);
         return [.. all.Values
             .Where(e => kind is null || e.Document.Kind == kind)
@@ -56,20 +65,28 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
             .Select(e => e.Summary)];
     }
 
-    public async Task<UiLayoutDocument?> FindAsync(string key, CancellationToken cancellationToken = default) =>
-        (await SnapshotAsync(cancellationToken)).GetValueOrDefault(key)?.Document;
+    public async Task<UiLayoutDocument?> FindAsync(string key, CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity($"ui.layouts.get {key}");
+        activity?.SetTag("middt.ui.key", key);
+        return (await SnapshotAsync(cancellationToken)).GetValueOrDefault(key)?.Document;
+    }
 
     public bool CanOpen(UiLayoutDocument layout, ExpressionUser user) =>
         layout.Roles.Count == 0 || layout.Roles.Any(user.IsInRole) || user.IsInRole(options.Value.AdminRole);
 
     public UiValidationResult Validate(UiLayoutDocument layout)
     {
+        using var activity = ActivitySource.StartActivity($"ui.layouts.validate {layout.Key}");
+        activity?.SetTag("middt.ui.key", layout.Key);
+
         var result = validator.Validate(layout);
         if (UiJson.Serialize(layout).Length > options.Value.MaxLayoutLength)
         {
             result.Errors.Add($"Layout is larger than {options.Value.MaxLayoutLength} characters.");
         }
 
+        activity?.SetTag("middt.ui.valid", result.IsValid);
         return result;
     }
 
@@ -80,6 +97,9 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
     /// </summary>
     public async Task<UiLayoutDocument> SaveAsync(UiLayoutDocument layout, int? expectedVersion, string? user, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity($"ui.layouts.save {layout.Key}");
+        activity?.SetTag("middt.ui.key", layout.Key);
+
         var existing = await db.Layouts.SingleOrDefaultAsync(e => e.Key == layout.Key, cancellationToken);
         if (existing is not null && expectedVersion != existing.Version)
         {
@@ -106,6 +126,9 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
 
     public async Task<bool> DeleteAsync(string key, int? expectedVersion, string? user, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity($"ui.layouts.delete {key}");
+        activity?.SetTag("middt.ui.key", key);
+
         var existing = await db.Layouts.SingleOrDefaultAsync(e => e.Key == key, cancellationToken);
         if (existing is null)
         {
@@ -125,11 +148,15 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
 
     public async Task<IReadOnlyList<UiLayoutRevisionModel>> RevisionsAsync(string key, CancellationToken cancellationToken = default)
     {
+        using var activity = ActivitySource.StartActivity($"ui.layouts.revisions {key}");
+        activity?.SetTag("middt.ui.key", key);
+
         var rows = await db.Revisions.AsNoTracking()
             .Where(r => r.Key == key)
             .OrderByDescending(r => r.Version)
             .Take(50)
             .ToListAsync(cancellationToken);
+        activity?.SetTag("middt.ui.result_count", rows.Count);
         return [.. rows.Select(r => new UiLayoutRevisionModel { Version = r.Version, CreatedAt = r.CreatedAt, CreatedBy = r.CreatedBy, Content = r.Content })];
     }
 
@@ -202,6 +229,7 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
     {
         if (cache.TryGetValue(CacheKey, out Dictionary<string, Entry>? snapshot) && snapshot is not null)
         {
+            Activity.Current?.SetTag("middt.ui.cache_hit", true);
             return snapshot;
         }
 
@@ -212,9 +240,11 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
             // Another request may have loaded it while this one waited.
             if (cache.TryGetValue(CacheKey, out snapshot) && snapshot is not null)
             {
+                Activity.Current?.SetTag("middt.ui.cache_hit", true);
                 return snapshot;
             }
 
+            Activity.Current?.SetTag("middt.ui.cache_hit", false);
             var generation = Interlocked.Read(ref gate.Generation);
             snapshot = await LoadSnapshotAsync(cancellationToken);
             if (Interlocked.Read(ref gate.Generation) == generation)
@@ -236,7 +266,9 @@ public sealed class UiLayoutStore(UiDbContext db, IMemoryCache cache, UiLayoutVa
 
     private async Task<Dictionary<string, Entry>> LoadSnapshotAsync(CancellationToken cancellationToken)
     {
+        using var activity = ActivitySource.StartActivity("ui.layouts.reload_snapshot");
         var rows = await db.Layouts.AsNoTracking().ToListAsync(cancellationToken);
+        activity?.SetTag("middt.ui.layout_count", rows.Count);
         var result = new Dictionary<string, Entry>(StringComparer.Ordinal);
         foreach (var row in rows)
         {

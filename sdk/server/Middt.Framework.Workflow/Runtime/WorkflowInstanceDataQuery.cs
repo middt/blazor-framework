@@ -9,6 +9,7 @@ using Middt.Framework.Common.Model.Data;
 using Middt.Framework.Expressions;
 using Middt.Framework.Model.Enumerations;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Persistence;
 using Middt.Framework.Workflow.Schema;
@@ -28,6 +29,9 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity($"workflow.query.get_all {entity}");
+        activity?.SetTag("middt.workflow.entity", entity);
+
         var query = BuildAccessibleQuery(entity, user);
         if (query is null)
         {
@@ -56,6 +60,9 @@ public sealed class WorkflowInstanceDataQuery(WorkflowDbContext db, WorkflowRegi
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity($"workflow.query.get_items {entity}");
+        activity?.SetTag("middt.workflow.entity", entity);
+
         var query = BuildAccessibleQuery(entity, user);
         if (query is null)
         {

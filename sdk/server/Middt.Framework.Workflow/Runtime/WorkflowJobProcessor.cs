@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Middt.Framework.Model.Workflow;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Persistence;
 
 namespace Middt.Framework.Workflow.Runtime;
@@ -108,6 +109,9 @@ public sealed partial class WorkflowJobProcessor(
 
     private async Task ProcessAsync(Guid jobId, CancellationToken cancellationToken)
     {
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity("workflow.job");
+        activity?.SetTag("middt.workflow.job_id", jobId.ToString());
+
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<WorkflowDbContext>();
         var engine = scope.ServiceProvider.GetRequiredService<WorkflowEngine>();
@@ -115,6 +119,13 @@ public sealed partial class WorkflowJobProcessor(
         if (job is null)
         {
             return;
+        }
+
+        if (activity is not null)
+        {
+            activity.DisplayName = $"workflow.job {job.Kind}";
+            activity.SetTag("middt.workflow.job_kind", job.Kind.ToString());
+            activity.SetTag("middt.workflow.instance_id", job.InstanceId.ToString());
         }
 
         string? error = null;

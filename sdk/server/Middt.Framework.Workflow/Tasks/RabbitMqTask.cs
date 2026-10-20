@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 using RabbitMQ.Client;
 
@@ -124,6 +126,22 @@ public sealed class RabbitMqTask : IWorkflowTask
                     headers[key] = val.ToJsonString();
                 }
             }
+        }
+
+        var destination = !string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(routingKey)
+            ? $"{exchange}/{routingKey}"
+            : (!string.IsNullOrEmpty(routingKey) ? routingKey : exchange);
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity($"messaging.rabbitmq.publish {destination}", ActivityKind.Producer);
+        activity?.SetTag("messaging.system", "rabbitmq");
+        activity?.SetTag("messaging.operation", "publish");
+        activity?.SetTag("messaging.destination.name", exchange);
+        activity?.SetTag("messaging.rabbitmq.destination.routing_key", routingKey);
+        activity?.SetTag("messaging.message.body.size", bodyBytes.Length);
+
+        if (activity?.Id is { Length: > 0 } traceparent)
+        {
+            headers ??= [];
+            headers.TryAdd("traceparent", traceparent);
         }
 
         // 1. Check if custom IWorkflowRabbitMqPublisher is registered in DI

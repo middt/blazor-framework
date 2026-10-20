@@ -13,7 +13,7 @@ using Middt.Demo.Api.Messages;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddServiceDefaults();
+builder.AddServiceDefaults(enableOpenTelemetry: true);
 builder.AddMiddtApi(options => options.Title = "Middt Sample API");
 
 var signalR = builder.Services.AddSignalR();

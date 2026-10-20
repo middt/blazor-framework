@@ -43,6 +43,13 @@
             "http://localhost:8080/signout-callback-oidc",
             "https://localhost:7020/signout-callback-oidc"
           ],
+          "GrantTypes": [
+            "authorization_code",
+            "refresh_token",
+            "password",
+            "client_credentials",
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+          ],
           "Scopes": [
             "openid",
             "profile",
@@ -72,6 +79,24 @@
             "offline_access",
             "api"
           ]
+        },
+        {
+          "ClientId": "middt-postman",
+          "DisplayName": "Middt Postman / CLI istemcisi",
+          "Type": "public",
+          "ConsentType": "implicit",
+          "GrantTypes": [
+            "password",
+            "refresh_token"
+          ],
+          "Scopes": [
+            "openid",
+            "profile",
+            "email",
+            "roles",
+            "offline_access",
+            "api"
+          ]
         }
       ],
       "Users": [
@@ -84,6 +109,15 @@
             "manager",
             "ui-admin",
             "idp-admin"
+          ]
+        },
+        {
+          "UserName": "manager2@test.com",
+          "Email": "manager2@test.com",
+          "Password": "test",
+          "DisplayName": "2. Onaycı Yönetici (4-Göz)",
+          "Roles": [
+            "manager"
           ]
         },
         {

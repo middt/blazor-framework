@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 
 namespace Middt.Framework.Workflow.Tasks;
@@ -41,6 +42,11 @@ public sealed class OperationTask : IWorkflowTask
             ?? throw new InvalidOperationException("The operation name is missing.");
         var dispatcher = context.Services.GetServices<IWorkflowOperationDispatcher>().SingleOrDefault(d => d.CanHandle(name))
             ?? throw new InvalidOperationException($"No dispatcher is registered for operation '{name}'.");
+
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity($"workflow.operation {name}");
+        activity?.SetTag("middt.workflow.operation", name);
+        activity?.SetTag("middt.workflow.dispatcher", dispatcher.GetType().Name);
+
         await dispatcher.ExecuteAsync(name, new WorkflowOperationContext
         {
             Data = context.Data,

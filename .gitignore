@@ -4,6 +4,7 @@
 .idea/
 *.user
 *.suo
+.DS_Store
 
 # Build output
 bin/

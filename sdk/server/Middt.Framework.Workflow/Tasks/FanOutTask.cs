@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Runtime;
 
@@ -169,7 +171,27 @@ public sealed class FanOutTask : IWorkflowTask
                         StartWorkflow = context.StartWorkflow,
                     };
 
-                    await impl.ExecuteAsync(itemContext, cancellationToken);
+                    var sw = Stopwatch.StartNew();
+                    using var itemActivity = WorkflowDiagnostics.StartTaskActivity(
+                        context.Workflow,
+                        context.InstanceId,
+                        "fanOut",
+                        $"fanOut[{index}]",
+                        $"{innerTask.DisplayKey}[{index}]",
+                        innerTask.Task,
+                        1);
+                    itemActivity?.SetTag("middt.workflow.fanout.index", index);
+
+                    try
+                    {
+                        await impl.ExecuteAsync(itemContext, cancellationToken);
+                        WorkflowDiagnostics.CompleteTaskActivity(itemActivity, context.Workflow, innerTask.Task, "fanOut", "Completed", sw.Elapsed.TotalMilliseconds);
+                    }
+                    catch (Exception ex)
+                    {
+                        WorkflowDiagnostics.CompleteTaskActivity(itemActivity, context.Workflow, innerTask.Task, "fanOut", "Failed", sw.Elapsed.TotalMilliseconds, ex.Message);
+                        throw;
+                    }
 
                     if (!string.IsNullOrEmpty(innerInto))
                     {

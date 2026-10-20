@@ -1,0 +1,606 @@
+{
+  "info": {
+    "name": "Middt Workflow 01 - Customer Onboarding (Müşteri Kaydı & KYC)",
+    "description": "Workflow Key: `customer-onboarding`\n\n### Senaryolar:\n- **Senaryo A (Otomatik Onay)**: `segment == \"Bireysel\"` ve `monthlyIncome >= 20000` olduğunda KYC skoru >= 700 hesaplanır ve `kyc-scoring` -> `auto-approve` -> `active` durumuna otomatik geçer.\n- **Senaryo B (Manuel KYC İncelemesi)**: `segment == \"Kurumsal\"` veya `monthlyIncome < 20000` olduğunda `kyc-scoring` -> `require-review` -> `kyc-review` durumuna düşer. Burada `add-kyc-note`, `approve-kyc` veya `reject-kyc` manuel geçişleri çalıştırılabilir.\n- **Aktif Müşteri İşlemleri (`active`)**: `update-income` ile gelir/segment güncellenip tekrar KYC skorlamasına sokulabilir veya `close-account` ile hesap kapatılabilir.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "apiUrl",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "idpUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "middt-postman",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "manager2_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerKey",
+      "value": "CUST-1001",
+      "type": "string"
+    },
+    {
+      "key": "customerOnboardingInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riskLimitInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationSubFlowInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderOrchestrationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slaEscalationInstanceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Kimlik Doğrulama (Middt Identity OAuth2)",
+      "description": "Middt Identity (`http://localhost:8083`) üzerinden `middt-postman` public client ile JWT Bearer token alır ve otomatik olarak `{{access_token}}`, `{{manager2_access_token}}`, `{{user_access_token}}` değişkenlerine yazar.",
+      "item": [
+        {
+          "name": "1. Token Al - Manager & Admin (test@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "    pm.environment.set(\"access_token\", json.access_token);",
+                  "    console.log(\"access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "test@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Ana test kullanıcısı (`manager`, `ui-admin`, `idp-admin` rollerine sahip). Alınan token otomatik olarak `{{access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "2. Token Al - 2. Onaycı Manager (manager2@test.com - 4-Göz İçin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"manager2_access_token\", json.access_token);",
+                  "    pm.environment.set(\"manager2_access_token\", json.access_token);",
+                  "    console.log(\"manager2_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "manager2@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "`credit-allocation` akışındaki 4-Göz (`approve-stage2-four-eyes`, `denyRoles: [\"$previousUser\"]`) adımını farklı bir yönetici ile onaylamak için kullanılır. Otomatik olarak `{{manager2_access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "3. Token Al - Standart Kullanıcı (user@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"user_access_token\", json.access_token);",
+                  "    pm.environment.set(\"user_access_token\", json.access_token);",
+                  "    console.log(\"user_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "user@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Yönetici rolü olmayan standart kullanıcı (`user@test.com`). Yetki kontrollerini (403 Forbidden) veya standart kullanıcı geçişlerini test etmek için kullanılır."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Customer Onboarding (Müşteri Kaydı & KYC)",
+      "description": "Workflow Key: `customer-onboarding`\n\n### Senaryolar:\n- **Senaryo A (Otomatik Onay)**: `segment == \"Bireysel\"` ve `monthlyIncome >= 20000` olduğunda KYC skoru >= 700 hesaplanır ve `kyc-scoring` -> `auto-approve` -> `active` durumuna otomatik geçer.\n- **Senaryo B (Manuel KYC İncelemesi)**: `segment == \"Kurumsal\"` veya `monthlyIncome < 20000` olduğunda `kyc-scoring` -> `require-review` -> `kyc-review` durumuna düşer. Burada `add-kyc-note`, `approve-kyc` veya `reject-kyc` manuel geçişleri çalıştırılabilir.\n- **Aktif Müşteri İşlemleri (`active`)**: `update-income` ile gelir/segment güncellenip tekrar KYC skorlamasına sokulabilir veya `close-account` ile hesap kapatılabilir.",
+      "item": [
+        {
+          "name": "1. Tanımı Getir (GET /api/workflows/customer-onboarding)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding",
+            "description": "`customer-onboarding` iş akışının durumlarını, geçişlerini ve JSON şemalarını döner."
+          }
+        },
+        {
+          "name": "2A. Başlat - Senaryo A: Bireysel Yüksek Gelir (Otomatik Onay -> active)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"customerOnboardingInstanceId\", val);",
+                  "        pm.environment.set(\"customerOnboardingInstanceId\", val);",
+                  "        console.log(\"customerOnboardingInstanceId =\", val);",
+                  "    }",
+                  "    if (json.data && json.data.key) {",
+                  "        pm.collectionVariables.set(\"customerKey\", json.data.key);",
+                  "        pm.environment.set(\"customerKey\", json.data.key);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances",
+            "description": "Bireysel ve aylık geliri >= 20.000 TL olduğu için KYC skoru 750 hesaplanır ve otomatik olarak `active` durumuna geçer. İş anahtarı `{{customerKey}}` değişkenine kaydedilir (Kredi Tahsis akışında kullanılmak üzere).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"CUST-AUTO-{{$randomInt}}\",\n  \"data\": {\n    \"fullName\": \"Ahmet Yılmaz\",\n    \"identityNumber\": \"12345678901\",\n    \"email\": \"ahmet.yilmaz@example.com\",\n    \"phone\": \"+905321112233\",\n    \"segment\": \"Bireysel\",\n    \"monthlyIncome\": 65000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2B. Başlat - Senaryo B: Kurumsal / Düşük Gelir (Manuel İnceleme -> kyc-review)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"customerOnboardingInstanceId\", val);",
+                  "        pm.environment.set(\"customerOnboardingInstanceId\", val);",
+                  "        console.log(\"customerOnboardingInstanceId =\", val);",
+                  "    }",
+                  "    if (json.data && json.data.key) {",
+                  "        pm.collectionVariables.set(\"customerKey\", json.data.key);",
+                  "        pm.environment.set(\"customerKey\", json.data.key);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances",
+            "description": "Kurumsal segment ve düşük gelir nedeniyle KYC skoru < 700 çıkar; otomatik olarak `kyc-review` (Uyum İncelemesi Bekliyor) durumuna yönlendirilir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"CUST-REV-{{$randomInt}}\",\n  \"data\": {\n    \"fullName\": \"Anadolu Lojistik A.Ş.\",\n    \"identityNumber\": \"98765432109\",\n    \"email\": \"finans@anadolulojistik.com.tr\",\n    \"phone\": \"+902123334455\",\n    \"segment\": \"Kurumsal\",\n    \"monthlyIncome\": 15000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Akış Durumunu Sorgula (GET Instance)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}",
+            "description": "`{{customerOnboardingInstanceId}}` örneğinin güncel durumunu (`state`), verisini (`data`) ve çalıştırılabilir geçişlerini (`availableTransitions`) döner."
+          }
+        },
+        {
+          "name": "4. [kyc-review] İnceleme Notu Ekle (add-kyc-note -> $self)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/transitions/add-kyc-note",
+            "description": "`kyc-review` durumundayken durumu değiştirmeden (`$self`) inceleme notu ekler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lastReviewNote\": \"Ticaret sicil gazetesi ve imza sirküleri kontrol edildi, ek belge beklenmiyor.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5A. [kyc-review] KYC Onayla (approve-kyc -> active)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/transitions/approve-kyc",
+            "description": "`kyc-review` durumundaki müşteriyi `manager` rolüyle onaylayarak `active` durumuna geçirir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approvalNote\": \"MASAK ve KYC kontrolleri olumlu tamamlandı, müşteri hesabı aktifleştirildi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5B. [kyc-review] KYC Reddet (reject-kyc -> rejected)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/transitions/reject-kyc",
+            "description": "Alternatif: `kyc-review` durumundaki başvuruyu reddederek `rejected` (Finans) durumuna taşır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Kimlik doğrulama belgeleri eksik ve uyumsuz.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. [active] Gelir / Segment Güncelle (update-income -> kyc-scoring)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/transitions/update-income",
+            "description": "`active` durumundaki müşterinin gelir ve segment bilgisini güncelleyerek tekrar `kyc-scoring` (yeniden skorlama) adımına sokar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monthlyIncome\": 85000,\n  \"segment\": \"Bireysel\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7. [active] Hesabı Kapat (close-account -> closed)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/transitions/close-account",
+            "description": "`active` durumundaki müşteri hesabını kapatır (`closed` finish state).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"closeReason\": \"Müşteri talebi ile hesap kapatıldı.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8. Geçmişi Listele (GET History)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances/{{customerOnboardingInstanceId}}/history",
+            "description": "Akış örneğinin tüm durum geçiş geçmişini (`wf.WorkflowHistory`) listeler."
+          }
+        },
+        {
+          "name": "9. Tüm Örnekleri Listele (GET Instances)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/customer-onboarding/instances?page=1&pageSize=20",
+            "description": "`customer-onboarding` akışına ait tüm örnekleri sayfalı olarak listeler."
+          }
+        }
+      ]
+    }
+  ]
+}

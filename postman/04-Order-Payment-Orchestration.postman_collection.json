@@ -1,0 +1,499 @@
+{
+  "info": {
+    "name": "Middt Workflow 04 - Order & Payment Orchestration (FanOut & Rebus)",
+    "description": "Workflow Key: `order-payment-orchestration`\n\n### Özellikler:\n- **`fanOut`**: Başlangıçta (`parallel-checks`) 3 paralel alt-akış (`fraudCheck`, `stockReservation`, `complianceScreening` -> `risk-limit-eval`) çalıştırır.\n- **`gateway-charge`**:\n  1. `http` task ile `/api/v1/OrderPaymentOrchestration/ping` ödeme ağ geçidine POST atar.\n  2. `cache` task ile döviz kuru bilgisini Redis/Memory cache üzerinden okur/yazar.\n  3. `publish` task ile Rebus/RabbitMQ üzerine `OrderPaymentCaptured` mesajı bırakır.\n- **Senaryolar**:\n  - **Senaryo A (`amount < 50000`)**: `gateway-charge` -> `payment-succeeded` -> otomatik olarak `completed` durumuna tamamlanır.\n  - **Senaryo B (`amount >= 50000`)**: `gateway-charge` -> `high-value-review` -> `manual-verification` (Yüksek Tutarlı Sipariş Onayı) durumuna düşer; ardından `confirm-order` veya `cancel-order` çalıştırılır.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "apiUrl",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "idpUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "middt-postman",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "manager2_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerKey",
+      "value": "CUST-1001",
+      "type": "string"
+    },
+    {
+      "key": "customerOnboardingInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riskLimitInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationSubFlowInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderOrchestrationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slaEscalationInstanceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Kimlik Doğrulama (Middt Identity OAuth2)",
+      "description": "Middt Identity (`http://localhost:8083`) üzerinden `middt-postman` public client ile JWT Bearer token alır ve otomatik olarak `{{access_token}}`, `{{manager2_access_token}}`, `{{user_access_token}}` değişkenlerine yazar.",
+      "item": [
+        {
+          "name": "1. Token Al - Manager & Admin (test@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "    pm.environment.set(\"access_token\", json.access_token);",
+                  "    console.log(\"access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "test@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Ana test kullanıcısı (`manager`, `ui-admin`, `idp-admin` rollerine sahip). Alınan token otomatik olarak `{{access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "2. Token Al - 2. Onaycı Manager (manager2@test.com - 4-Göz İçin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"manager2_access_token\", json.access_token);",
+                  "    pm.environment.set(\"manager2_access_token\", json.access_token);",
+                  "    console.log(\"manager2_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "manager2@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "`credit-allocation` akışındaki 4-Göz (`approve-stage2-four-eyes`, `denyRoles: [\"$previousUser\"]`) adımını farklı bir yönetici ile onaylamak için kullanılır. Otomatik olarak `{{manager2_access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "3. Token Al - Standart Kullanıcı (user@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"user_access_token\", json.access_token);",
+                  "    pm.environment.set(\"user_access_token\", json.access_token);",
+                  "    console.log(\"user_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "user@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Yönetici rolü olmayan standart kullanıcı (`user@test.com`). Yetki kontrollerini (403 Forbidden) veya standart kullanıcı geçişlerini test etmek için kullanılır."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Order & Payment Orchestration (Sipariş & Ödeme Orkestrasyonu)",
+      "description": "Workflow Key: `order-payment-orchestration`\n\n### Özellikler:\n- **`fanOut`**: Başlangıçta (`parallel-checks`) 3 paralel alt-akış (`fraudCheck`, `stockReservation`, `complianceScreening` -> `risk-limit-eval`) çalıştırır.\n- **`gateway-charge`**:\n  1. `http` task ile `/api/v1/OrderPaymentOrchestration/ping` ödeme ağ geçidine POST atar.\n  2. `cache` task ile döviz kuru bilgisini Redis/Memory cache üzerinden okur/yazar.\n  3. `publish` task ile Rebus/RabbitMQ üzerine `OrderPaymentCaptured` mesajı bırakır.\n- **Senaryolar**:\n  - **Senaryo A (`amount < 50000`)**: `gateway-charge` -> `payment-succeeded` -> otomatik olarak `completed` durumuna tamamlanır.\n  - **Senaryo B (`amount >= 50000`)**: `gateway-charge` -> `high-value-review` -> `manual-verification` (Yüksek Tutarlı Sipariş Onayı) durumuna düşer; ardından `confirm-order` veya `cancel-order` çalıştırılır.",
+      "item": [
+        {
+          "name": "1. Tanımı Getir (GET /api/workflows/order-payment-orchestration)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration",
+            "description": "`order-payment-orchestration` iş akışının tanımını döner."
+          }
+        },
+        {
+          "name": "2A. Başlat - Senaryo A: Normal Tutar < 50.000 TL (FanOut + HTTP + Cache + Rebus -> completed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"orderOrchestrationInstanceId\", val);",
+                  "        pm.environment.set(\"orderOrchestrationInstanceId\", val);",
+                  "        console.log(\"orderOrchestrationInstanceId =\", val);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances",
+            "description": "3'lü paralel FanOut + HTTP Gateway + Cache + Rebus adımlarını çalıştırır ve `amount < 50000` olduğu için otomatik olarak `completed` durumuna ulaşır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"ORD-AUTO-{{$randomInt}}\",\n  \"data\": {\n    \"orderCode\": \"SIP-2026-101\",\n    \"customerName\": \"Zeynep Kaya\",\n    \"amount\": 18500,\n    \"paymentMethod\": \"Kredi Kartı\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2B. Başlat - Senaryo B: Yüksek Tutar >= 50.000 TL (Manuel Finans Onayı -> manual-verification)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"orderOrchestrationInstanceId\", val);",
+                  "        pm.environment.set(\"orderOrchestrationInstanceId\", val);",
+                  "        console.log(\"orderOrchestrationInstanceId =\", val);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances",
+            "description": "Tutar >= 50.000 TL olduğu için paralel kontroller ve provizyon sonrası `manual-verification` (Yüksek Tutarlı Sipariş Onayı) durumunda bekler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"ORD-HIGH-{{$randomInt}}\",\n  \"data\": {\n    \"orderCode\": \"SIP-2026-999\",\n    \"customerName\": \"Mega Elektronik A.Ş.\",\n    \"amount\": 125000,\n    \"paymentMethod\": \"Kurumsal Açık Hesap\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. Akış Durumunu Sorgula (GET Instance)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances/{{orderOrchestrationInstanceId}}",
+            "description": "Sipariş akışının paralel kontrol sonuçlarını (`parallelChecks`), gateway referans kodunu (`gatewayResponse`) ve güncel durumunu döner."
+          }
+        },
+        {
+          "name": "4A. [manual-verification] Siparişi Onayla (confirm-order -> completed)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances/{{orderOrchestrationInstanceId}}/transitions/confirm-order",
+            "description": "`manual-verification` durumundaki yüksek tutarlı siparişi onaylayarak `completed` durumuna taşır.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"financeNote\": \"Kurumsal açık hesap limiti ve fatura bilgileri finans ekibince onaylandı.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4B. [manual-verification] Siparişi İptal Et & İade Başlat (cancel-order -> cancelled)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances/{{orderOrchestrationInstanceId}}/transitions/cancel-order",
+            "description": "Alternatif: `manual-verification` durumundaki siparişi iptal eder (`cancelled`).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Şüpheli işlem bildirimi nedeniyle sipariş iptal edildi ve provizyon iadesi başlatıldı.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. Geçmişi Listele (GET History)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/order-payment-orchestration/instances/{{orderOrchestrationInstanceId}}/history",
+            "description": "Sipariş orkestrasyonu akışının geçiş geçmişini döner."
+          }
+        }
+      ]
+    }
+  ]
+}

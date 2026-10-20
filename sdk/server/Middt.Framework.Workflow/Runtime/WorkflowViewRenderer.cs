@@ -1,4 +1,5 @@
 using Middt.Framework.Model.Workflow;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 
 namespace Middt.Framework.Workflow.Runtime;
@@ -20,10 +21,16 @@ public sealed class WorkflowViewRenderer(IEnumerable<IWorkflowViewRenderer> rend
     /// <summary>Returns the HTML, or <c>null</c> when no renderer handles the state's view.</summary>
     public async Task<string?> RenderAsync(WorkflowInstanceModel instance, WorkflowUser? user = null, CancellationToken cancellationToken = default)
     {
+        using var activity = WorkflowDiagnostics.ActivitySource.StartActivity($"workflow.view.render {instance.Workflow}/{instance.State}");
+        activity?.SetTag("middt.workflow.key", instance.Workflow);
+        activity?.SetTag("middt.workflow.instance_id", instance.Id.ToString());
+        activity?.SetTag("middt.workflow.state", instance.State);
+
         foreach (var renderer in renderers)
         {
             if (await renderer.RenderAsync(instance, user ?? WorkflowUser.System, cancellationToken) is { } html)
             {
+                activity?.SetTag("middt.workflow.renderer", renderer.GetType().Name);
                 return html;
             }
         }

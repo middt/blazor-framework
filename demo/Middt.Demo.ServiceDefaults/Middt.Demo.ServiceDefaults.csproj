@@ -18,4 +18,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\sdk\server\Middt.Framework.Common\Middt.Framework.Common.csproj" />
+  </ItemGroup>
+
 </Project>

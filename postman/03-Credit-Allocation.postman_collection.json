@@ -1,0 +1,629 @@
+{
+  "info": {
+    "name": "Middt Workflow 03 - Credit Allocation (SubFlow & 4-Göz Onay)",
+    "description": "Workflow Key: `credit-allocation`\n\n### Özellikler:\n1. **`loadWorkflow`**: Başlangıçta `{{customerKey}}` ile `customer-onboarding` kaydını okur.\n2. **`SubFlow` (`risk-subflow`)**: `risk-limit-eval` alt akışını başlatır (`forwardTransitions: true`).\n   - Eğer `amount <= 500000` (veya `requireUnderwriting: false`) ise alt akış anında tamamlanır ve ana akış doğrudan `stage1-approval` (1. Derece Onay) durumuna gelir.\n   - Eğer `amount > 500000` ve `requireUnderwriting: true` ise alt akış `manual-underwriting` durumunda bekler; `approve-underwriting` geçişi doğrudan **ana akış (parent)** üzerinden çağrılabilir (`forwardTransitions: true`)!\n3. **4-Göz İlkesi (`stage2-approval`)**:\n   - `stage1-approval` adımını `test@test.com` (`{{access_token}}`) onayladıktan sonra, `approve-stage2-four-eyes` geçişinde `denyRoles: [\"$previousUser\"]` kuralı vardır.\n   - Bu nedenle 2. derece onay isteği otomatik olarak **`{{manager2_access_token}}` (`manager2@test.com`)** ile gönderilir (veya tek kullanıcıyla `executive-override` kullanılabilir).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "apiUrl",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "idpUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "middt-postman",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "manager2_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerKey",
+      "value": "CUST-1001",
+      "type": "string"
+    },
+    {
+      "key": "customerOnboardingInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riskLimitInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "creditAllocationSubFlowInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderOrchestrationInstanceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "slaEscalationInstanceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Kimlik Doğrulama (Middt Identity OAuth2)",
+      "description": "Middt Identity (`http://localhost:8083`) üzerinden `middt-postman` public client ile JWT Bearer token alır ve otomatik olarak `{{access_token}}`, `{{manager2_access_token}}`, `{{user_access_token}}` değişkenlerine yazar.",
+      "item": [
+        {
+          "name": "1. Token Al - Manager & Admin (test@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "    pm.environment.set(\"access_token\", json.access_token);",
+                  "    console.log(\"access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "test@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Ana test kullanıcısı (`manager`, `ui-admin`, `idp-admin` rollerine sahip). Alınan token otomatik olarak `{{access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "2. Token Al - 2. Onaycı Manager (manager2@test.com - 4-Göz İçin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"manager2_access_token\", json.access_token);",
+                  "    pm.environment.set(\"manager2_access_token\", json.access_token);",
+                  "    console.log(\"manager2_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "manager2@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "`credit-allocation` akışındaki 4-Göz (`approve-stage2-four-eyes`, `denyRoles: [\"$previousUser\"]`) adımını farklı bir yönetici ile onaylamak için kullanılır. Otomatik olarak `{{manager2_access_token}}` değişkenine kaydedilir."
+          }
+        },
+        {
+          "name": "3. Token Al - Standart Kullanıcı (user@test.com)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Token başarıyla alındı (200 OK)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set(\"user_access_token\", json.access_token);",
+                  "    pm.environment.set(\"user_access_token\", json.access_token);",
+                  "    console.log(\"user_access_token kaydedildi.\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "password",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "username",
+                  "value": "user@test.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "test",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email roles offline_access api",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": "{{idpUrl}}/connect/token",
+            "description": "Yönetici rolü olmayan standart kullanıcı (`user@test.com`). Yetki kontrollerini (403 Forbidden) veya standart kullanıcı geçişlerini test etmek için kullanılır."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Credit Allocation (Kredi Tahsis, SubFlow & 4-Göz Onay)",
+      "description": "Workflow Key: `credit-allocation`\n\n### Özellikler:\n1. **`loadWorkflow`**: Başlangıçta `{{customerKey}}` ile `customer-onboarding` kaydını okur.\n2. **`SubFlow` (`risk-subflow`)**: `risk-limit-eval` alt akışını başlatır (`forwardTransitions: true`).\n   - Eğer `amount <= 500000` (veya `requireUnderwriting: false`) ise alt akış anında tamamlanır ve ana akış doğrudan `stage1-approval` (1. Derece Onay) durumuna gelir.\n   - Eğer `amount > 500000` ve `requireUnderwriting: true` ise alt akış `manual-underwriting` durumunda bekler; `approve-underwriting` geçişi doğrudan **ana akış (parent)** üzerinden çağrılabilir (`forwardTransitions: true`)!\n3. **4-Göz İlkesi (`stage2-approval`)**:\n   - `stage1-approval` adımını `test@test.com` (`{{access_token}}`) onayladıktan sonra, `approve-stage2-four-eyes` geçişinde `denyRoles: [\"$previousUser\"]` kuralı vardır.\n   - Bu nedenle 2. derece onay isteği otomatik olarak **`{{manager2_access_token}}` (`manager2@test.com`)** ile gönderilir (veya tek kullanıcıyla `executive-override` kullanılabilir).",
+      "item": [
+        {
+          "name": "1. Tanımı Getir (GET /api/workflows/credit-allocation)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation",
+            "description": "`credit-allocation` iş akışının tanımını döner."
+          }
+        },
+        {
+          "name": "2A. Başlat - Senaryo A: Hızlı Risk Onaylı Kredi <= 500.000 TL (-> stage1-approval)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"creditAllocationInstanceId\", val);",
+                  "        pm.environment.set(\"creditAllocationInstanceId\", val);",
+                  "        console.log(\"creditAllocationInstanceId =\", val);",
+                  "    }",
+                  "    if (json.data && json.data.activeSubFlow && json.data.activeSubFlow.instanceId) {",
+                  "        pm.collectionVariables.set(\"creditAllocationSubFlowInstanceId\", json.data.activeSubFlow.instanceId);",
+                  "        pm.environment.set(\"creditAllocationSubFlowInstanceId\", json.data.activeSubFlow.instanceId);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances",
+            "description": "Alt akış (`risk-limit-eval`) otomatik onaylanır ve ana akış doğrudan `stage1-approval` (1. Derece Tahsis Onayı) durumuna gelir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"CRD-FAST-{{$randomInt}}\",\n  \"data\": {\n    \"customerKey\": \"{{customerKey}}\",\n    \"amount\": 350000,\n    \"termMonths\": 24,\n    \"collateralAmount\": 500000,\n    \"iban\": \"TR330006100519786457841326\",\n    \"requireUnderwriting\": false\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2B. Başlat - Senaryo B: Yüksek Tutar > 500.000 TL + Manuel Underwriting SubFlow (-> risk-subflow)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 2xx\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202]);",
+                  "});",
+                  "try {",
+                  "    const json = pm.response.json();",
+                  "    const val = json.data.id;",
+                  "    if (val) {",
+                  "        pm.collectionVariables.set(\"creditAllocationInstanceId\", val);",
+                  "        pm.environment.set(\"creditAllocationInstanceId\", val);",
+                  "        console.log(\"creditAllocationInstanceId =\", val);",
+                  "    }",
+                  "    if (json.data && json.data.activeSubFlow && json.data.activeSubFlow.instanceId) {",
+                  "        pm.collectionVariables.set(\"creditAllocationSubFlowInstanceId\", json.data.activeSubFlow.instanceId);",
+                  "        pm.environment.set(\"creditAllocationSubFlowInstanceId\", json.data.activeSubFlow.instanceId);",
+                  "    }",
+                  "} catch (e) {",
+                  "    console.warn(\"Response parse warning:\", e);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances",
+            "description": "Tutar > 500.000 TL ve `requireUnderwriting: true` olduğu için `risk-subflow` alt akışı `manual-underwriting` durumunda duraklar. Bir sonraki adımda (`3. [risk-subflow] Alt Akış Onayını İlet`) ana akış üzerinden onaylayabilirsiniz.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"CRD-SUB-{{$randomInt}}\",\n  \"data\": {\n    \"customerKey\": \"{{customerKey}}\",\n    \"amount\": 1500000,\n    \"termMonths\": 36,\n    \"collateralAmount\": 2000000,\n    \"iban\": \"TR330006100519786457841326\",\n    \"requireUnderwriting\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3. [risk-subflow] Alt Akış Onayını Ana Akış Üzerinden İlet (approve-underwriting -> stage1-approval)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/approve-underwriting",
+            "description": "Senaryo B için: `forwardTransitions: true` sayesinde `approve-underwriting` geçişini doğrudan `credit-allocation` örneği üzerinde çalıştırır. Alt akış tamamlanır ve ana akış `stage1-approval` durumuna geçer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"underwriterNote\": \"Alt akış (SubFlow) parent üzerinden onaylandı, 1. derece tahsis onayına aktarılıyor.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4. Akış Durumunu Sorgula (GET Instance)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}",
+            "description": "Kredi tahsis akışının güncel durumunu, hesaplanan faiz/taksit/teminat oranlarını ve aktif geçişlerini döner."
+          }
+        },
+        {
+          "name": "5. [stage1-approval] Teminat Güncelle & Yeniden Hesapla (update-collateral -> $self reenter)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/update-collateral",
+            "description": "`stage1-approval` durumundayken `reenter: true` ile teminat tutarını günceller ve `onEntry` görevini tekrar çalıştırarak `collateralCoveragePct` (Teminat Karşılama Oranı %) değerini yeniden hesaplar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collateralAmount\": 900000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. [stage1-approval] 1. Derece Onay Ver (approve-stage1 -> stage2-approval) [Manager 1: test@test.com]",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/approve-stage1",
+            "description": "1. yönetici (`test@test.com` - `{{access_token}}`) ile 1. derece onayı verir. Akış `stage2-approval` (2. Derece 4-Göz Onayı) durumuna geçer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage1Comment\": \"1. derece tahsis kontrolü tamamlandı, teminat yapısı uygun.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7A. [stage2-approval] 1. Dereceye İade Et (return-to-stage1 -> stage1-approval)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/return-to-stage1",
+            "description": "Opsiyonel: Dosyayı revizyon için `stage1-approval` adımına geri gönderir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7B. [stage2-approval] 2. Derece Onay (4-Göz) - Farklı Yönetici İle (approve-stage2-four-eyes -> disbursed)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/approve-stage2-four-eyes",
+            "description": "`denyRoles: [\"$previousUser\"]` kuralı gereği bu istek otomatik olarak `{{manager2_access_token}}` (`manager2@test.com`) Bearer token'ı ile gönderilir. Onay sonrası `disbursed` (Kullandırıldı) durumuna geçer ve Rebus üzerinden `CreditDisbursed` eventi yayınlanır.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{manager2_access_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage2Comment\": \"4-Göz ilkesi kapsamında 2. yönetici (manager2@test.com) tarafından onaylandı, kullandırım yapılabilir.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7C. [stage2-approval] Genel Müdür İstisna Onayı - Tek Kullanıcı (executive-override -> disbursed)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/transitions/executive-override",
+            "description": "Alternatif: İkinci bir yönetici hesabı kullanmadan `idp-admin` rolüyle (`test@test.com`) 4-Göz kuralını bypass ederek doğrudan `disbursed` durumuna geçirir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"overrideReason\": \"Komite kararı ile tek kullanıcı (idp-admin) istisna onayı verildi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8. Geçmişi Listele (GET History)",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/credit-allocation/instances/{{creditAllocationInstanceId}}/history",
+            "description": "Kredi tahsis akışının tüm geçiş geçmişini döner."
+          }
+        }
+      ]
+    }
+  ]
+}

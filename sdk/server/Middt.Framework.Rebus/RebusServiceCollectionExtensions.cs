@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Middt.Framework.Workflow;
 using Middt.Framework.Workflow.Tasks;
 using Rebus.Config;
+using Rebus.Pipeline;
 using Rebus.Retry.Simple;
 using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
@@ -77,6 +78,14 @@ public static class RebusServiceCollectionExtensions
                         o.RetryStrategy(errorQueueName: settings.ErrorQueueName, maxDeliveryAttempts: settings.MaxDeliveryAttempts);
                         o.SetNumberOfWorkers(settings.NumberOfWorkers);
                         o.SetMaxParallelism(settings.MaxParallelism);
+                        o.Decorate<IPipeline>(c =>
+                        {
+                            var pipeline = c.Get<IPipeline>();
+                            var step = new RebusOpenTelemetryStep();
+                            return new PipelineStepConcatenator(pipeline)
+                                .OnSend(step, PipelineAbsolutePosition.Front)
+                                .OnReceive(step, PipelineAbsolutePosition.Front);
+                        });
                     });
 
                 options.Customize?.Invoke(configurer);

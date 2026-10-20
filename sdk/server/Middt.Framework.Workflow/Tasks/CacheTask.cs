@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Caching.Distributed;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Middt.Framework.Expressions;
 using Middt.Framework.Workflow.Definitions;
+using Middt.Framework.Workflow.Diagnostics;
 using Middt.Framework.Workflow.Expressions;
 using Middt.Framework.Workflow.Runtime;
 
@@ -102,20 +104,31 @@ public sealed class CacheTask : IWorkflowTask
 
         var distributed = context.Services.GetService<IDistributedCache>();
         var memory = context.Services.GetService<IMemoryCache>();
+        var backend = distributed is not null ? "distributed" : memory is not null ? "memory" : "none";
 
-        if (distributed is not null)
+        using (var getActivity = WorkflowDiagnostics.ActivitySource.StartActivity($"cache.get {rawKey}"))
         {
-            var cachedJson = await distributed.GetStringAsync(cacheKey, cancellationToken);
-            if (cachedJson is not null)
+            getActivity?.SetTag("middt.cache.key", cacheKey);
+            getActivity?.SetTag("middt.cache.backend", backend);
+
+            if (distributed is not null)
             {
+                var cachedJson = await distributed.GetStringAsync(cacheKey, cancellationToken);
+                if (cachedJson is not null)
+                {
+                    getActivity?.SetTag("middt.cache.hit", true);
+                    JsonPath.Set(context.Data, into, JsonNode.Parse(cachedJson));
+                    return;
+                }
+            }
+            else if (memory is not null && memory.TryGetValue<string>(cacheKey, out var cachedJson) && cachedJson is not null)
+            {
+                getActivity?.SetTag("middt.cache.hit", true);
                 JsonPath.Set(context.Data, into, JsonNode.Parse(cachedJson));
                 return;
             }
-        }
-        else if (memory is not null && memory.TryGetValue<string>(cacheKey, out var cachedJson) && cachedJson is not null)
-        {
-            JsonPath.Set(context.Data, into, JsonNode.Parse(cachedJson));
-            return;
+
+            getActivity?.SetTag("middt.cache.hit", false);
         }
 
         var taskRegistry = context.Services.GetRequiredService<WorkflowTaskRegistry>();
@@ -137,7 +150,20 @@ public sealed class CacheTask : IWorkflowTask
             StartWorkflow = context.StartWorkflow,
         };
 
-        await impl.ExecuteAsync(innerContext, cancellationToken);
+        var sw = Stopwatch.StartNew();
+        using (var subTaskActivity = WorkflowDiagnostics.StartTaskActivity(context.Workflow, context.InstanceId, "cache", "subTask", innerTask.DisplayKey, innerTask.Task, 1))
+        {
+            try
+            {
+                await impl.ExecuteAsync(innerContext, cancellationToken);
+                WorkflowDiagnostics.CompleteTaskActivity(subTaskActivity, context.Workflow, innerTask.Task, "subTask", "Completed", sw.Elapsed.TotalMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                WorkflowDiagnostics.CompleteTaskActivity(subTaskActivity, context.Workflow, innerTask.Task, "subTask", "Failed", sw.Elapsed.TotalMilliseconds, ex.Message);
+                throw;
+            }
+        }
 
         var sourcePath = innerTask.Config["into"]?.GetValue<string>() ?? into;
         var produced = JsonPath.Get(context.Data, sourcePath);
@@ -148,17 +174,24 @@ public sealed class CacheTask : IWorkflowTask
 
         var serialized = produced?.ToJsonString() ?? "null";
 
-        if (distributed is not null)
+        using (var setActivity = WorkflowDiagnostics.ActivitySource.StartActivity($"cache.set {rawKey}"))
         {
-            await distributed.SetStringAsync(
-                cacheKey,
-                serialized,
-                new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl },
-                cancellationToken);
-        }
-        else if (memory is not null)
-        {
-            memory.Set(cacheKey, serialized, ttl);
+            setActivity?.SetTag("middt.cache.key", cacheKey);
+            setActivity?.SetTag("middt.cache.backend", backend);
+            setActivity?.SetTag("middt.cache.ttl", ttlText);
+
+            if (distributed is not null)
+            {
+                await distributed.SetStringAsync(
+                    cacheKey,
+                    serialized,
+                    new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl },
+                    cancellationToken);
+            }
+            else if (memory is not null)
+            {
+                memory.Set(cacheKey, serialized, ttl);
+            }
         }
     }
 }
