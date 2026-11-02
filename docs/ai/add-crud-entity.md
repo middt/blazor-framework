@@ -10,7 +10,7 @@ In `demo/Middt.Demo.Api`, domain records live as JSON documents inside PostgreSQ
 
 ### 1. Workflow definition (`Workflows/<key>.json`)
 1. Define or reuse a workflow in `demo/Middt.Demo.Api/Workflows/` (e.g., `customer-onboarding.json`, `credit-allocation.json`, `order-payment-orchestration.json`).
-2. Declare searchable/sortable fields in `dataSchema.properties` with explicit JSON types (`string`, `integer`, `number`, `boolean`). `WorkflowPartitionManager` automatically creates PostgreSQL partitions and typed B-Tree expression indexes on `WorkflowInstanceData.Data` at startup.
+2. Declare searchable/sortable fields in `dataSchema.properties` with explicit JSON types (`string`, `integer`, `number`, `boolean`) and `"x-search": true` (or `"x-index": true`). `WorkflowPartitionManager` automatically creates PostgreSQL partitions and selective typed B-Tree expression indexes on `WorkflowInstanceData.Data` at startup.
 
 ### 2. Screen = JSON layout (`Layouts/<screen-key>.json`)
 1. Copy `demo/Middt.Demo.Api/Layouts/customer-directory.json` (or `credit-pipeline.json` / `order-monitor.json`).
@@ -18,7 +18,7 @@ In `demo/Middt.Demo.Api`, domain records live as JSON documents inside PostgreSQ
    - `entity`: the workflow key in PascalCase or kebab-case (e.g., `"CustomerOnboarding"` or `"customer-onboarding"` — `WorkflowInstanceDataQuery` resolves both dynamically).
    - `columns`: `{ "field": "key", "title": "Müşteri Anahtarı", "sortable": true, ... }`.
    - `search`: search/filter field definitions (`text`, `number`, `select`, `date`, `checkbox`).
-3. Restart the API (or create/edit the layout at runtime in `/ui-admin` / `/admin/layouts`).
+3. Restart the API (or create/edit the layout at runtime in `/ui-admin`).
 4. The screen appears automatically in **both** menus (Blazor `:8080`, Angular `:8081`) at `/ui/<screen-key>`.
 
 ---

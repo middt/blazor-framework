@@ -7,7 +7,7 @@ frontend render the same JSON layouts as the Blazor renderer of the framework:
 | --- | --- |
 | `types.ts` – layout document, nodes, menu, summary, revisions, widget specs, validation result, response envelope | `Middt.Framework.Ui.Abstractions/Model/UiLayoutDocument.cs`, `BaseResponseDataModel.cs` |
 | `expression.ts` – the portable expression language (`PortableExpression`) | `Middt.Framework.Expressions/Portable/*` |
-| `render-context.ts` – `UiRenderContext` (text, format, isVisible, with, idFor), `UiFormats`, `UiUrl` | `Middt.Framework.Ui.Abstractions/Rendering/UiRenderContext.cs` |
+| `render-context.ts` – `UiRenderContext` (text, format, isVisible, with, idFor, canExecuteTransition, executeTransition), `UiFormats`, `UiUrl` | `Middt.Framework.Ui.Abstractions/Rendering/UiRenderContext.cs` |
 | `fields.ts` – grid columns / form fields, validation (Turkish messages) | `Middt.Framework.Ui.Abstractions/Model/UiFieldModels.cs` |
 | `client.ts` – `UiApiClient` (layout API) and `UiDataClient` (CRUD controllers) | `Middt.Framework.Client/Http/UiClients.cs`, `UiEndpoints.cs` |
 | `workflow-ui.ts` – `jsonPatchDiff`, `workflowTransitionPrefill` / `workflowTransitionInput` (forms of `input.format: jsonPatch` transitions) | `Middt.Framework.Expressions/JsonPatch.cs`, `Middt.Framework.Blazor/Workflow/WorkflowUi.cs` |
@@ -31,7 +31,7 @@ npm test          # node --test test/
 1. **Fetch the layout** – `GET api/ui/layouts/{key}` returns a `UiLayoutDocument`; `GET api/ui/layouts?kind=page` feeds the menu.
 2. **Render nodes by widget name** – every `UiNode` has `widget`, optional `id`, `visibleWhen`, `children` and its
    properties inline (`uiNodeProps(node)`). Map widget names (`heading`, `text`, `fields`, `alert`, `badge`, `section`,
-   `columns`, `divider`, `list`, `link`, `grid`, `record` and any custom ones listed by `GET api/ui/widgets`) to components.
+   `columns`, `divider`, `list`, `link`, `grid`, `record`, `layout` and any custom ones listed by `GET api/ui/widgets`) to components.
 3. **Evaluate with this package** – `ctx.isVisible(node)`, `ctx.text(node.text)`, `ctx.format(value, column.format)`,
    `ctx.with('row', item)` for list/grid rows, `ctx.with('record', loaded)` for `record` widgets, `ctx.render(node.filter)`
    for template maps. Only render links that pass `UiUrl.isSafe` (navigation from row actions: `UiUrl.isLocal`).

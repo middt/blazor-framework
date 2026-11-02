@@ -46,12 +46,13 @@ When the API starts up:
      *(e.g., `order-approval` $\to$ `OrderApproval`, `bike-repair_v2` $\to$ `BikeRepairV2`)*
    - Automatically executes `CREATE TABLE IF NOT EXISTS {schema}."{Table}_{Suffix}" PARTITION OF {schema}."{Table}" FOR VALUES IN ('{workflowKey}');` for all 5 tables.
    - Creates a catch-all fallback `{Table}_Default` for untracked or dynamic definitions.
-4. **Inspects `dataSchema.properties` and `start.input.schema.properties`** from the JSON definition:
-   - For every declared property, creates a dedicated, typed B-Tree functional index on that workflow's partition:
-     - `integer` / `number`: `((((data->>'field')::numeric)))`
-     - `boolean`: `((((data->>'field')::boolean)))`
-     - `string`: `(((data->>'field')::text))`
-5. Creates global `jsonb_path_ops` GIN indexes on `Data` for arbitrary JSON containment queries (`@>`).
+4. **Inspects `dataSchema.properties`** from the JSON definition (`WorkflowPartitionManager.ExtractIndexedProperties`):
+   - For properties with `"x-index": true` or searchable (`"x-search"` enabled) `enum`, `integer`, `number`, or `boolean` properties (excluding masked `"x-mask"` fields or `"x-index": false`), creates a dedicated, typed B-Tree functional index on that workflow's partition:
+     - `integer` / `number`: `(((("Data"->>'field')::numeric)))`
+     - `boolean`: `(((("Data"->>'field')::boolean)))`
+     - `string`: `((("Data"->>'field')::text))`
+   - Automatically drops any stale `IX_Part_{Suffix}_*` indexes that are no longer in the workflow's indexed property set (`DropStaleFlowIndexesAsync`).
+5. Creates global `jsonb_path_ops` GIN indexes on `Data` (`WorkflowInstanceData` and `WorkflowHistory`) for arbitrary JSON containment queries (`@>`).
 6. On **SQLite** (used in unit tests and local dev without Docker), creates partial expression indexes:
    `CREATE INDEX IF NOT EXISTS "IX_Part_{Suffix}_{prop}" ON "WorkflowInstanceData" (json_extract("Data", '$.{prop}')) WHERE "WorkflowKey" = '{key}';`
 
@@ -59,10 +60,10 @@ When the API starts up:
 
 ## 3. How to configure a future workflow for indexing
 
-When creating a new workflow JSON file (e.g. `invoice-processing.v1.json`):
+When creating a new workflow JSON file (e.g. `invoice-processing.json`):
 
-### Step 1: Provide explicit property types in `dataSchema`
-Always define the properties you anticipate querying, filtering, sorting, or joining on in `dataSchema.properties`.
+### Step 1: Provide explicit property types and `"x-search"` / `"x-index"` in `dataSchema`
+Define the properties you anticipate querying, filtering, sorting, or joining on in `dataSchema.properties` with `"x-search": true` (for numeric/boolean/enum filters) or `"x-index": true` (for string/custom B-Tree indexing).
 
 ```jsonc
 {
@@ -72,10 +73,10 @@ Always define the properties you anticipate querying, filtering, sorting, or joi
   "dataSchema": {
     "type": "object",
     "properties": {
-      "invoiceNumber": { "type": "string" },
-      "vendorId": { "type": "integer" },
-      "totalAmount": { "type": "number" },
-      "isPriority": { "type": "boolean" },
+      "invoiceNumber": { "type": "string", "x-search": true, "x-index": true },
+      "vendorId": { "type": "integer", "x-search": true },
+      "totalAmount": { "type": "number", "x-search": true },
+      "isPriority": { "type": "boolean", "x-search": true },
       "dueDate": { "type": "string", "format": "date-time" }
     }
   },
@@ -91,13 +92,13 @@ At next boot, the framework will create:
 - `wf."WorkflowJobs_InvoiceProcessing"`
 - `wf."WorkflowHistory_InvoiceProcessing"`
 - `wf."WorkflowIncidents_InvoiceProcessing"`
-- Index `IX_Part_InvoiceProcessing_invoiceNumber` on `((data->>'invoiceNumber')::text)`
-- Index `IX_Part_InvoiceProcessing_vendorId` on `(((data->>'vendorId')::numeric))`
-- Index `IX_Part_InvoiceProcessing_totalAmount` on `(((data->>'totalAmount')::numeric))`
-- Index `IX_Part_InvoiceProcessing_isPriority` on `(((data->>'isPriority')::boolean))`
+- Index `IX_Part_InvoiceProcessing_invoiceNumber` on `((("Data"->>'invoiceNumber')::text))`
+- Index `IX_Part_InvoiceProcessing_vendorId` on `(((("Data"->>'vendorId')::numeric)))`
+- Index `IX_Part_InvoiceProcessing_totalAmount` on `(((("Data"->>'totalAmount')::numeric)))`
+- Index `IX_Part_InvoiceProcessing_isPriority` on `(((("Data"->>'isPriority')::boolean)))`
 
 ### Step 2: Querying indexed workflow fields
-When querying workflow instance data in custom endpoints, repositories, or `WorkflowView`:
+When querying workflow instance data in custom endpoints, repositories, or `WorkflowInstanceDataQuery`:
 - **Always include `WorkflowKey` in the query** to trigger partition pruning:
   ```csharp
   var results = await db.InstanceData
@@ -107,7 +108,7 @@ When querying workflow instance data in custom endpoints, repositories, or `Work
 - With typed B-Tree functional index in place, PostgreSQL can perform index range scans on numbers:
   ```sql
   SELECT * FROM wf."WorkflowInstanceData_InvoiceProcessing"
-  WHERE ((data->>'totalAmount')::numeric) > 50000;
+  WHERE (("Data"->>'totalAmount')::numeric) > 50000;
   ```
 
 ---
@@ -119,8 +120,8 @@ If a workflow requires compound indexes (e.g. `(vendorId, dueDate)` together):
    ```sql
    CREATE INDEX IF NOT EXISTS "IX_InvoiceProcessing_Vendor_DueDate"
    ON wf."WorkflowInstanceData_InvoiceProcessing" (
-       (((data->>'vendorId')::numeric)),
-       (((data->>'dueDate')::text))
+       (((("Data"->>'vendorId')::numeric))),
+       ((("Data"->>'dueDate')::text))
    );
    ```
 2. Or declare an SQL view using `Middt.Framework.Workflow.View`:

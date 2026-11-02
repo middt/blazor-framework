@@ -55,7 +55,7 @@ demo/                             the 100% backend-driven JSON demo
   Middt.Demo.Angular              Angular BFF host
   angular-app/                    Angular demo SPA using @middt/angular as a package
   identity.json                   demo settings of Middt Identity
-spec/                             expressions.conformance.json · ui-layout.schema.json (shared by .NET and TypeScript)
+spec/                             expressions.conformance.json · json-patch.conformance.json · ui-layout.schema.json (shared by .NET and TypeScript)
 tests/  docs/
 ```
 
@@ -169,11 +169,11 @@ A definition ([full example](demo/Middt.Demo.Api/Workflows/customer-onboarding.j
 | States | `Initial`, `Intermediate`, `Finish`, `SubFlow`; sub types `Human`, `Success`, `Error`, `Cancelled`, `Timeout` |
 | Transitions | `Manual` (API, `roles`, optional availability `rule`), `Automatic` (`rule`, one `default` else-branch, chained), `Scheduled` (`after`), `Event` (`event` name; triggered by a message, see [Messages](#messages-event-transitions)), shared transitions (`availableIn`), `$self` (data update), workflow `timeout` |
 | Wizards | `step` numbers on states (progress indicator), `"view": { "inline": true }` on transitions (step form rendered inside the screen, pre-filled from `input.into` when a step is revisited), manual transitions with a `rule` (availability condition, e.g. one "Back" per branch); see [credit-allocation.json](demo/Middt.Demo.Api/Workflows/credit-allocation.json) |
-| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path; `into: "items[]"` appends the validated object to a JSON array), or – with `"format": "jsonPatch"` – the body is a JSON Patch on the data at `into` (see [JSON Patch](#updating-data-with-a-json-patch-inputformat-jsonpatch)); `set` computes values (an input without schema ignores the body, and paths like `items[-1].paidAt` target the last element of an array). UI hint `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` on a property: both frontends render a select whose options come from `api/v{version}/{entity}/getall` – capped at `MaxGetAllItems` (1000), so return the relevant rows first, e.g. newest first (shape checked at load time, the value itself is validated by the property's other keywords) |
+| Input | JSON Schema subset (`type`, `properties`, `required`, `additionalProperties`, `enum`, `const`, min/max, lengths, `pattern`, `format`, `items`); the body is only written when the transition declares an `input.schema` (`into` path; `into: "items[]"` appends the validated object to a JSON array), or – with `"format": "jsonPatch"` – the body is a JSON Patch on the data at `into` (see [JSON Patch](#updating-data-with-a-json-patch-inputformat-jsonpatch)); `set` computes values (an input without schema ignores the body, and paths like `items[-1].paidAt` target the last element of an array). UI hints: `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` renders a select whose options come from `api/v{version}/{entity}/getall` (capped at `MaxGetAllItems` = 1000, so return the relevant rows first, e.g. newest first; shape checked at load time, value validated by the property's other keywords); `"x-enumFrom": "partialPayment.reference"` populates `enum` and `default` dynamically from an array in the current instance's `data` |
 | Tasks | `onEntry`, `onExit`, `onExecute`; general `set`, `setKey` (gives the instance its business key once it is known, e.g. `CUST-{{ data.identityNumber }}`), `log`, `http` (templated, host placeholders forbidden, values URL-encoded), `publish` (`IWorkflowMessagePublisher`, e.g. Rebus), `startWorkflow`, `loadWorkflow`, `fanOut`, `cache`, and `operation` (dispatches an explicitly allowed application operation); `when` condition; `"background": true` on a state's `onEntry` task runs it outside the instance lock (see [Long tasks](#long-tasks-background)) |
 | Errors | per task / workflow `onError`: `maxAttempts` + exponential `delay`, then `Fault` (incident, `retry` endpoint), `Continue` or `Transition` (rolls the failed step back, then runs the given transition) |
 | Subflows | `SubFlow` state starts a child (`input` mapping, `outputInto`); the parent continues when the child finishes (`child.subType` in rules); cancelling the parent cancels the child |
-| Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now`; reflection and type access are disabled; `{{ expr }}` templates in task config |
+| Expressions | C#-like (DynamicExpresso) over `data`, `input`, `child`, `result`, `user` (`user.IsInRole("x")`), `instance`, `now` (including JSON array helpers `Count`, `Any`, `Sum`, `Last`, `Remove`, `Where`, `WhereNot`, and indexers like `[-1]`); reflection and type access are disabled; `{{ expr }}` templates in task config |
 | History | `"history": "full"` (default: data snapshot per transition), `"delta"` (mostly only the change, as a JSON Patch in `Patch`, with a full snapshot for the first row, the row that finishes the instance, every `historySnapshotEvery` rows (default 20) and whenever the patch would not be smaller than the data – so any version is rebuilt from the nearest snapshot with at most that many patches; `WorkflowEngine.HistoryDataAsync`) or `"none"` (no history rows; the instance data itself is still saved on every transition) – see [History modes](#history-modes-and-how-json-patch-is-used) |
 | Runtime | Busy flag via conditional UPDATE (concurrent requests → 409), a heartbeat that keeps a running claim alive (`BusyHeartbeatInterval`), atomic final state + history + follow-up jobs, incidents, idempotent start by business key, async transitions (202), durable timers and follow-up jobs with renewed leases, claimed with `FOR UPDATE SKIP LOCKED` on PostgreSQL and woken across nodes by `LISTEN`/`NOTIFY` (multi-instance safe, no polling delay), crash recovery of Busy instances, queued `IWorkflowEventHandler` notifications after commit |
 
@@ -295,7 +295,9 @@ a removal, an item appended to a list – without resending the rest, and can gu
 ```
 
 ```http
-POST /api/workflows/invoice-collection/instances/{id}/transitions/update-billing-contact
+PATCH /api/workflows/invoice-collection/instances/{id}/transitions/update-billing-contact
+Content-Type: application/json-patch+json
+
 [ { "op": "test",    "path": "/phone", "value": "02124440123" },
   { "op": "replace", "path": "/phone", "value": "02124440999" },
   { "op": "remove",  "path": "/address" } ]
@@ -308,7 +310,7 @@ POST /api/workflows/invoice-collection/instances/{id}/transitions/update-billing
   The patch is atomic – applied completely or not at all. An invalid operation or a result the schema rejects answers
   400, a failed `test` 409 (an optimistic check: "only change the phone if it is still the one I saw"); either way the
   instance stays as it was and Active.
-- **Body**: a bare JSON array over HTTP; programmatic callers pass `{ "patch": [ … ] }` (that is also how it travels inside
+- **Body**: a bare JSON array over HTTP (`POST` or `PATCH`, with `application/json` or `application/json-patch+json`); programmatic callers pass `{ "patch": [ … ] }` (that is also how it travels inside
   the engine). `set` expressions, tasks and the rest of the transition run as usual.
 - **History**: the client's patch is the transition input, so it is stored in the history row's `Input`; with
   `history: delta` the row's `Patch` holds the resulting change from the data root (`/billingContact/phone`).
@@ -322,8 +324,8 @@ POST /api/workflows/invoice-collection/instances/{id}/transitions/update-billing
 
 
 Blazor: register `builder.Services.AddMiddtApiClient<WorkflowApiClient>();` and use the components from
-`Middt.Framework.Blazor.Base.Component.Workflow` – `WorkflowInstanceList` (paged list, columns generated from `dataSchema`, start dialog generated from the
-start input schema), `WorkflowInstanceDetail` (state, data, history, incidents, retry, one button per available transition
+`Middt.Framework.Blazor.Workflow` – `WorkflowInstanceList` (paged list, columns and filters generated from `dataSchema`, start dialog generated from the
+start input schema), `WorkflowInstanceDetail` (state, data, graphical SVG flow & execution path diagrams via `WorkflowDiagram`, history, incidents, retry, one button per available transition
 with a form generated from its input schema) and `JsonSchemaForm`. A schema property with
 `"x-lookup": { "entity": "CustomerOnboarding", "valueField": "key", "textField": "fullName" }` is rendered as a select of the
 entity's rows (same shape as the layout field `lookup`; the value type follows the property `type`). The demo has one
@@ -382,7 +384,7 @@ HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@midd
 |---|---|
 | `heading`, `text`, `alert`, `badge`, `divider`, `link` | Display widgets; text properties are `{{ }}` templates |
 | `fields` | Label/value list with formats (`N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`) |
-| `section`, `columns`, `list` | Containers (`list` repeats its children per array item as `row`) |
+| `section`, `columns`, `list` | Containers (`list` repeats its children per array item as `row`, with optional per-item `rowTransition` workflow button) |
 | `layout` *(reusable / interactive)* | Embeds another `kind: "view"` layout by `key` with optional `data` scope expression and `title` (max nesting depth 5) |
 | `grid` *(interactive)* | Server paged/sorted grid over a workflow (`entity`): search fields, fixed `filter`, row actions, create/edit/delete dialog |
 | `record` *(interactive)* | Loads one entity by `recordId` and renders its `children` with `record` in scope |
@@ -403,14 +405,14 @@ HTML (`UiHtmlRenderer`), and Angular renders it with `@middt/angular` (on `@midd
 - **Blazor & Angular**: `<UiPageHost Key="@Key" />` / `<UiLayoutHost />` (Blazor) and `<middt-layout-page />` / `<middt-layout-host />` (Angular), plus `<UiLayoutEditor />` / `<middt-layout-editor />` at `/ui-admin` (edit JSON, validate on the server, preview, save, revisions, delete).
   Grid/record/layout widgets call the API **with the signed-in user's token**, so API authorization is unchanged;
   a layout can only show what the user may already read.
-- **Workflows**: every state in the sample uses `"view": { "layout": "kyc-review" }` (or `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`);
+- **Workflows**: every state in the sample uses `"view": { "layout": "kyc-review" }` (or `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `invoice-detail`, `invoice-result`);
   both frontends render it automatically with `data` and `instance`.
 - **Editors**: `GET api/ui/schema` (also committed as `spec/ui-layout.schema.json`) is the JSON Schema of layouts;
   seed files reference it with `"$schema"` for completion in VS Code / Rider.
 - **Custom widgets**: register the spec in the API – `o.AddWidget(spec, html)` (optional static HTML) – and an
   implementation in each frontend: `AddMiddtUi(w => w.Add<MyWidget>(spec))` in Blazor, `provideMiddtUiWidgets({ name, component })` in Angular.
 
-All screens in `demo/Middt.Demo.Api/Layouts` (`executive-overview`, `customer-directory`, `credit-pipeline`, `order-monitor`, `kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `customer-summary-card`, `risk-eval-card`, and `workflow-footer`) are 100% backend-driven JSON layouts.
+All screens in `demo/Middt.Demo.Api/Layouts` (`customer-directory`, `credit-pipeline`, `order-monitor`, `kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `invoice-detail`, `invoice-result`, `customer-summary-card`, `risk-eval-card`, and `workflow-footer`) are 100% backend-driven JSON layouts.
 
 ## Messaging (Rebus)
 
@@ -550,8 +552,8 @@ identity provider: <http://localhost:8083> (login, registration, password reset,
 <http://localhost:8180/scalar>.
 Signing in once at the IdP signs you into both UIs (single sign-on); see [docs/identity.md](docs/identity.md).
 
-"Fatura Tahsilatı" (`invoice-collection`) can be driven by hand: a manager records a partial or full payment with the
-buttons "Kısmi Ödeme Kaydet" / "Ödemeyi Kaydet (Tam)", the invoice moves to "Muhasebe Mutabakatı" and – after the
+"Fatura Tahsilatı" (`invoice-collection`) can be driven by hand: a manager records partial or full payments with the
+button "Ödeme Kaydet" (`record-payment`, appending to `partialPayment[]`), removes a mistaken partial payment row directly from the list with the row's "Sil" button (`delete-payment` via `list.rowTransition`), and once `paidAmount >= total` the invoice automatically moves to "Muhasebe Mutabakatı" (`payment-completed`) and – after the
 background ledger call – to "Tahsil Edildi". "Fatura İletişim Bilgilerini Güncelle" edits the billing contact with a
 JSON Patch (the form opens with the current values; only the changes are sent). The payment steps are also triggered by a
 payment system's message (`POST /api/workflows/invoice-collection/messages/payment.received?key=INV-…`). Postman

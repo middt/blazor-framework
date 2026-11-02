@@ -45,7 +45,7 @@ demo/                             100% backend-driven JSON demo (KYC, credit, or
   Middt.Demo.Angular              Angular BFF host (:8081)
   angular-app/                    Angular demo SPA workspace
   identity.json                   demo settings of Middt Identity (:8083) – both demos sign in there
-spec/                             expressions.conformance.json · ui-layout.schema.json (generated)
+spec/                             expressions.conformance.json · json-patch.conformance.json · ui-layout.schema.json (generated)
 tests/Middt.Framework.Tests       all .NET tests (xunit.v3)
 docs/                             architecture.md, ai/ playbooks
 ```

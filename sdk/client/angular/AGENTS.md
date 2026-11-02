@@ -4,7 +4,7 @@ Workspace with one library: `projects/middt-angular` → package **`@middt/angul
 NOT here (`demo/angular-app`). Depends on `@middt/ui-core` as a `file:` package – build ui-core first.
 
 ```bash
-(cd ../typescript/ui-core && npm run build) && npx ng build middt-angular
+(cd ../ui-core && npm run build) && npx ng build middt-angular
 ```
 
 - Structure: `core/src` (config/`provideMiddt`, `bffFetch` with `X-CSRF`, `AuthService` via `/bff/user`, guards,

@@ -230,15 +230,15 @@ Dedicated partition açıldıktan sonra, `WorkflowInstanceData_OrderPayment` üz
 ```sql
 -- Müşteri ID araması
 CREATE INDEX IF NOT EXISTS "IX_Part_Order_CustomerId" 
-ON wf."WorkflowInstanceData_OrderPayment" (((data->>'customerId')::text));
+ON wf."WorkflowInstanceData_OrderPayment" ((("Data"->>'customerId')::text));
 
 -- Tutar sıralaması ve aralık sorguları
 CREATE INDEX IF NOT EXISTS "IX_Part_Order_Total" 
-ON wf."WorkflowInstanceData_OrderPayment" ((((data->>'total')::numeric)));
+ON wf."WorkflowInstanceData_OrderPayment" (((("Data"->>'total')::numeric)));
 
 -- Sipariş durum kodu
 CREATE INDEX IF NOT EXISTS "IX_Part_Order_StatusCode" 
-ON wf."WorkflowInstanceData_OrderPayment" (((data->>'statusCode')::text));
+ON wf."WorkflowInstanceData_OrderPayment" ((("Data"->>'statusCode')::text));
 ```
 
 ---

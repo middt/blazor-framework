@@ -164,15 +164,15 @@ public override async Task<ActionResult<BaseResponseDataModel<Customer>>> Insert
 
 > **Vaka:** Müşteri ekleme veya hesap açılış akışında, açılır kutudan (dropdown) **yalnızca o şubenin personelleri** seçilebilmelidir.
 
-### Yöntem 1: Doğrudan SQL ile Yükleme (`db-query`)
-Akışın ilgili adımına (`onEntry`) doğrudan bir `db-query` görevi eklenerek şube ID'si parametrik olarak sorgulanabilir:
+### Yöntem 1: İzinli Uygulama Operasyonu (`operation` Task) veya `loadWorkflow`
+Akışın ilgili adımına (`onEntry`) `IWorkflowOperationDispatcher` üzerinde tanımlı bir `operation` görevi (veya başka bir iş akışı kaydını okumak için `loadWorkflow`) eklenerek şube ID'si parametrik olarak sorgulanabilir:
 
 ```json
 {
-  "task": "db-query",
+  "task": "operation",
   "config": {
-    "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
-    "parameters": [ "{{ input.branchId ?? data.branchId }}" ],
+    "operation": "load-branch-staff",
+    "branchId": "{{ input.branchId ?? data.branchId }}",
     "into": "availableStaffList"
   }
 }
@@ -180,20 +180,20 @@ Akışın ilgili adımına (`onEntry`) doğrudan bir `db-query` görevi eklenere
 
 > 💡 **Not:** Parametre yalnızca akış verisinden (`data.branchId`) değil; kullanıcının formda gönderdiği istek gövdesinden (`input.branchId`), HTTP Header'dan veya QueryString'den de gelebilir. Aşağıda bu kaynakların nasıl yönetileceği detaylandırılmıştır.
 
-> ⚠️ **Uyarı:** Aynı sorguyu birden fazla iş akışında tekrar tekrar yazmak (kredi, müşteri ekleme, hesap açma) **kod tekrarına (DRY ihlali)** ve şema değiştiğinde tüm JSON dosyalarını güncelleme yüküne yol açar. Bu nedenle aşağıdaki **SubFlow (Alt Akış)** deseni tercih edilmelidir.
+> ⚠️ **Uyarı:** Aynı veri hazırlama adımını birden fazla iş akışında tekrar tekrar kurgulamak (kredi, müşteri ekleme, hesap açma) **kod tekrarına (DRY ihlali)** yol açar. Bu nedenle aşağıdaki **SubFlow (Alt Akış)** deseni tercih edilmelidir.
 
 ---
 
 ### Yöntem 2: Tekrar Kullanılabilir SubFlow (Alt Akış) Deseni *(Önerilen Yaklaşım)*
 
-SQL sorgusunu her akışa gömmek yerine, veri çekme mantığı **bağımsız ve tekrar kullanılabilir bir Alt Akış (SubFlow)** haline getirilir:
+Sorgu ve doğrulama mantığını her akışa gömmek yerine, veri çekme mantığı **bağımsız ve tekrar kullanılabilir bir Alt Akış (SubFlow)** haline getirilir:
 
 #### 1. Reusable Alt Akış Tanımı (`get-branch-staff.json`)
 
-Bu demo akışı parametreli SQL ve alt akış veri eşlemesini gösterir; **şube yetkilendirmesi yapmaz**. Aşağıdaki
+Bu örnek akış parametreli operasyon çağrısını ve alt akış veri eşlemesini gösterir; **şube yetkilendirmesi yapmaz**. Aşağıdaki
 `branchId` değerini istemciden alıp doğrudan sorguda kullanmak gerçek personel verisi için yeterli değildir. Üretim
 uygulamasında yetkili şube sunucuda doğrulanmış kimlik bilgisinden gelmeli ve sorgudan önce kontrol edilmelidir.
-Bu akış parametre olarak `branchId` alır, doğrular, sorguyu çalıştırır ve sonucu döner:
+Bu akış parametre olarak `branchId` alır, doğrular, operasyonu çalıştırır ve sonucu döner:
 
 ```json
 {
@@ -215,10 +215,10 @@ Bu akış parametre olarak `branchId` alır, doğrular, sorguyu çalıştırır 
       "title": "Personel Sorgusu",
       "onEntry": [
         {
-          "task": "db-query",
+          "task": "operation",
           "config": {
-            "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
-            "parameters": [ "{{ data.branchId }}" ],
+            "operation": "load-branch-staff",
+            "branchId": "{{ data.branchId }}",
             "into": "items"
           }
         }
@@ -266,28 +266,35 @@ Herhangi bir ana iş akışında (müşteri açılışı, transfer onayı, vb.) 
 ```
 
 #### 3. Ekranda Verinin Kullanılması (`assign-staff-step`)
-Alt akış tamamlandığında veriler ebeveyn akışın `data.availableStaff` alanına yazılır. Formdaki açılır kutu doğrudan bu veriye bağlanır:
+Alt akış tamamlandığında veriler ebeveyn akışın `data.availableStaff` alanına yazılır. Geçiş formundaki açılır kutu `x-enumFrom` (veya `x-lookup`) ile doğrudan bu veriye bağlanır:
 
 ```json
 {
   "key": "assign-staff-step",
   "title": "Müşteri Temsilcisi Atama",
-  "view": {
-    "type": "Form",
-    "schema": {
-      "type": "object",
-      "properties": {
-        "selectedStaffId": {
-          "type": "integer",
-          "title": "Atanan Müşteri Temsilcisi",
-          "enumSource": "data.availableStaff.items"
-        }
-      },
-      "required": [ "selectedStaffId" ]
-    }
-  },
+  "subType": "Human",
+  "view": { "layout": "staff-assignment" },
   "transitions": [
-    { "key": "submit-staff", "target": "next-step", "trigger": "Manual" }
+    {
+      "key": "submit-staff",
+      "title": "Temsilci Ata",
+      "target": "next-step",
+      "trigger": "Manual",
+      "input": {
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "selectedStaff" ],
+          "properties": {
+            "selectedStaff": {
+              "type": "string",
+              "title": "Atanan Müşteri Temsilcisi",
+              "x-enumFrom": "availableStaff.items.name"
+            }
+          }
+        }
+      }
+    }
   ]
 }
 ```
@@ -296,7 +303,7 @@ Alt akış tamamlandığında veriler ebeveyn akışın `data.availableStaff` al
 1. **Sıfır Bekleme Süresi (Senkron Yürütme):** Alt akışın tüm adımları `Automatic` olduğunda, Middt motoru alt akışı başlatır, sorguyu çalıştırır ve ebeveyne geri döner. Ebeveyn akış tek bir tick içinde `assign-staff-step` ekranına geçer; kullanıcı gecikme hissetmez.
 2. **Kapsülleme (Encapsulation):** Tablo adı, kolon adı veya filtre kuralı (`active = 1`, `store_id`) değiştiğinde yalnızca `get-branch-staff.json` dosyası güncellenir; onlarca iş akışına dokunulmaz.
 3. **Versiyonlama Desteği:** İleride `version: 2` çıkartılabilir ve eski çalışan akışlar bozulmadan yeni akışlara entegre edilebilir (`"version": 2`).
-4. **Kolay Zenginleştirme:** Gelecekte alt akışın içine SQL sorgusu öncesinde Redis önbellek kontrolü (`cache-get`) veya harici İK servisinden LDAP kontrolü (`http-request`) eklemek mümkündür.
+4. **Kolay Zenginleştirme:** Gelecekte alt akışın içine sorgu öncesinde Redis önbellek kontrolü (`cache`) veya harici İK servisinden LDAP kontrolü (`http`) eklemek mümkündür.
 
 ---
 
@@ -326,12 +333,10 @@ Middt'in taşınabilir ifade motoru (`ExpressionEvaluator`) **null-coalescing (`
 
 ```json
 {
-  "task": "db-query",
+  "task": "operation",
   "config": {
-    "sql": "SELECT staff_id AS id, first_name + ' ' + last_name AS name FROM staffs WHERE branch_id = {0} AND active = 1",
-    "parameters": [
-      "{{ input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? data.branchId }}"
-    ],
+    "operation": "load-branch-staff",
+    "branchId": "{{ input.header.branchId ?? input.query.branchId ?? input.body.branchId ?? data.branchId }}",
     "into": "availableStaffList"
   }
 }
@@ -406,18 +411,15 @@ Eğer kullanıcı sayfaya `?branchId=101` linki ile gelmişse veya aktif şubesi
   });
   ```
 
-#### D. Dış Servis Çağrılarında Header ve Query Aktarımı (`http-request` Task)
+#### D. Dış Servis Çağrılarında Header ve Query Aktarımı (`http` Task)
 İş akışının bir adımı harici bir REST API çağrısı yapıyorsa (`HttpTask`), URL Query ve Header değerleri doğrudan JSON tanımı üzerinden `{{ ... }}` şablonlarıyla beslenebilir:
 
 ```json
 {
-  "task": "http-request",
+  "task": "http",
   "config": {
     "method": "GET",
-    "url": "https://api.internal/v1/staffs",
-    "queryParams": {
-      "branchId": "{{ input.branchId ?? data.branchId }}"
-    },
+    "url": "https://api.internal/v1/staffs?branchId={{ input.branchId ?? data.branchId }}",
     "headers": {
       "X-Branch-Id": "{{ input.branchId ?? data.branchId }}",
       "Authorization": "Bearer {{ data.accessToken }}"
@@ -461,7 +463,7 @@ Form şemasında `x-lookup` kullanıldığında:
   "target": "eft-processed",
   "trigger": "Manual",
   "roles": [ "branch-manager" ],
-  "rule": "user.isInRole('branch-manager') && user.branchId == data.branchId"
+  "rule": "user.IsInRole(\"branch-manager\") && data.branchId != null"
 }
 ```
 

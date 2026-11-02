@@ -12,9 +12,9 @@ Both **Blazor Server** and **Angular** render these JSON definitions identically
 |---|---|---|
 | **Left Navigation Menu** (Workflows) | `Workflows/*.json` (`key`, `title`, `icon`) via `GET /api/workflows` | `MenuService` / `MenuService` |
 | **Left Navigation Menu** (UI Pages) | `Layouts/*.json` (`kind: "page"`, `key`, `title`, `menu`) via `GET /api/ui/layouts` | `MenuService` / `MenuService` |
-| **Workflow Instance List Table** (`/workflow/{key}`) | `Workflows/*.json` (`dataSchema.properties`, `x-list`, `x-mask`) | `WorkflowInstanceList` / `MiddtWorkflowListComponent` |
-| **Workflow Start & Action Forms** | `Workflows/*.json` (`transitions[].input.schema`, `x-lookup`, `x-mask`) | `JsonSchemaForm` / `MiddtSchemaFormComponent` |
-| **Workflow State Detail Screen** (`/workflow/{key}/{id}`) | `Workflows/*.json` (`states[].view.layout`) $\rightarrow$ `Layouts/*.json` (`kind: "view"`) | `WorkflowInstanceDetail` + `UiLayoutHost` / `MiddtWorkflowDetailComponent` + `MiddtLayoutHostComponent` |
+| **Workflow Instance List Table** (`/workflow/{key}`) | `Workflows/*.json` (`dataSchema.properties`, `x-list`, `x-search`, `x-mask`) | `WorkflowInstanceList` / `MiddtWorkflowInstanceListComponent` |
+| **Workflow Start & Action Forms** | `Workflows/*.json` (`transitions[].input.schema`, `x-lookup`, `x-enumFrom`, `x-mask`) | `JsonSchemaForm` / `MiddtJsonSchemaFormComponent` |
+| **Workflow State Detail Screen** (`/workflow/{key}/{id}`) | `Workflows/*.json` (`states[].view.layout`) $\rightarrow$ `Layouts/*.json` (`kind: "view"`) | `WorkflowInstanceDetail` + `UiLayoutHost` / `MiddtWorkflowInstanceDetailComponent` + `MiddtLayoutHostComponent` |
 | **Reusable Nested Widgets** | `Layouts/*.json` (`kind: "view"`) embedded via `{ "widget": "layout", "key": "...", "data": "..." }` | `UiLayoutWidget` / `UiLayoutWidget` |
 | **Directory / CRUD / Overview Pages** (`/ui/{key}`) | `Layouts/*.json` (`kind: "page"`) | `UiPageHost` / `MiddtLayoutPageComponent` |
 
@@ -41,7 +41,7 @@ A workflow definition automatically registers:
     "required": ["fullName", "identityNumber", "segment"],
     "properties": {
       "fullName":       { "type": "string", "title": "Ad Soyad / Ünvan", "x-search": true },
-      "identityNumber": { "type": "string", "title": "TCKN / VKN", "x-mask": "middle" },
+      "identityNumber": { "type": "string", "title": "TCKN / VKN", "x-mask": { "pattern": "last4", "exceptRoles": [ "manager", "auditor" ] } },
       "segment":        { "type": "string", "title": "Segment", "enum": ["Bireysel", "KOBİ", "Kurumsal"], "x-search": true },
       "kycScore":       { "type": "integer", "title": "KYC Skoru" },
       "riskLevel":      { "type": "string", "title": "Risk Seviyesi", "enum": ["Düşük", "Orta", "Yüksek"], "x-search": true },
@@ -53,8 +53,9 @@ A workflow definition automatically registers:
 
 ### `dataSchema` Extensions
 - **`"x-list": false`**: Hides the property from the workflow instance table (`/workflow/{key}`) while keeping it in the schema for documentation, validation, and detail layouts.
-- **`"x-search": true`**: Adds a filter control to the workflow instance list toolbar (`WorkflowInstanceList` in Blazor & Angular). Properties with `"enum": [...]` render as a selectable dropdown (`AllowClear`); other scalar properties render as a text search box.
-- **`"x-mask": "middle" | "end"`**: Masks sensitive values when returned by `WorkflowInstanceDataQuery`.
+- **`"x-search": true | "text" | "select" | "range" | "min" | "max" | "gte" | "lte" | "date-range"`**: Adds a filter control to the workflow instance list toolbar (`WorkflowInstanceList` in Blazor & `MiddtWorkflowInstanceListComponent` in Angular). Properties with `"enum": [...]` render as a selectable dropdown (`AllowClear`); numeric/date range modes render range inputs; other scalar properties render as a text/number search box. Setting `"x-date-search": true` on root `dataSchema` adds creation date range filters (`createdFrom` / `createdTo`).
+- **`"x-index": true | false`**: Explicitly opts a property in or out of selective PostgreSQL partition B-Tree functional index creation (`WorkflowPartitionManager`).
+- **`"x-mask": { "pattern": "last4" | "email" | "***", "exceptRoles": ["manager", "auditor"] }`**: Masks sensitive string values in projected instance and query responses unless the caller has an exempted role.
 - **`"x-roles": ["manager"]`**: Restricts field visibility to specific roles.
 - **`"x-lookup"`**: Populates dropdown options dynamically from an entity endpoint in transition forms:
   ```json
@@ -171,19 +172,19 @@ You can build reusable partial layouts (`kind: "view"`) and embed them inside an
 
 | Widget | Category | Key Properties | Description |
 |---|---|---|---|
-| `section` | Container | `title`, `subtitle`, `children` | Titled card/panel grouping child widgets |
+| `section` | Container | `title`, `children` | Titled card/panel grouping child widgets |
 | `columns` | Container | `widths: ["2", "1"]`, `children` | Responsive multi-column layout |
-| `list` | Container | `source` (array expression), `emptyText`, `rowTransition` (`{ key, text, icon, style, input }`), `children` | Repeats `children` for each item in `source` as `row` (and optionally renders a row-level workflow transition button when `rowTransition.key` is in `AvailableTransitions`) |
+| `list` | Container | `source` (array expression), `empty`, `rowTransition` (`{ key, text, icon, style, input }`), `children` | Repeats `children` for each item in `source` as `row` (`row.rowNumber` is 1-based; optionally renders a row-level workflow transition button when `rowTransition.key` is in `AvailableTransitions`) |
 | `layout` | Container / Reusable | `key`, `data` (optional expression), `title` | Embeds another JSON layout by `key` with optional `data` scope |
-| `heading` | Display | `text`, `level` (`1`..`4`) | Section or page heading (`{{ }}` template) |
-| `text` | Display | `text`, `style` (`body`/`lead`/`muted`/`small`/`code`) | Paragraph or inline text (`{{ }}` template) |
-| `alert` | Display | `severity` (`info`/`success`/`warning`/`danger`), `title`, `text` | Callout banner (`{{ }}` template) |
-| `badge` | Display | `text`, `color` (`neutral`/`info`/`success`/`warning`/`danger`) | Colored status pill |
+| `heading` | Display | `text`, `level` (`1`..`6`) | Section or page heading (`{{ }}` template) |
+| `text` | Display | `text`, `style` (`normal`/`muted`/`lead`/`small`/`code`) | Paragraph or inline text (`{{ }}` template) |
+| `alert` | Display | `severity` (`info`/`success`/`warning`/`danger`), `text` | Callout banner (`{{ }}` template) |
+| `badge` | Display | `text`, `color` (`primary`/`secondary`/`success`/`warning`/`danger`/`info`) | Colored status pill |
 | `divider` | Display | – | Horizontal separator line |
 | `link` | Display | `text`, `href` (`{{ }}` template, validated by `UiUrl.IsSafe`), `style` (`link`/`button`) | Safe navigation link or action button |
 | `fields` | Display | `items: [{ label, value, format, visibleWhen }]` | Label/value definition list (`format`: `N0`–`N6`, `F0`–`F6`, `d`, `D`, `g`, `t`) |
-| `record` | Interactive | `entity`, `recordId` (`{{ }}` template), `emptyText`, `children` | Loads one entity by ID and renders `children` with `record` in scope |
-| `grid` | Interactive | `entity`, `pageSize`, `filter`, `columns`, `search`, `create`, `edit`, `delete`, `form`, `rowActions` | Full server-paged CRUD / directory data grid |
+| `record` | Interactive | `entity`, `recordId` (`{{ }}` template), `notFound`, `children` | Loads one entity by ID and renders `children` with `record` in scope |
+| `grid` | Interactive | `entity`, `title`, `pageSize`, `autoLoad`, `filter`, `columns`, `search`, `create`, `edit`, `delete`, `form`, `formTitle`, `rowActions` | Full server-paged CRUD / directory data grid |
 
 ---
 

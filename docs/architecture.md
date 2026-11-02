@@ -9,7 +9,7 @@ backend-for-frontend blocks (`sdk/client/Middt.Framework.Bff`), so no frontend e
                          │ Middt.Framework.Model            wire DTOs: envelope, auth, workflow, SignalR                │
                          │ Middt.Framework.Expressions      portable expression language (+ DynamicExpresso for workflows)│
                          │ Middt.Framework.Ui.Abstractions  layout model, widget specs, validator, formats, JSON Schema   │
-                         │ spec/                            expressions.conformance.json, ui-layout.schema.json           │
+                         │ spec/                            expressions & json-patch conformance, ui-layout.schema.json    │
                          └───────────────▲───────────────────────────────▲──────────────────────────────▲───────────────┘
                                          │                               │                              │ same rules
 ┌──────────── 2. Backend ────────────────┴───┐   ┌──── 3. .NET client SDK ──┴──────┐   ┌──── TypeScript ───┴────────────┐
@@ -69,13 +69,13 @@ widgets can also be defined in pure JSON (`kind: "view"`) and embedded via `{ "w
    `GET /bff/user`, and proxies `/api/**` and `/hubs/**` (YARP, WebSockets included) to the API with the session's
    access token, refreshing it before it expires. CSRF: API calls carry an `X-CSRF` header, WebSocket upgrades must be
    same-origin. The API is unchanged.
-3. **Layouts**: `UiLayoutRendererComponent` loads layouts and maps widget names to Angular
+3. **Layouts**: `MiddtLayoutPageComponent` / `MiddtLayoutHostComponent` (`UiLayoutViewComponent`) loads layouts and maps widget names to Angular
    components (`MIDDT_UI_WIDGETS`); `@middt/ui-core` evaluates `visibleWhen`, templates and
    formats exactly like .NET; the same CSS classes (`middt-ui-*`) and E2E selectors work in both frontends.
    The Angular package has focused `core`, `ui`, `workflow`, and `signalr` entry points; the root entry point remains
    an aggregate for compatibility.
-4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components; all workflow states use `view.layout`
-   JSON layouts (`kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`) rendered by
+4. **Workflows**: `WorkflowApiClient` (ui-core) + list/detail/wizard components (and graphical SVG flow/path diagrams); all workflow states use `view.layout`
+   JSON layouts (`kyc-review`, `credit-review`, `order-review`, `order-result`, `order-escalated`, `risk-detail`, `invoice-detail`, `invoice-result`) rendered by
    the layout host in both frontends.
    Transition input schemas are rendered as forms; a property with `x-lookup` (`entity`, `valueField`, `textField`)
    becomes a select loaded dynamically from the endpoint – the engine only checks the hint's shape.
