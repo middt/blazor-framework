@@ -8,10 +8,27 @@
     }
     else
     {
+        var rowTransition = RowTransition();
         <ul class="middt-ui-list">
-            @foreach (var item in items)
+            @for (var i = 0; i < items.Count; i++)
             {
-                <li><UiNodeList Nodes="Node.Children" Context="@Context.With(UiExpressions.Row, item)" /></li>
+                var item = items[i];
+                if (item is JsonObject itemObj && itemObj["rowNumber"] is null)
+                {
+                    itemObj["rowNumber"] = i + 1;
+                }
+
+                var rowContext = Context.With(UiExpressions.Row, item);
+                <li>
+                    <UiNodeList Nodes="Node.Children" Context="@rowContext" />
+                    @if (rowTransition is { } tr)
+                    {
+                        <div class="middt-ui-toolbar rz-mt-1">
+                            <RadzenButton Text="@tr.Text" Icon="@tr.Icon" ButtonStyle="@tr.Style" Size="ButtonSize.Small"
+                                          Click="@(() => ExecuteRowTransitionAsync(tr, rowContext))" data-transition="@tr.Key" />
+                        </div>
+                    }
+                </li>
             }
         </ul>
     }
@@ -33,4 +50,38 @@
             return [];
         }
     }
+
+    private RowTransitionSpec? RowTransition()
+    {
+        if (Node.ObjectProp("rowTransition") is not { } obj
+            || UiFieldJson.GetString(obj, "key") is not { Length: > 0 } key
+            || !Context.CanExecuteTransition(key))
+        {
+            return null;
+        }
+
+        var text = UiFieldJson.GetString(obj, "text") ?? key;
+        var icon = UiFieldJson.GetString(obj, "icon");
+        var style = UiFieldJson.GetString(obj, "style") switch
+        {
+            "danger" => ButtonStyle.Danger,
+            "secondary" => ButtonStyle.Secondary,
+            "light" => ButtonStyle.Light,
+            _ => ButtonStyle.Primary,
+        };
+        return new RowTransitionSpec(key, text, icon, style, obj["input"] as JsonObject);
+    }
+
+    private Task ExecuteRowTransitionAsync(RowTransitionSpec tr, UiRenderContext rowContext)
+    {
+        if (Context.ExecuteTransition is not { } execute)
+        {
+            return Task.CompletedTask;
+        }
+
+        var renderedInput = tr.InputTemplate is null ? null : rowContext.Render(tr.InputTemplate) as JsonObject;
+        return execute(tr.Key, renderedInput);
+    }
+
+    private sealed record RowTransitionSpec(string Key, string Text, string? Icon, ButtonStyle Style, JsonObject? InputTemplate);
 }

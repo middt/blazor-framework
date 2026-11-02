@@ -68,6 +68,7 @@ A workflow definition automatically registers:
     }
   }
   ```
+- **`"x-enumFrom": "<arrayPath>.<field>"`**: Populates a transition form property's `enum` and `default` dynamically from an array in the current workflow instance's `data` (e.g. `"x-enumFrom": "partialPayment.reference"` on `delete-payment`).
 
 ---
 
@@ -172,7 +173,7 @@ You can build reusable partial layouts (`kind: "view"`) and embed them inside an
 |---|---|---|---|
 | `section` | Container | `title`, `subtitle`, `children` | Titled card/panel grouping child widgets |
 | `columns` | Container | `widths: ["2", "1"]`, `children` | Responsive multi-column layout |
-| `list` | Container | `source` (array expression), `emptyText`, `children` | Repeats `children` for each item in `source` as `row` |
+| `list` | Container | `source` (array expression), `emptyText`, `rowTransition` (`{ key, text, icon, style, input }`), `children` | Repeats `children` for each item in `source` as `row` (and optionally renders a row-level workflow transition button when `rowTransition.key` is in `AvailableTransitions`) |
 | `layout` | Container / Reusable | `key`, `data` (optional expression), `title` | Embeds another JSON layout by `key` with optional `data` scope |
 | `heading` | Display | `text`, `level` (`1`..`4`) | Section or page heading (`{{ }}` template) |
 | `text` | Display | `text`, `style` (`body`/`lead`/`muted`/`small`/`code`) | Paragraph or inline text (`{{ }}` template) |

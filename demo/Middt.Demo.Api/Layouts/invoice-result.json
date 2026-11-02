@@ -3,7 +3,7 @@
   "key": "invoice-result",
   "title": "Fatura Tahsilat Sonucu",
   "kind": "view",
-  "version": 1,
+  "version": 3,
   "body": [
     {
       "widget": "alert",
@@ -32,6 +32,28 @@
             { "label": "Muhasebe Referansı", "value": "{{ data.ledgerResponse.body.referenceCode }}", "visibleWhen": "data.ledgerResponse != null" },
             { "label": "Mutabakat Zamanı", "value": "{{ data.reconciledAt }}", "visibleWhen": "data.reconciledAt != null" },
             { "label": "Elle Mutabakat Yapan", "value": "{{ data.reconciledBy }}", "visibleWhen": "data.reconciledBy != null" }
+          ]
+        }
+      ]
+    },
+    {
+      "widget": "section",
+      "title": "Kısmi Ödemeler",
+      "visibleWhen": "data.partialPayment != null && data.partialPayment.Count > 0",
+      "children": [
+        {
+          "widget": "list",
+          "source": "data.partialPayment",
+          "children": [
+            {
+              "widget": "fields",
+              "items": [
+                { "label": "Ödenen Tutar", "value": "{{ row.amount }}", "format": "N2" },
+                { "label": "Banka Referansı", "value": "{{ row.reference }}", "visibleWhen": "row.reference != null" },
+                { "label": "Kaydeden", "value": "{{ row.recordedBy }}", "visibleWhen": "row.recordedBy != null" },
+                { "label": "Ödeme Zamanı", "value": "{{ row.paidAt }}", "format": "g", "visibleWhen": "row.paidAt != null" }
+              ]
+            }
           ]
         }
       ]

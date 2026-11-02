@@ -3,7 +3,7 @@
   "key": "invoice-detail",
   "title": "Fatura Tahsilat Durumu",
   "kind": "view",
-  "version": 1,
+  "version": 4,
   "body": [
     {
       "widget": "alert",
@@ -39,10 +39,60 @@
             { "label": "Fatura No", "value": "{{ data.invoiceNo }}" },
             { "label": "Müşteri", "value": "{{ data.customerName }}" },
             { "label": "Fatura Tutarı", "value": "{{ data.total }}", "format": "N2" },
+            { "label": "Toplam Ödenen", "value": "{{ data.paidAmount }}", "format": "N2", "visibleWhen": "data.paidAmount != null && data.paidAmount > 0" },
+            { "label": "Kalan Tutar", "value": "{{ data.remainingAmount }}", "format": "N2", "visibleWhen": "data.remainingAmount != null && data.remainingAmount > 0" },
             { "label": "Açıklama", "value": "{{ data.description }}", "visibleWhen": "data.description != null" },
-            { "label": "Son Kısmi Ödeme", "value": "{{ data.lastPartialPayment.amount }}", "format": "N2", "visibleWhen": "data.lastPartialPayment != null" },
-            { "label": "Ödenen Tutar", "value": "{{ data.payment.amount }}", "format": "N2", "visibleWhen": "data.payment != null" },
+            { "label": "Ödenen Tutar", "value": "{{ data.payment.amount }}", "format": "N2", "visibleWhen": "data.payment != null && data.payment.amount > 0" },
             { "label": "Banka Referansı", "value": "{{ data.payment.reference }}", "visibleWhen": "data.payment != null && data.payment.reference != null" }
+          ]
+        }
+      ]
+    },
+    {
+      "widget": "section",
+      "title": "Kısmi Ödemeler",
+      "visibleWhen": "data.partialPayment != null && data.partialPayment.Count > 0",
+      "children": [
+        {
+          "widget": "list",
+          "source": "data.partialPayment",
+          "rowTransition": {
+            "key": "delete-payment",
+            "text": "Sil",
+            "icon": "delete",
+            "style": "danger",
+            "input": {
+              "reference": "#{{ row.rowNumber }} - {{ row.amount }} ₺ ({{ row.reference }})",
+              "reason": "Hatalı kısmi ödeme satırı silindi."
+            }
+          },
+          "children": [
+            {
+              "widget": "fields",
+              "items": [
+                { "label": "Ödeme No", "value": "#{{ row.rowNumber }}", "visibleWhen": "row.rowNumber != null" },
+                { "label": "Ödenen Tutar", "value": "{{ row.amount }}", "format": "N2" },
+                { "label": "Banka Referansı", "value": "{{ row.reference }}", "visibleWhen": "row.reference != null" },
+                { "label": "Kaydeden", "value": "{{ row.recordedBy }}", "visibleWhen": "row.recordedBy != null" },
+                { "label": "Ödeme Zamanı", "value": "{{ row.paidAt }}", "format": "g", "visibleWhen": "row.paidAt != null" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "widget": "section",
+      "title": "Son Silinen Ödeme Kaydı",
+      "visibleWhen": "data.lastDeletedPayment != null",
+      "children": [
+        {
+          "widget": "fields",
+          "items": [
+            { "label": "Silinen Referans", "value": "{{ data.lastDeletedPayment.reference }}" },
+            { "label": "Silme Nedeni", "value": "{{ data.lastDeletedPayment.reason }}", "visibleWhen": "data.lastDeletedPayment.reason != null" },
+            { "label": "Silen Kullanıcı", "value": "{{ data.lastDeletedPayment.deletedBy }}", "visibleWhen": "data.lastDeletedPayment.deletedBy != null" },
+            { "label": "Silinme Zamanı", "value": "{{ data.lastDeletedPayment.deletedAt }}", "format": "g", "visibleWhen": "data.lastDeletedPayment.deletedAt != null" }
           ]
         }
       ]

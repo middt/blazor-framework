@@ -167,6 +167,17 @@ export class MiddtWorkflowInstanceDetailComponent {
     const instance = this.instance();
     return instance === null ? {} : workflowLayoutVariables(instance);
   });
+  protected readonly availableTransitionKeys = computed(() => new Set((this.instance()?.availableTransitions ?? []).map(t => t.key)));
+  protected readonly executeLayoutTransition = (transitionKey: string, input: Record<string, unknown> | null): void => {
+    if (this.executing()) {
+      return;
+    }
+
+    const transition = (this.instance()?.availableTransitions ?? []).find(t => t.key === transitionKey);
+    if (transition !== undefined) {
+      void this.#execute(transition, input, false);
+    }
+  };
   protected readonly layoutKeyId = computed(() => {
     const instance = this.instance();
     return instance?.layout ? [`${instance.id}:${instance.dataVersion}:${instance.layout}`] : [];

@@ -56,6 +56,8 @@ public sealed partial class UiRenderContext
         Now = parent.Now;
         IdPrefix = parent.IdPrefix;
         Culture = parent.Culture;
+        AvailableTransitions = parent.AvailableTransitions;
+        ExecuteTransition = parent.ExecuteTransition;
         this.variables = variables;
     }
 
@@ -72,6 +74,16 @@ public sealed partial class UiRenderContext
     public string IdPrefix { get; init; } = "ui";
 
     public CultureInfo Culture { get; init; } = CultureInfo.CurrentCulture;
+
+    /// <summary>Keys of workflow transitions currently available on the hosted workflow instance.</summary>
+    public IReadOnlySet<string>? AvailableTransitions { get; init; }
+
+    /// <summary>Executes a workflow transition from an interactive widget (e.g. <c>list.rowTransition</c>).</summary>
+    public Func<string, JsonObject?, Task>? ExecuteTransition { get; init; }
+
+    /// <summary><c>true</c> when <paramref name="key"/> can be executed in the current workflow state.</summary>
+    public bool CanExecuteTransition(string? key) =>
+        Interactive && !string.IsNullOrEmpty(key) && ExecuteTransition is not null && (AvailableTransitions?.Contains(key) ?? false);
 
     public IReadOnlyDictionary<string, JsonNode?> Variables => variables;
 

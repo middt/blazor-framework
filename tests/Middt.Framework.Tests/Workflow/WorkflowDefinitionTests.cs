@@ -104,7 +104,7 @@ public sealed class WorkflowDefinitionTests
 
         var invoice = registry.GetLatest("invoice-collection");
         invoice.History.Should().Be(HistoryMode.Delta);
-        invoice.FindState("awaiting-payment")!.Transitions.Where(t => t.Trigger == TriggerType.Event).Select(t => t.Event).Should().Equal("payment.received", "payment.received");
+        invoice.FindState("awaiting-payment")!.Transitions.Where(t => t.Trigger == TriggerType.Event).Select(t => t.Event).Should().Equal("payment.received");
         invoice.FindState("reconciling")!.OnEntry.Should().Contain(t => t.Background);
 
         var customer = registry.GetLatest("customer-onboarding");

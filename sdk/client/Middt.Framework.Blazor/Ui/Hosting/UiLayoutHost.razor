@@ -40,6 +40,12 @@ else if (layout is not null && context is not null)
     public IReadOnlyDictionary<string, JsonNode?>? Variables { get; set; }
 
     [Parameter]
+    public IReadOnlySet<string>? AvailableTransitions { get; set; }
+
+    [Parameter]
+    public Func<string, JsonObject?, Task>? ExecuteTransition { get; set; }
+
+    [Parameter]
     public string IdPrefix { get; set; } = "ui-view";
 
     protected override async Task OnParametersSetAsync()
@@ -59,10 +65,15 @@ else if (layout is not null && context is not null)
         }
 
         // Same layout, variables and prefix: keep the context so the widgets (grids, selects) are not re-rendered and reloaded.
-        if (layout is not null && (context is null || !ReferenceEquals(contextLayout, layout) || !ReferenceEquals(contextVariables, Variables) || context.IdPrefix != IdPrefix))
+        if (layout is not null && (context is null || !ReferenceEquals(contextLayout, layout) || !ReferenceEquals(contextVariables, Variables) || context.IdPrefix != IdPrefix || !ReferenceEquals(context.AvailableTransitions, AvailableTransitions)))
         {
             user ??= ExpressionUser.FromPrincipal((await AuthenticationStateProvider.GetAuthenticationStateAsync()).User);
-            context = new UiRenderContext(catalog, user, Variables, interactive: true) { IdPrefix = IdPrefix };
+            context = new UiRenderContext(catalog, user, Variables, interactive: true)
+            {
+                IdPrefix = IdPrefix,
+                AvailableTransitions = AvailableTransitions,
+                ExecuteTransition = ExecuteTransition,
+            };
             contextLayout = layout;
             contextVariables = Variables;
         }

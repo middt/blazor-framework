@@ -217,8 +217,7 @@ public sealed partial class WorkflowEngine(
             return await GetAsync(workflow, instanceId, user, cancellationToken);
         }
 
-        var transition = FindManualTransition(definition, snapshot, transitionKey, user);
-        ValidateInput(transition, input);
+        var transition = FindManualTransition(definition, snapshot, transitionKey, user, input);
 
         if (runAsync)
         {

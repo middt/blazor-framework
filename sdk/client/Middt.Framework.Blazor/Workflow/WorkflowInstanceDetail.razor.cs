@@ -224,6 +224,7 @@ public partial class WorkflowInstanceDetail
             if (layoutVariables is null || layoutVariablesKey != key)
             {
                 layoutVariablesKey = key;
+                availableTransitionKeys = instance?.AvailableTransitions.Select(t => t.Key).ToHashSet(StringComparer.Ordinal) ?? [];
                 layoutVariables = new Dictionary<string, JsonNode?>
                 {
                     ["data"] = instance?.Data.DeepClone(),
@@ -244,7 +245,27 @@ public partial class WorkflowInstanceDetail
         }
     }
 
+    private IReadOnlySet<string> AvailableTransitionKeys
+    {
+        get
+        {
+            _ = LayoutVariables;
+            return availableTransitionKeys ?? new HashSet<string>(StringComparer.Ordinal);
+        }
+    }
+
+    private Task ExecuteLayoutTransitionAsync(string transitionKey, JsonObject? input)
+    {
+        if (executing || instance?.AvailableTransitions.FirstOrDefault(t => t.Key == transitionKey) is not { } transition)
+        {
+            return Task.CompletedTask;
+        }
+
+        return ExecuteTransitionCoreAsync(transition, input, fromStep: false);
+    }
+
     private IReadOnlyDictionary<string, JsonNode?>? layoutVariables;
+    private HashSet<string>? availableTransitionKeys;
     private LayoutVariablesKey? layoutVariablesKey;
 
     private readonly record struct LayoutVariablesKey(
@@ -555,21 +576,27 @@ public partial class WorkflowInstanceDetail
     private string? TargetSubType(AvailableTransitionModel transition) =>
         definition?.States.FirstOrDefault(s => s.Key == transition.Target)?.SubType;
 
-    private ButtonStyle TransitionStyle(AvailableTransitionModel transition) => TargetSubType(transition) switch
-    {
-        "Success" => ButtonStyle.Success,
-        "Error" => ButtonStyle.Danger,
-        "Cancelled" or "Timeout" => ButtonStyle.Light,
-        _ => ButtonStyle.Primary,
-    };
+    private ButtonStyle TransitionStyle(AvailableTransitionModel transition) =>
+        transition.Key.StartsWith("delete-", StringComparison.Ordinal)
+            ? ButtonStyle.Danger
+            : TargetSubType(transition) switch
+            {
+                "Success" => ButtonStyle.Success,
+                "Error" => ButtonStyle.Danger,
+                "Cancelled" or "Timeout" => ButtonStyle.Light,
+                _ => ButtonStyle.Primary,
+            };
 
-    private string TransitionIcon(AvailableTransitionModel transition) => TargetSubType(transition) switch
-    {
-        "Success" => "check_circle",
-        "Error" => "block",
-        "Cancelled" or "Timeout" => "cancel",
-        _ => "arrow_forward",
-    };
+    private string TransitionIcon(AvailableTransitionModel transition) =>
+        transition.Key.StartsWith("delete-", StringComparison.Ordinal)
+            ? "delete"
+            : TargetSubType(transition) switch
+            {
+                "Success" => "check_circle",
+                "Error" => "block",
+                "Cancelled" or "Timeout" => "cancel",
+                _ => "arrow_forward",
+            };
 
     private PointStyle HistoryPointStyle(WorkflowHistoryModel entry) =>
         definition?.States.FirstOrDefault(s => s.Key == entry.ToState)?.SubType switch

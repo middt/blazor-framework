@@ -149,7 +149,9 @@
             {
                 @* Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). *@
                 <div class="middt-wf-view" data-layout="@layoutKey">
-                    <Middt.Framework.Blazor.Ui.UiLayoutHost @key="@($"{instance.Id}:{instance.DataVersion}:{layoutKey}")" Key="@layoutKey" Variables="@LayoutVariables" IdPrefix="@($"{IdPrefix}-layout")" />
+                    <Middt.Framework.Blazor.Ui.UiLayoutHost @key="@($"{instance.Id}:{instance.DataVersion}:{layoutKey}")" Key="@layoutKey" Variables="@LayoutVariables"
+                                                            AvailableTransitions="@AvailableTransitionKeys" ExecuteTransition="@ExecuteLayoutTransitionAsync"
+                                                            IdPrefix="@($"{IdPrefix}-layout")" />
                 </div>
                 <details class="middt-wf-raw">
                     <summary>Ham veri</summary>

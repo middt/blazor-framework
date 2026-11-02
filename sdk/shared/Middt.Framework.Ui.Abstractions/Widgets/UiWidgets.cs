@@ -103,10 +103,24 @@ public static partial class UiWidgets
 
     public static UiWidgetSpec Divider { get; } = new("divider", "Horizontal line.");
 
+    private static readonly UiPropSpec[] RowTransitionProps =
+    [
+        new("key", UiPropType.String, "Workflow transition key, e.g. delete-payment.") { Required = true },
+        new("text", UiPropType.String, "Button label, e.g. Sil."),
+        new("icon", UiPropType.String, "Material icon name, e.g. delete."),
+        new("style", UiPropType.Enum) { Values = ["primary", "secondary", "light", "danger"] },
+        new("input", UiPropType.TemplateMap, "Transition input built from row/data, e.g. { \"reference\": \"{{ row.reference }}\" }."),
+    ];
+
     public static UiWidgetSpec List { get; } = new("list", "Repeats its children for each item of an array (the item is 'row').")
     {
         Children = UiChildren.Required,
-        Props = [new("source", UiPropType.Expression, "Expression returning an array, e.g. data.items.") { Required = true }, new("empty", UiPropType.String, "Text shown when the array is empty.")],
+        Props =
+        [
+            new("source", UiPropType.Expression, "Expression returning an array, e.g. data.items.") { Required = true },
+            new("empty", UiPropType.String, "Text shown when the array is empty."),
+            new("rowTransition", UiPropType.Object, "Optional workflow transition button shown on each item when the transition is available.") { Properties = RowTransitionProps },
+        ],
     };
 
     public static UiWidgetSpec Link { get; } = new("link", "Link to a local page (or http/https URL).")

@@ -82,6 +82,10 @@ export interface UiRenderContextOptions {
   timeZone?: string;
   /** Evaluator (default: the shared {@link uiEvaluator}). */
   evaluator?: PortableExpression;
+  /** Keys of workflow transitions currently available on the hosted workflow instance. */
+  availableTransitions?: Iterable<string>;
+  /** Executes a workflow transition from an interactive widget (e.g. `list.rowTransition`). */
+  executeTransition?: (key: string, input: Record<string, unknown> | null) => void | Promise<void>;
 }
 
 // Intl formatters are expensive to construct: one per locale/options/time zone, shared by all render contexts.
@@ -175,6 +179,8 @@ export class UiRenderContext {
   readonly locale: string;
   readonly timeZone: string | undefined;
   readonly evaluator: PortableExpression;
+  readonly availableTransitions: ReadonlySet<string> | undefined;
+  readonly executeTransition: ((key: string, input: Record<string, unknown> | null) => void | Promise<void>) | undefined;
   readonly #variables: Record<string, unknown>;
   #expressionContext: ExpressionContext | undefined;
 
@@ -186,7 +192,24 @@ export class UiRenderContext {
     this.locale = options.locale ?? 'tr-TR';
     this.timeZone = options.timeZone;
     this.evaluator = options.evaluator ?? uiEvaluator;
+    this.availableTransitions = options.availableTransitions === undefined
+      ? undefined
+      : options.availableTransitions instanceof Set
+        ? options.availableTransitions
+        : new Set(options.availableTransitions);
+    this.executeTransition = options.executeTransition;
     this.#variables = { ...(options.variables ?? {}) };
+  }
+
+  /** `true` when `key` can be executed in the current workflow state. */
+  canExecuteTransition(key: string | null | undefined): boolean {
+    return (
+      this.interactive &&
+      typeof key === 'string' &&
+      key.length > 0 &&
+      this.executeTransition !== undefined &&
+      (this.availableTransitions?.has(key) ?? false)
+    );
   }
 
   get variables(): Readonly<Record<string, unknown>> {
@@ -208,6 +231,8 @@ export class UiRenderContext {
       locale: this.locale,
       timeZone: this.timeZone,
       evaluator: this.evaluator,
+      availableTransitions: this.availableTransitions,
+      executeTransition: this.executeTransition,
     });
   }
 

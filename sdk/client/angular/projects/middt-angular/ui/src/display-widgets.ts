@@ -1,8 +1,10 @@
 // Display widgets – same markup and CSS classes as the Blazor display widgets and the static UiHtmlRenderer.
 
 import { ChangeDetectionStrategy, Component, computed, forwardRef, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
-import { PortableExpressionError, UiExpressions, UiFieldJson, UiUrl } from '@middt/ui-core';
+import { PortableExpressionError, UiExpressions, UiFieldJson, UiRenderContext, UiUrl } from '@middt/ui-core';
 import { UiNodeComponent, UiNodeListComponent } from './node.component';
 import { cloneJson, isJsonObject, UiProps, UiWidgetBase } from './widget-base';
 
@@ -140,7 +142,7 @@ const MAX_LIST_ITEMS = 1000;
 @Component({
   selector: 'middt-ui-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [forwardRef(() => UiNodeListComponent)],
+  imports: [forwardRef(() => UiNodeListComponent), MatButtonModule, MatIconModule],
   host: contents,
   template: `
     @if (items().length === 0) {
@@ -148,7 +150,20 @@ const MAX_LIST_ITEMS = 1000;
     } @else {
       <ul class="middt-ui-list">
         @for (item of items(); track $index) {
-          <li><middt-ui-node-list [nodes]="node().children" [context]="item" /></li>
+          <li>
+            <middt-ui-node-list [nodes]="node().children" [context]="item" />
+            @if (rowTransition(); as tr) {
+              <div class="middt-ui-toolbar">
+                <button mat-stroked-button type="button" [class.middt-ui-danger]="tr.style === 'danger'"
+                        [attr.data-transition]="tr.key" (click)="executeRowTransition(tr, item)">
+                  @if (tr.icon) {
+                    <mat-icon>{{ tr.icon }}</mat-icon>
+                  }
+                  {{ tr.text }}
+                </button>
+              </div>
+            }
+          </li>
         }
       </ul>
     }
@@ -174,8 +189,46 @@ export class UiListWidget extends UiWidgetBase {
       throw error;
     }
 
-    return Array.isArray(value) ? value.slice(0, MAX_LIST_ITEMS).map(item => context.with(UiExpressions.row, cloneJson(item))) : [];
+    return Array.isArray(value)
+      ? value.slice(0, MAX_LIST_ITEMS).map((item, idx) => {
+          const cloned = cloneJson(item);
+          if (isJsonObject(cloned) && !('rowNumber' in cloned)) {
+            cloned['rowNumber'] = idx + 1;
+          }
+          return context.with(UiExpressions.row, cloned);
+        })
+      : [];
   });
+
+  protected readonly rowTransition = computed(() => {
+    const context = this.context();
+    const obj = UiProps.object(this.node(), 'rowTransition');
+    const key = obj === null ? null : UiFieldJson.getString(obj, 'key');
+    if (obj === null || key === null || !context.canExecuteTransition(key)) {
+      return null;
+    }
+
+    return {
+      key,
+      text: UiFieldJson.getString(obj, 'text') ?? key,
+      icon: UiFieldJson.getString(obj, 'icon'),
+      style: UiFieldJson.getString(obj, 'style') ?? 'primary',
+      inputTemplate: isJsonObject(obj['input']) ? obj['input'] : null,
+    };
+  });
+
+  protected executeRowTransition(
+    tr: { key: string; inputTemplate: Record<string, unknown> | null },
+    rowContext: UiRenderContext,
+  ): void {
+    const execute = this.context().executeTransition;
+    if (execute === undefined) {
+      return;
+    }
+
+    const rendered = tr.inputTemplate === null ? null : rowContext.render(tr.inputTemplate);
+    void execute(tr.key, isJsonObject(rendered) ? rendered : null);
+  }
 }
 
 @Component({

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Middt Workflow 06 - Invoice Collection (Messages & Background Tasks)",
-    "description": "Workflow Key: `invoice-collection`\n\n### Özellikler:\n- **Elle ilerletme**: Ödemeler `record-partial-payment` / `record-payment` / `record-late-payment` butonlarıyla kaydedilir (mesaj kaynağı gerekmez).\n- **JSON Patch ile güncelleme (`input.format: jsonPatch`)**: `update-billing-contact` gövdesi bir RFC 6902 patch dizisidir (`add`, `replace`, `remove`, `test` ...).\n- **Mesajla tetiklenen geçişler (`trigger: Event`)**: `payment.received` mesajı iş anahtarı (`?key=INV-...`) veya instance id ile faturaya ulaşır; kurala göre tam (`payment-received`) ya da kısmi (`partial-payment`, `$self`) ödeme geçişi çalışır.\n- **Bekletmeli mesaj (`bufferFor`)**: Fatura mesajı o an alamıyorsa mesaj saklanır (202) ve uygun duruma girdiği anda teslim edilir.\n- **Arka plan görevi (`background: true`)**: Muhasebe kaydı (`post-ledger`, HTTP) instance kilidi dışında çalışır; fatura `Active` kalır, sonuç gelince otomatik `paid` olur.\n- **Delta geçmiş (`history: delta`)**: Geçmiş satırları çoğunlukla yalnızca değişikliği tutar; ilk/son satır ve her 10 satırda bir tam anlık görüntü.\n- **Zamanlanmış vade (`mark-overdue`, 7 gün)** ve gecikmeli ödeme (`late-payment-received`).",
+    "description": "Workflow Key: `invoice-collection`\n\n### Özellikler:\n- **Tekil Ödeme Geçişleri (`record-payment` / `payment-received`)**: Hem kısmi hem tam ödemeler tek bir manuel buton (`record-payment`) veya tek bir mesaj geçişi (`payment-received`) ile kaydedilir; her ödeme `into: \"partialPayment[]\"` ile diziye eklenir ve kümülatif `paidAmount >= total` olduğunda `payment-completed` (`Automatic`) geçişi faturayı otomatik olarak `reconciling` durumuna taşır. Fazla ödeme (`input.amount <= data.remainingAmount`) `409 Conflict` ile engellenir.\n- **JSON Patch ile güncelleme (`input.format: jsonPatch`)**: `update-billing-contact` gövdesi bir RFC 6902 patch dizisidir (`add`, `replace`, `remove`, `test` ...); hem `POST` hem `PATCH` (`application/json` veya `application/json-patch+json`) desteklenir.\n- **Bekletmeli mesaj (`bufferFor`)**: Fatura mesajı o an alamıyorsa mesaj saklanır (202) ve uygun duruma girdiği anda teslim edilir.\n- **Arka plan görevi (`background: true`)**: Muhasebe kaydı (`post-ledger`, HTTP) instance kilidi dışında çalışır; fatura `Active` kalır, sonuç gelince otomatik `paid` olur.\n- **Delta geçmiş (`history: delta`)**: Geçmiş satırları çoğunlukla yalnızca değişikliği tutar; ilk/son satır ve her 10 satırda bir tam anlık görüntü.\n- **Zamanlanmış vade (`mark-overdue`, 7 gün)** ve gecikmeli ödeme (`record-late-payment` / `late-payment-received`).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -340,7 +340,7 @@
           }
         },
         {
-          "name": "3. Akış Durumunu Sorgula (manuel butonlar: record-partial-payment, record-payment)",
+          "name": "3. Akış Durumunu Sorgula (manuel butonlar: record-payment, update-billing-contact, cancel-invoice)",
           "event": [],
           "request": {
             "method": "GET",
@@ -351,7 +351,7 @@
               }
             ],
             "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}",
-            "description": "`availableTransitions` içinde manuel ödeme butonları görünür (`record-partial-payment`, `record-payment`, `cancel-invoice`). Mesajla tetiklenen geçişler (`payment-received`, `partial-payment`) buton olarak listelenmez."
+            "description": "`availableTransitions` içinde manuel butonlar görünür (`record-payment`, `update-billing-contact`, `cancel-invoice`). Mesajla tetiklenen geçiş (`payment-received`) buton olarak listelenmez."
           }
         },
         {
@@ -531,7 +531,7 @@
           ]
         },
         {
-          "name": "5. Kısmi Ödeme Kaydet (record-partial-payment, -> awaiting-payment)",
+          "name": "5A. 1. Ödeme Kaydet - 5.000 ₺ (record-payment -> awaiting-payment, kalan: 7.500 ₺)",
           "event": [
             {
               "listen": "test",
@@ -541,51 +541,11 @@
                   "pm.test(\"HTTP status 200\", function () {",
                   "    pm.expect(pm.response.code).to.be.oneOf([200]);",
                   "});",
-                  "pm.test(\"state = awaiting-payment\", function () {",
-                  "    pm.expect(pm.response.json().data.state).to.eql(\"awaiting-payment\");",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-partial-payment",
-            "description": "Manuel kısmi ödeme (`$self`): ödeme `lastPartialPayment` altına yazılır, fatura ödeme beklemeye devam eder.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "6. Ödemeyi Kaydet - Tam (record-payment, -> reconciling)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"HTTP status 200\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
-                  "});",
-                  "pm.test(\"state = reconciling\", function () {",
-                  "    pm.expect(pm.response.json().data.state).to.eql(\"reconciling\");",
+                  "pm.test(\"state = awaiting-payment, paidAmount = 5000, remainingAmount = 7500\", function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.state).to.eql(\"awaiting-payment\");",
+                  "    pm.expect(d.data.paidAmount).to.eql(5000);",
+                  "    pm.expect(d.data.remainingAmount).to.eql(7500);",
                   "});"
                 ]
               }
@@ -604,10 +564,189 @@
               }
             ],
             "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-payment",
-            "description": "Tam ödeme: fatura `reconciling` durumuna geçer. Muhasebe kaydı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
+            "description": "12.500 ₺ tutarındaki faturaya 5.000 ₺ ödeme kaydeder (`$self`). `paidAmount = 5000`, `remainingAmount = 7500` olur; toplam tutara ulaşılmadığı için fatura `awaiting-payment` durumunda beklemeye devam eder.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0002\"\n}",
+              "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5B. Hatalı Ödeme Kaydı Ekle - 3.000 ₺ (record-payment -> awaiting-payment, kalan: 4.500 ₺)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"paidAmount = 8000, remainingAmount = 4500\", function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.data.paidAmount).to.eql(8000);",
+                  "    pm.expect(d.data.remainingAmount).to.eql(4500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-payment",
+            "description": "Silme (`delete-payment`) senaryosunu test etmek için yanlışlıkla girilmiş 3.000 ₺ tutarında (`EFT-YANLIS-01`) bir kısmi ödeme ekler.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 3000,\n  \"reference\": \"EFT-YANLIS-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5C. Hatalı Ödeme Kaydını Sil (delete-payment -> awaiting-payment, kalan tekrar: 7.500 ₺)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Hatalı ödeme silindi, paidAmount = 5000, remainingAmount = 7500\", function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.state).to.eql(\"awaiting-payment\");",
+                  "    pm.expect(d.data.paidAmount).to.eql(5000);",
+                  "    pm.expect(d.data.remainingAmount).to.eql(7500);",
+                  "    pm.expect(d.data.partialPayment.length).to.eql(1);",
+                  "    pm.expect(d.data.lastDeletedPayment.reference).to.eql(\"EFT-YANLIS-01\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/delete-payment",
+            "description": "`delete-payment` geçişi `EFT-YANLIS-01` referanslı kısmi ödemeyi `data.partialPayment.Remove(\"reference\", input.reference)` ile diziden çıkarır, `paidAmount` (`Sum(\"amount\")`) ve `remainingAmount` alanlarını yeniden hesaplar ve silme bilgisini `data.lastDeletedPayment` altına kaydeder.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reference\": \"EFT-YANLIS-01\",\n  \"reason\": \"Hatalı ödeme kaydı düzeltildi.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5D. Fazla Ödeme Denemesi - 8.000 ₺ (409 beklenir - kalan: 7.500 ₺)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 409 (Fazla ödeme engellendi)\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([409]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-payment",
+            "description": "Kalan bakiye 7.500 ₺ iken 8.000 ₺ ödenmek istendiğinde `input.amount <= data.remainingAmount` kuralı devreye girer ve fazla ödeme `409 Conflict` ile reddedilir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 8000,\n  \"reference\": \"EFT-FAZLA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6. 2. Ödeme İle Bakiyeyi Tamamla - 7.500 ₺ (record-payment -> otomatik reconciling)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP status 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"state = reconciling, paidAmount = 12500, remainingAmount = 0\", function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d.state).to.eql(\"reconciling\");",
+                  "    pm.expect(d.data.paidAmount).to.eql(12500);",
+                  "    pm.expect(d.data.remainingAmount).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/transitions/record-payment",
+            "description": "Kalan 7.500 ₺ tutar da `record-payment` ile girildiğinde kümülatif `paidAmount` 12.500 ₺'ye (`>= data.total`) ulaşır ve `payment-completed` (`Automatic`) geçişi otomatik olarak faturayı `reconciling` durumuna ilerletir!",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 7500,\n  \"reference\": \"EFT-2026-0002\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -696,7 +835,7 @@
                   }
                 ],
                 "url": "{{apiUrl}}/api/workflows/invoice-collection/messages/payment.received?key={{invoiceKey}}",
-                "description": "Mesaj iş anahtarıyla eşleştirilir. `amount < total` olduğu için `payment-received` kuralı tutmaz, `partial-payment` (`$self`) çalışır; ödeme `lastPartialPayment` altına yazılır.",
+                "description": "Mesaj iş anahtarıyla eşleştirilir. `payment-received` (`$self`) çalışır ve ödeme `partialPayment` dizisine eklenir; `paidAmount < total` olduğu için fatura `awaiting-payment` durumunda kalır.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"amount\": 5000,\n  \"reference\": \"EFT-2026-0001\"\n}",
@@ -709,7 +848,7 @@
               }
             },
             {
-              "name": "9B. Mesaj - Tam Ödeme (instance id ile, -> reconciling)",
+              "name": "9B. Mesaj - Kalan Ödeme İle Tamamla - 7.500 ₺ (instance id ile, -> reconciling)",
               "event": [
                 {
                   "listen": "test",
@@ -719,8 +858,10 @@
                       "pm.test(\"HTTP status 200\", function () {",
                       "    pm.expect(pm.response.code).to.be.oneOf([200]);",
                       "});",
-                      "pm.test(\"state = reconciling\", function () {",
-                      "    pm.expect(pm.response.json().data.state).to.eql(\"reconciling\");",
+                      "pm.test(\"state = reconciling, paidAmount = 12500\", function () {",
+                      "    const d = pm.response.json().data;",
+                      "    pm.expect(d.state).to.eql(\"reconciling\");",
+                      "    pm.expect(d.data.paidAmount).to.eql(12500);",
                       "});"
                     ]
                   }
@@ -739,10 +880,10 @@
                   }
                 ],
                 "url": "{{apiUrl}}/api/workflows/invoice-collection/instances/{{invoiceInstanceId}}/messages/payment.received",
-                "description": "Kural tutar (`input.amount >= data.total`), fatura `reconciling` durumuna geçer. Muhasebe çağrısı (`post-ledger`) arka planda çalıştığı için yanıt hemen döner ve instance `Active` kalır.",
+                "description": "Önceki 5.000 ₺ kısmi ödemenin üzerine kalan 7.500 ₺ mesaj olarak geldiğinde kümülatif kural tutar (`data.paidAmount + input.amount >= data.total`) ve fatura `reconciling` durumuna geçer.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"amount\": 12500,\n  \"reference\": \"EFT-2026-0002\"\n}",
+                  "raw": "{\n  \"amount\": 7500,\n  \"reference\": \"EFT-2026-0002\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"

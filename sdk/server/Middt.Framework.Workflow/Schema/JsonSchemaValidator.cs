@@ -45,6 +45,9 @@ public static partial class JsonSchemaValidator
     /// <summary>Schema keyword on the root <c>dataSchema</c> controlling whether <c>createdFrom</c>/<c>createdTo</c> date range filters are shown.</summary>
     public const string DateSearchKeyword = "x-date-search";
 
+    /// <summary>Schema keyword on a transition input property populating <c>enum</c> dynamically from an instance data array path (<c>&lt;arrayPath&gt;.&lt;field&gt;</c>).</summary>
+    public const string EnumFromKeyword = "x-enumFrom";
+
     private static readonly HashSet<string> SupportedSearchModes =
     [
         "text", "select", "range", "min", "max", "gte", "lte", "date-range",
@@ -97,6 +100,13 @@ public static partial class JsonSchemaValidator
                 if (!valid)
                 {
                     yield return $"{path}.{keyword}: must be a boolean or one of {string.Join(", ", SupportedSearchModes)}.";
+                }
+            }
+            else if (keyword == EnumFromKeyword)
+            {
+                if (value is not JsonValue ev || !ev.TryGetValue<string>(out var ef) || string.IsNullOrWhiteSpace(ef))
+                {
+                    yield return $"{path}.{keyword}: must be a non-empty string path ('<arrayPath>.<field>').";
                 }
             }
             else if (!SupportedKeywords.Contains(keyword))

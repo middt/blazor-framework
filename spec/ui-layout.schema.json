@@ -1220,6 +1220,48 @@
         "empty": {
           "type": "string",
           "description": "Text shown when the array is empty."
+        },
+        "rowTransition": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Workflow transition key, e.g. delete-payment."
+            },
+            "text": {
+              "type": "string",
+              "description": "Button label, e.g. Sil."
+            },
+            "icon": {
+              "type": "string",
+              "description": "Material icon name, e.g. delete."
+            },
+            "style": {
+              "enum": [
+                "primary",
+                "secondary",
+                "light",
+                "danger"
+              ]
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "description": "Transition input built from row/data, e.g. { \"reference\": \"{{ row.reference }}\" }."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "key"
+          ],
+          "description": "Optional workflow transition button shown on each item when the transition is available."
         }
       },
       "required": [

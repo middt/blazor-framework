@@ -14,7 +14,12 @@ export class UiRenderContextFactory {
     return this.#auth.load();
   }
 
-  create(variables: Record<string, unknown>, idPrefix: string): UiRenderContext {
+  create(
+    variables: Record<string, unknown>,
+    idPrefix: string,
+    availableTransitions?: Iterable<string>,
+    executeTransition?: (key: string, input: Record<string, unknown> | null) => void | Promise<void>,
+  ): UiRenderContext {
     const user = this.#auth.user();
     return new UiRenderContext({
       user: { id: user.id ?? null, name: user.name ?? null, roles: user.roles },
@@ -22,6 +27,8 @@ export class UiRenderContextFactory {
       interactive: true,
       idPrefix,
       locale: this.#config.locale,
+      availableTransitions,
+      executeTransition,
     });
   }
 }

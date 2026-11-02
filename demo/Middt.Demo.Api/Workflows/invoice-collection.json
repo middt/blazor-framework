@@ -10,7 +10,9 @@
     "properties": {
       "invoiceNo": { "type": "string", "title": "Fatura No", "x-search": true },
       "customerName": { "type": "string", "title": "Müşteri Adı", "x-search": true },
-      "total": { "type": "number", "title": "Fatura Tutarı (₺)", "x-search": true }
+      "total": { "type": "number", "title": "Fatura Tutarı (₺)", "x-search": true },
+      "paidAmount": { "type": "number", "title": "Ödenen Tutar (₺)" },
+      "remainingAmount": { "type": "number", "title": "Kalan Tutar (₺)" }
     }
   },
   "start": {
@@ -29,6 +31,8 @@
         }
       },
       "set": {
+        "paidAmount": "0",
+        "remainingAmount": "input.total",
         "createdBy": "user.Name",
         "createdAt": "now"
       }
@@ -48,31 +52,19 @@
       ],
       "transitions": [
         {
+          "key": "payment-completed",
+          "title": "Ödeme Tamamlandı",
+          "target": "reconciling",
+          "trigger": "Automatic",
+          "rule": "data.paidAmount >= data.total"
+        },
+        {
           "key": "payment-received",
           "title": "Ödeme Alındı",
-          "target": "reconciling",
-          "trigger": "Event",
-          "event": "payment.received",
-          "rule": "input.amount >= data.total",
-          "input": {
-            "schema": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [ "amount" ],
-              "properties": {
-                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)" },
-                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
-              }
-            },
-            "into": "payment"
-          }
-        },
-        {
-          "key": "partial-payment",
-          "title": "Kısmi Ödeme",
           "target": "$self",
           "trigger": "Event",
           "event": "payment.received",
+          "rule": "input.amount <= data.remainingAmount",
           "input": {
             "schema": {
               "type": "object",
@@ -83,14 +75,23 @@
                 "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
               }
             },
-            "into": "lastPartialPayment"
+            "into": "partialPayment[]",
+            "set": {
+              "paidAmount": "data.paidAmount + input.amount",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "partialPayment[-1].reference": "input.reference ?? \"BANKA-EFT\"",
+              "partialPayment[-1].paidAt": "now",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")"
+            }
           }
         },
         {
-          "key": "record-partial-payment",
-          "title": "Kısmi Ödeme Kaydet",
+          "key": "record-payment",
+          "title": "Ödeme Kaydet",
           "target": "$self",
           "roles": [ "manager" ],
+          "rule": "input.amount <= data.remainingAmount",
           "input": {
             "schema": {
               "type": "object",
@@ -101,27 +102,56 @@
                 "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
               }
             },
-            "into": "lastPartialPayment",
-            "set": { "recordedBy": "user.Name" }
+            "into": "partialPayment[]",
+            "set": {
+              "paidAmount": "data.paidAmount + input.amount",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "partialPayment[-1].reference": "input.reference ?? \"EFT-2026-0001\"",
+              "partialPayment[-1].paidAt": "now",
+              "partialPayment[-1].recordedBy": "user.Name",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")",
+              "recordedBy": "user.Name"
+            }
           }
         },
         {
-          "key": "record-payment",
-          "title": "Ödemeyi Kaydet (Tam)",
-          "target": "reconciling",
+          "key": "delete-payment",
+          "title": "Ödeme Kaydını Sil",
+          "target": "$self",
           "roles": [ "manager" ],
+          "rule": "data.paidAmount > 0 && data.partialPayment != null && data.partialPayment.Count > 0 && data.partialPayment.Any(\"reference\", input.reference)",
           "input": {
             "schema": {
               "type": "object",
               "additionalProperties": false,
-              "required": [ "amount" ],
+              "required": [ "reference" ],
               "properties": {
-                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 12500 },
-                "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
+                "reference": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "title": "Silinecek Ödeme",
+                  "x-enumFrom": "partialPayment.reference"
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "title": "Silme Nedeni",
+                  "default": "Hatalı ödeme kaydı düzeltildi."
+                }
               }
             },
-            "into": "payment",
-            "set": { "recordedBy": "user.Name" }
+            "into": "lastDeletedPayment",
+            "set": {
+              "partialPayment": "data.partialPayment.Remove(\"reference\", input.reference)",
+              "paidAmount": "data.partialPayment.Sum(\"amount\")",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")",
+              "lastDeletedPayment.deletedBy": "user.Name",
+              "lastDeletedPayment.deletedAt": "now"
+            }
           }
         },
         {
@@ -177,12 +207,19 @@
       "subType": "Human",
       "transitions": [
         {
+          "key": "late-payment-completed",
+          "title": "Gecikmeli Ödeme Tamamlandı",
+          "target": "reconciling",
+          "trigger": "Automatic",
+          "rule": "data.paidAmount >= data.total"
+        },
+        {
           "key": "late-payment-received",
           "title": "Gecikmeli Ödeme Alındı",
-          "target": "reconciling",
+          "target": "$self",
           "trigger": "Event",
           "event": "payment.received",
-          "rule": "input.amount >= data.total",
+          "rule": "input.amount <= data.remainingAmount",
           "input": {
             "schema": {
               "type": "object",
@@ -193,26 +230,83 @@
                 "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı" }
               }
             },
-            "into": "payment"
+            "into": "partialPayment[]",
+            "set": {
+              "paidAmount": "data.paidAmount + input.amount",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "partialPayment[-1].reference": "input.reference ?? \"BANKA-EFT\"",
+              "partialPayment[-1].paidAt": "now",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")"
+            }
           }
         },
         {
           "key": "record-late-payment",
-          "title": "Gecikmeli Ödemeyi Kaydet",
-          "target": "reconciling",
+          "title": "Gecikmeli Ödeme Kaydet",
+          "target": "$self",
           "roles": [ "manager" ],
+          "rule": "input.amount <= data.remainingAmount",
           "input": {
             "schema": {
               "type": "object",
               "additionalProperties": false,
               "required": [ "amount" ],
               "properties": {
-                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 12500 },
+                "amount": { "type": "number", "minimum": 0, "title": "Ödenen Tutar (₺)", "default": 5000 },
                 "reference": { "type": "string", "maxLength": 60, "title": "Banka Referansı", "default": "EFT-2026-0001" }
               }
             },
-            "into": "payment",
-            "set": { "recordedBy": "user.Name" }
+            "into": "partialPayment[]",
+            "set": {
+              "paidAmount": "data.paidAmount + input.amount",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "partialPayment[-1].reference": "input.reference ?? \"EFT-2026-0001\"",
+              "partialPayment[-1].paidAt": "now",
+              "partialPayment[-1].recordedBy": "user.Name",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")",
+              "recordedBy": "user.Name"
+            }
+          }
+        },
+        {
+          "key": "delete-payment",
+          "title": "Ödeme Kaydını Sil",
+          "target": "$self",
+          "roles": [ "manager" ],
+          "rule": "data.paidAmount > 0 && data.partialPayment != null && data.partialPayment.Count > 0 && data.partialPayment.Any(\"reference\", input.reference)",
+          "input": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [ "reference" ],
+              "properties": {
+                "reference": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "title": "Silinecek Ödeme",
+                  "x-enumFrom": "partialPayment.reference"
+                },
+                "reason": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "title": "Silme Nedeni",
+                  "default": "Hatalı ödeme kaydı düzeltildi."
+                }
+              }
+            },
+            "into": "lastDeletedPayment",
+            "set": {
+              "partialPayment": "data.partialPayment.Remove(\"reference\", input.reference)",
+              "paidAmount": "data.partialPayment.Sum(\"amount\")",
+              "remainingAmount": "data.total > data.paidAmount ? data.total - data.paidAmount : 0",
+              "payment.amount": "data.paidAmount",
+              "payment.reference": "data.partialPayment.Last(\"reference\")",
+              "lastDeletedPayment.deletedBy": "user.Name",
+              "lastDeletedPayment.deletedAt": "now"
+            }
           }
         },
         {

@@ -30,13 +30,19 @@ export class MiddtLayoutHostComponent {
   readonly layoutKey = input.required<string>();
   /** Expression variables (`data`, `instance`, ...). */
   readonly variables = input<Record<string, unknown>>({});
+  readonly availableTransitions = input<Iterable<string> | undefined>(undefined);
+  readonly executeTransition = input<((key: string, input: Record<string, unknown> | null) => void | Promise<void>) | undefined>(undefined);
   readonly idPrefix = input('ui-view');
 
   protected readonly layout = signal<UiLayoutDocument | null>(null);
   protected readonly error = signal<string | null>(null);
   readonly #userReady = signal(false);
 
-  protected readonly context = computed(() => (this.#userReady() ? this.#contexts.create(this.variables() ?? {}, this.idPrefix()) : null));
+  protected readonly context = computed(() =>
+    this.#userReady()
+      ? this.#contexts.create(this.variables() ?? {}, this.idPrefix(), this.availableTransitions(), this.executeTransition())
+      : null,
+  );
 
   constructor() {
     void this.#contexts.ready().then(() => this.#userReady.set(true));

@@ -19,9 +19,9 @@
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
     "@microsoft/signalr": "^10.0.11",
+    "@middt/ui-core": "file:../ui-core",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0",
-    "@middt/ui-core": "file:../ui-core"
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
     "@angular/build": "^22.2.2",
@@ -31,6 +31,7 @@
     "ng-packagr": "^22.2.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
+    "vite": "^8.3.5",
     "vitest": "^5.0.0"
   }
 }

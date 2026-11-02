@@ -387,13 +387,17 @@ public sealed class SampleJsonWorkflowTests
 
         var partial = await PayAsync("INV-FTR-2026-0001", 5000);
         partial.Instance!.State.Should().Be("awaiting-payment");
-        partial.Instance.Data["lastPartialPayment"]!["amount"]!.GetValue<decimal>().Should().Be(5000);
+        partial.Instance.Data["partialPayment"]!.AsArray().Should().ContainSingle();
+        partial.Instance.Data["partialPayment"]![0]!["amount"]!.GetValue<decimal>().Should().Be(5000);
 
-        // 2. The due date passes (scheduled transition); a late full payment then starts the reconciliation.
+        // 2. The due date passes (scheduled transition); a late remaining payment then starts the reconciliation (overpayment is rejected).
         await host.RunJobsAsync(TimeSpan.FromDays(7));
         (await host.GetAsync(invoice.Id)).State.Should().Be("overdue");
 
-        var paid = await PayAsync("INV-FTR-2026-0001", 12500);
+        var overpaidEvent = () => PayAsync("INV-FTR-2026-0001", 12500);
+        await overpaidEvent.Should().ThrowAsync<WorkflowConflictException>("paying 12500 when remainingAmount is 7500 exceeds the remaining balance");
+
+        var paid = await PayAsync("INV-FTR-2026-0001", 7500);
         paid.Instance!.State.Should().Be("reconciling");
         paid.Instance.Status.Should().Be(WorkflowInstanceStatus.Active, "the ledger call runs in the background, not inside the lock");
         httpHandler.Requests.Should().BeEmpty();
@@ -408,8 +412,8 @@ public sealed class SampleJsonWorkflowTests
 
         var history = await host.HistoryAsync(invoice.Id);
         history.Select(h => (h.TransitionKey, h.Trigger)).Should().Equal(
-            ("start", "Start"), ("partial-payment", "Event"), ("mark-overdue", "Scheduled"),
-            ("late-payment-received", "Event"), ("$background", "Background"), ("reconciled", "Automatic"));
+            ("start", "Start"), ("payment-received", "Event"), ("mark-overdue", "Scheduled"),
+            ("late-payment-received", "Event"), ("late-payment-completed", "Automatic"), ("$background", "Background"), ("reconciled", "Automatic"));
 
         // 4. history: delta – snapshots for the first and the final row, patches in between; every version replays.
         var rows = await host.WithDbAsync(db => db.History.AsNoTracking().Where(h => h.InstanceId == invoice.Id).OrderBy(h => h.Id).ToListAsync(TestContext.Current.CancellationToken));
@@ -451,19 +455,65 @@ public sealed class SampleJsonWorkflowTests
         contactUpdated.Data["billingContact"]!.ToJsonString().Should().Be("""{"email":"finans@deniz.com","phone":"02125551111"}""");
         contactUpdated.Data["contactUpdatedBy"]!.GetValue<string>().Should().Be("alice@test.com");
 
-        // Without a message source the same steps are buttons for a manager.
+        // Without a message source the same steps are buttons for a manager; delete-payment is hidden before any payment exists.
         (await host.GetAsync(invoice.Id, Alice)).AvailableTransitions.Select(t => t.Key)
-            .Should().Contain(["record-partial-payment", "record-payment", "cancel-invoice"]).And.NotContain(["payment-received", "partial-payment"]);
-        await host.TransitionAsync(invoice.Id, "record-partial-payment", new { amount = 5000, reference = "EFT-0101" }, Alice);
-        var reconciling = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 12500, reference = "EFT-0102" }, Alice);
+            .Should().Contain(["record-payment", "cancel-invoice"]).And.NotContain(["payment-received", "delete-payment"]);
+        var afterFirstPartial = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 5000, reference = "EFT-0101" }, Alice);
+        afterFirstPartial.State.Should().Be("awaiting-payment");
+        afterFirstPartial.Data["paidAmount"]!.GetValue<decimal>().Should().Be(5000m);
+        afterFirstPartial.Data["remainingAmount"]!.GetValue<decimal>().Should().Be(7500m);
+
+        // A mistakenly entered partial payment can be deleted via 'delete-payment' (with dynamic enum options from partialPayment.reference).
+        // Even if two payments share the same reference ("EFT-0101"), every payment row appears distinctly in the dropdown.
+        var afterDuplicateRefPartial = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 2000, reference = "EFT-0101" }, Alice);
+        var afterWrongPartial = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 3000, reference = "EFT-WRONG" }, Alice);
+        afterWrongPartial.Data["paidAmount"]!.GetValue<decimal>().Should().Be(10000m);
+        afterWrongPartial.Data["remainingAmount"]!.GetValue<decimal>().Should().Be(2500m);
+        var deleteTransition = afterWrongPartial.AvailableTransitions.Single(t => t.Key == "delete-payment");
+        deleteTransition.InputSchema!["properties"]!["reference"]!["enum"]!.AsArray()
+            .Select(v => v!.GetValue<string>()).Should().Equal(
+                "#1 - 5000 ₺ (EFT-0101)",
+                "#2 - 2000 ₺ (EFT-0101)",
+                "#3 - 3000 ₺ (EFT-WRONG)");
+        deleteTransition.InputSchema["properties"]!["reference"]!["default"]!.GetValue<string>().Should().Be("#3 - 3000 ₺ (EFT-WRONG)");
+
+        var deleteNonExistent = () => host.TransitionAsync(invoice.Id, "delete-payment", new { reference = "EFT-NOPE" }, Alice);
+        await deleteNonExistent.Should().ThrowAsync<WorkflowConflictException>();
+
+        // Delete the 2nd payment (#2 - 2000 ₺) by its dropdown label, then delete the 3rd payment by its plain reference ("EFT-WRONG").
+        var afterDeleteSecond = await host.TransitionAsync(invoice.Id, "delete-payment", new { reference = "#2 - 2000 ₺ (EFT-0101)", reason = "Mükerrer kayıt silindi" }, Alice);
+        afterDeleteSecond.Data["paidAmount"]!.GetValue<decimal>().Should().Be(8000m);
+        afterDeleteSecond.Data["partialPayment"]!.AsArray().Should().HaveCount(2);
+
+        var afterDeleteWrong = await host.TransitionAsync(invoice.Id, "delete-payment", new { reference = "EFT-WRONG", reason = "Hatalı tutar girildi" }, Alice);
+        afterDeleteWrong.State.Should().Be("awaiting-payment");
+        afterDeleteWrong.Data["paidAmount"]!.GetValue<decimal>().Should().Be(5000m);
+        afterDeleteWrong.Data["remainingAmount"]!.GetValue<decimal>().Should().Be(7500m);
+        afterDeleteWrong.Data["payment"]!["reference"]!.GetValue<string>().Should().Be("EFT-0101");
+        afterDeleteWrong.Data["partialPayment"]!.AsArray().Should().ContainSingle();
+        afterDeleteWrong.Data["lastDeletedPayment"]!["reference"]!.GetValue<string>().Should().Be("EFT-WRONG");
+        afterDeleteWrong.Data["lastDeletedPayment"]!["deletedBy"]!.GetValue<string>().Should().Be("alice@test.com");
+
+        // Overpaying (e.g., 12500 or 8000 when remainingAmount is 7500) is rejected with WorkflowConflictException.
+        var overpayFull = () => host.TransitionAsync(invoice.Id, "record-payment", new { amount = 12500, reference = "EFT-OVER" }, Alice);
+        await overpayFull.Should().ThrowAsync<WorkflowConflictException>();
+        var overpayPartial = () => host.TransitionAsync(invoice.Id, "record-payment", new { amount = 8000, reference = "EFT-OVER2" }, Alice);
+        await overpayPartial.Should().ThrowAsync<WorkflowConflictException>();
+
+        var reconciling = await host.TransitionAsync(invoice.Id, "record-payment", new { amount = 7500, reference = "EFT-0102" }, Alice);
         reconciling.State.Should().Be("reconciling");
         reconciling.Status.Should().Be(WorkflowInstanceStatus.Active);
+        reconciling.Data["paidAmount"]!.GetValue<decimal>().Should().Be(12500m);
+        reconciling.Data["remainingAmount"]!.GetValue<decimal>().Should().Be(0m);
+        reconciling.Data["partialPayment"]!.AsArray().Select(p => p!["amount"]!.GetValue<decimal>()).Should().Equal(5000m, 7500m);
 
         await host.RunJobsAsync();
         (await host.GetAsync(invoice.Id)).State.Should().Be("paid");
 
         (await host.HistoryAsync(invoice.Id)).Select(h => h.TransitionKey).Should().Equal(
-            "start", "update-billing-contact", "update-billing-contact", "record-partial-payment", "record-payment", "$background", "reconciled");
+            "start", "update-billing-contact", "update-billing-contact",
+            "record-payment", "record-payment", "record-payment", "delete-payment", "delete-payment", "record-payment",
+            "payment-completed", "$background", "reconciled");
     }
 
     [Fact]

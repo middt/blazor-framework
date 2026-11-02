@@ -105,7 +105,7 @@ public static class WorkflowEndpoints
             return Results.Ok(BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1));
         }).WithName("GetWorkflowInstance");
 
-        group.MapPost("{workflow}/instances/{id:guid}/transitions/{transition}", async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonNode? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
+        group.MapMethods("{workflow}/instances/{id:guid}/transitions/{transition}", ["POST", "PATCH"], async (string workflow, Guid id, string transition, bool? async, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] JsonNode? input, WorkflowEngine engine, ClaimsPrincipal principal, HttpContext http, CancellationToken ct) =>
         {
             // A bare JSON array is a JSON Patch (input.format: jsonPatch); it travels as { "patch": [...] }.
             var request = input switch
@@ -122,7 +122,9 @@ public static class WorkflowEndpoints
             http.Response.Headers.ETag = ComputeInstanceETag(instance);
             var body = BaseResponseDataModel<WorkflowInstanceModel>.Success(instance, 1);
             return async == true ? Results.Accepted(null, body) : Results.Ok(body);
-        }).WithName("ExecuteWorkflowTransition");
+        })
+        .Accepts<JsonNode>("application/json", "application/json-patch+json")
+        .WithName("ExecuteWorkflowTransition");
 
         group.MapGet("{workflow}/instances/{id:guid}/view", async (string workflow, Guid id, WorkflowEngine engine, WorkflowViewRenderer renderer, ClaimsPrincipal principal, CancellationToken ct) =>
         {

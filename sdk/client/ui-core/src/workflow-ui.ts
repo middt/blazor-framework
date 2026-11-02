@@ -163,6 +163,10 @@ function targetSubType(definition: WorkflowDefinitionModel | null | undefined, t
 
 /** Button style of a transition by the sub type of its target state. */
 export function workflowTransitionStyle(definition: WorkflowDefinitionModel | null | undefined, transition: AvailableTransitionModel): WorkflowTransitionStyle {
+  if (transition.key.startsWith('delete-')) {
+    return 'danger';
+  }
+
   switch (targetSubType(definition, transition.target)) {
     case 'Success':
       return 'success';
@@ -178,6 +182,10 @@ export function workflowTransitionStyle(definition: WorkflowDefinitionModel | nu
 
 /** Material icon of a transition by the sub type of its target state. */
 export function workflowTransitionIcon(definition: WorkflowDefinitionModel | null | undefined, transition: AvailableTransitionModel): string {
+  if (transition.key.startsWith('delete-')) {
+    return 'delete';
+  }
+
   switch (targetSubType(definition, transition.target)) {
     case 'Success':
       return 'check_circle';

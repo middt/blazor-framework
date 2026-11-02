@@ -230,7 +230,10 @@
           <!-- Server driven UI: the state's JSON layout (stored by the UI module, editable at runtime). -->
           <div class="middt-wf-view" [attr.data-layout]="instance.layout">
             @for (key of layoutKeyId(); track key) {
-              <middt-layout-host [layoutKey]="instance.layout" [variables]="layoutVariables()" [idPrefix]="idPrefix() + '-layout'" />
+              <middt-layout-host [layoutKey]="instance.layout" [variables]="layoutVariables()"
+                                 [availableTransitions]="availableTransitionKeys()"
+                                 [executeTransition]="executeLayoutTransition"
+                                 [idPrefix]="idPrefix() + '-layout'" />
             }
           </div>
           <details class="middt-wf-raw">
